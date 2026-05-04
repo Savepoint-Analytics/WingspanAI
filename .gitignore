@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+
+data/
+*.parquet
+*.csv
+*.zip
+*.
+
+rulebook_pdfs/*
+
+mlruns/
+*.pkl
+*.joblib
