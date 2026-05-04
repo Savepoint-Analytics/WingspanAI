@@ -197,8 +197,12 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/rules/base_game.py`: setup, legal action generation, state transitions, round advancement, and scoring skeleton.
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent.
+- `src/wingspan_ai/agents/archetypes.py`: scripted strategy archetype bots for behavioural signatures.
+- `src/wingspan_ai/agents/monte_carlo.py`: first Monte Carlo rollout agent.
+- `src/wingspan_ai/simulation/tournament.py`: seeded tournament runner and matchup summaries.
 - `src/wingspan_ai/telemetry/events.py`: versioned simulation event schema and in-memory event sink.
 - `src/wingspan_ai/telemetry/api.py`: draft FastAPI event ingestion service.
+- `src/wingspan_ai/telemetry/postgres.py`: optional PostgreSQL event repository.
 - `src/wingspan_ai/simulation/runner.py`: single-game runner with event emission and outcomes.
 - `src/wingspan_ai/experiments/mlflow_tracking.py`: MLflow logging skeleton for simulation results.
 - `flows/simulation_batch.py`: Prefect-compatible seeded simulation batch flow.
@@ -206,9 +210,13 @@ This structure should make it easier to adapt the approach to other board games 
 - `notebooks/first_simulation_analysis.ipynb`: first Python notebook for tiny simulation-batch review.
 - `docs/architecture/project_package_structure.md`: recommended package and project folder structure.
 - `docs/architecture/simulator_architecture.md`: initial rules-engine and simulator architecture draft.
+- `docs/agents/baseline_agents.md`: current baseline and strategy archetype definitions.
+- `docs/agents/bayesian_belief_model_plan.md`: first Bayesian belief model plan.
 - `docs/events/simulation_event_taxonomy.md`: event envelope, current event names, and replay direction.
 - `docs/events/postgresql_event_table_design.md`: draft PostgreSQL tables and indexes for events/outcomes.
+- `docs/experiments/case_study_outline.md`: first case-study outline.
 - `docs/rules/game_content_schema.md`: summary of the machine-readable content schema.
+- `docs/rules/power_handler_registry.md`: power-handler registry metadata plan.
 - `docs/rules/wingspan_card_list_audit.md`: current workbook field audit and normalization needs.
 
 ## Project Context Files

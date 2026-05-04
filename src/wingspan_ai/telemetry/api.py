@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+from typing import Protocol
+
 from wingspan_ai.telemetry.events import EventBatch, SimulationEvent
+
+
+class EventRepository(Protocol):
+    def insert_events(self, events: list[SimulationEvent]) -> int:
+        """Persist a validated event batch."""
 
 EVENT_STORE: list[SimulationEvent] = []
 
 
-def create_app():
+def create_app(repository: EventRepository | None = None):
     """Create the FastAPI app.
 
     FastAPI is imported lazily so core simulator tests do not require service
@@ -30,6 +37,8 @@ def create_app():
 
     @app.post("/events")
     def ingest_events(batch: EventBatch) -> dict[str, int]:
+        if repository is not None:
+            return {"accepted": repository.insert_events(batch.events)}
         EVENT_STORE.extend(batch.events)
         return {"accepted": len(batch.events)}
 

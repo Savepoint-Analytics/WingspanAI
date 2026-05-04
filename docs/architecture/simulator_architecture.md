@@ -41,7 +41,7 @@ Base-game setup should be deterministic for a given seed:
 7. Select four round goals.
 8. Initialize round 1 with eight action cubes per player.
 
-Initial hand/food selection is not implemented yet. For v1, setup preserves the source materials needed for that rule while letting tests and random play exercise the core action loop.
+Initial hand/food selection now has a deterministic v1 approximation: each player keeps three birds, one bonus card, and two starting food tokens biased toward the kept birds' food costs. This is not yet a full agent-choice implementation of the physical setup rule, but it gives baseline agents a consistent resource starting point and records discarded birds/bonus cards.
 
 ## Legal Actions
 
@@ -77,7 +77,12 @@ The current final-score skeleton counts:
 - Cached food.
 - Tucked cards.
 
-Bonus-card scoring and round-goal scoring intentionally return zero until handlers are implemented. This keeps early tests honest: unsupported scoring cannot accidentally affect agent comparisons.
+The first scoring handlers are intentionally narrow:
+
+- Bonus cards: `Bird Feeder`, `Backyard Birder`, and `Bird Counter`.
+- Round goals: simple count-based handlers for birds or eggs in habitats.
+
+These handlers are useful for plumbing tests and early telemetry, but true competitive round-goal placement scoring still needs a multiplayer scoring pass.
 
 ## Bird Powers
 

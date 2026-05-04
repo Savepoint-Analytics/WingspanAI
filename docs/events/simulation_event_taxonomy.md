@@ -46,12 +46,15 @@ Every event uses a stable envelope:
 
 Events default to public or aggregate information. Any event that includes player hands, bonus cards, deck order, hidden scoring estimates, or training-only labels must set `private_state_included=true` and document why the payload is acceptable for the destination.
 
+## Public State Snapshots
+
+`SimulationResult.public_state_snapshots` stores JSON-serializable public observations keyed by `public_state_ref`. This gives analysis notebooks and future replay tools a stable handle for the public state around each emitted event without including private hands, bonus cards, or deck order.
+
 ## Replay Direction
 
-The first runner stores enough action-level history to inspect decisions, but exact replay will also need public-state snapshots, deck-order references, and stochastic resolution records once bird powers are implemented.
+The first runner stores enough action-level history and public snapshots to inspect decisions, but exact replay will also need deck-order references and stochastic resolution records once bird powers are implemented.
 
 Near-term replay additions:
 
-- Add public snapshot artifacts keyed by `public_state_ref`.
 - Add `state_hash_before` and `state_hash_after`.
 - Add explicit RNG draw records for birdfeeder rerolls, predator powers, deck draws, and stochastic power handlers.

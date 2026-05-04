@@ -1,18 +1,17 @@
-from pathlib import Path
 from unittest import TestCase
 
 from wingspan_ai.agents import GreedyBaselineAgent, RandomLegalAgent
-from wingspan_ai.content.loader import load_base_game_content_catalog
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import legal_actions_for_current_player, score_player
 from wingspan_ai.simulation import run_single_game
 from wingspan_ai.telemetry.events import EventName
+from fixtures import make_test_catalog
 
 
 class SimulationRunnerTests(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.catalog = load_base_game_content_catalog(Path("wingspan-card-list.xlsx"))
+        cls.catalog = make_test_catalog()
 
     def test_single_game_runner_completes_random_vs_greedy_game(self) -> None:
         result = run_single_game(
@@ -27,6 +26,7 @@ class SimulationRunnerTests(TestCase):
         self.assertEqual(result.outcome.terminal_reason, "game_over")
         self.assertEqual(result.outcome.turns_played, 52)
         self.assertEqual(len(result.outcome.scores), 2)
+        self.assertTrue(result.public_state_snapshots)
         self.assertEqual(result.events[0].event_name, EventName.SIMULATION_RUN_STARTED)
         self.assertEqual(result.events[-1].event_name, EventName.GAME_ENDED)
 

@@ -1,0 +1,5 @@
+fastapi>=0.115
+uvicorn>=0.34
+psycopg[binary]>=3.2
+prefect>=3.0
+mlflow>=2.18

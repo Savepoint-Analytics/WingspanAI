@@ -444,6 +444,33 @@ Keep FastAPI, Prefect, and MLflow integrations optional/lazy so the core simulat
 - [ ] Install or lock dev/service/orchestration/tracking dependencies for pytest, ruff, FastAPI, Prefect, and MLflow.
 - [ ] Implement first power handlers, bonus-card scoring handlers, and round-goal scoring handlers.
 
+## Update: 2026-05-04 - Strategy bots, tournament runner, rollout agent, and research docs added
+
+### What changed
+Added scripted strategy archetype agents in `src/wingspan_ai/agents/archetypes.py`, a first Monte Carlo rollout agent in `src/wingspan_ai/agents/monte_carlo.py`, and a seeded tournament runner with matchup summaries in `src/wingspan_ai/simulation/tournament.py`.
+
+Setup now applies a deterministic v1 initial hand/food selection approximation: three birds, one bonus card, and two food tokens biased toward kept bird costs. The runner now returns public state snapshots keyed by `public_state_ref`.
+
+Added a power-handler registry skeleton in `src/wingspan_ai/rules/power_registry.py` and documented it in `docs/rules/power_handler_registry.md`. Added first narrow scoring handlers for `Bird Feeder`, `Backyard Birder`, `Bird Counter`, and simple count-based habitat round goals.
+
+Added optional PostgreSQL event persistence in `src/wingspan_ai/telemetry/postgres.py`, plus `requirements-dev.txt` and `requirements-services.txt` to lock the intended dev/service dependency groups without installing them in this environment.
+
+Drafted `docs/agents/baseline_agents.md`, `docs/agents/bayesian_belief_model_plan.md`, and `docs/experiments/case_study_outline.md`.
+
+### Why it matters
+The project now has interpretable strategy variants, a rollout planning baseline, and a tournament layer that can produce matchup summaries. The Bayesian modelling direction and case-study narrative are documented, so future modelling work has a clear target instead of drifting toward generic RL.
+
+### Decision
+Keep these agents intentionally simple until rule fidelity improves. Archetype bots are for behavioural signatures; Monte Carlo is for value-estimation plumbing; tournament metrics are useful for smoke tests but should not be treated as strategic findings until powers, scoring, setup, and workbook content are fully restored and validated.
+
+### Follow-up tasks
+- [ ] Restore or relocate `wingspan-card-list.xlsx`; workbook-backed tests now skip when the root workbook is absent.
+- [ ] Replace deterministic setup approximation with agent-selectable initial hand/food choices.
+- [ ] Expand bonus-card and round-goal scoring beyond the first narrow handlers.
+- [ ] Implement high-volume base-game power handlers from the power registry.
+- [ ] Persist public state snapshots as artifacts alongside simulation events.
+- [ ] Add real PostgreSQL integration tests once a local service is available.
+
 ## Decision log
 
 | Date | Decision | Notes |
@@ -458,6 +485,7 @@ Keep FastAPI, Prefect, and MLflow integrations optional/lazy so the core simulat
 | 2026-05-03 | Store data/rule encoding recommendations in `docs/rules/data_and_rule_encoding_recommendations.md`. | Keeps detailed technical guidance close to the rule docs and keeps `PROJECT_CONTEXT.md` concise. |
 | 2026-05-03 | Keep first rules loop explicit and minimal: setup, legal actions, transitions, round advancement, score skeleton, and random legal agent. | Gives the project a tested simulator foundation before adding powers, telemetry, scoring handlers, single-game runners, or ML agents. |
 | 2026-05-04 | Keep external service/orchestration/tracking integrations optional around a testable core simulator. | Lets the runner, events, and agents stay usable before FastAPI, Prefect, MLflow, PostgreSQL, and dev tools are installed locally. |
+| 2026-05-04 | Treat archetype bots and Monte Carlo rollouts as experimental baselines, not strategic conclusions. | Current rule fidelity is enough for plumbing and behavioural signatures, but not enough for claims about optimal Wingspan play. |
 
 ## Things to avoid repeating
 

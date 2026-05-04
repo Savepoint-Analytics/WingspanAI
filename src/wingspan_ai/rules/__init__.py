@@ -3,6 +3,7 @@
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import (
     FinalScoreBreakdown,
+    apply_default_initial_selection,
     apply_action,
     egg_cost_for_slot,
     legal_actions_for_current_player,
@@ -10,11 +11,15 @@ from wingspan_ai.rules.base_game import (
     score_player,
     setup_base_game,
 )
+from wingspan_ai.rules.power_registry import POWER_HANDLER_REGISTRY, PowerHandlerMetadata
 
 __all__ = [
     "ActionType",
     "FinalScoreBreakdown",
     "LegalAction",
+    "POWER_HANDLER_REGISTRY",
+    "PowerHandlerMetadata",
+    "apply_default_initial_selection",
     "apply_action",
     "egg_cost_for_slot",
     "legal_actions_for_current_player",

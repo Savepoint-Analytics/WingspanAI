@@ -47,6 +47,7 @@ class SimulationResult:
     state: GameState
     outcome: GameOutcome
     events: list[SimulationEvent]
+    public_state_snapshots: dict[str, dict]
 
 
 def run_single_game(
@@ -76,6 +77,8 @@ def run_single_game(
         player.agent_id = agent.agent_id
 
     sink = InMemoryEventSink()
+    public_state_snapshots: dict[str, dict] = {}
+    _record_public_snapshot(public_state_snapshots, state)
     _emit_run_started(sink, state, resolved_run_id, agents)
     _emit_game_started(sink, state, resolved_run_id)
     _emit_round_started(sink, state, resolved_run_id)
@@ -92,6 +95,7 @@ def run_single_game(
         active_player = state.active_player
         agent = agents[state.round_state.active_player_index]
         legal_actions = legal_actions_for_current_player(state)
+        _record_public_snapshot(public_state_snapshots, state)
         _emit_turn_started(sink, state, resolved_run_id)
         _emit_legal_actions(sink, state, resolved_run_id, legal_actions)
 
@@ -106,6 +110,7 @@ def run_single_game(
         _emit_action_selected(sink, state, resolved_run_id, active_player.agent_id, action)
         previous_round = state.round_state.round_number
         state = apply_action(state, action)
+        _record_public_snapshot(public_state_snapshots, state)
         turns_played += 1
         _emit_action_resolved(sink, state, resolved_run_id, active_player.player_id, action)
 
@@ -118,7 +123,12 @@ def run_single_game(
 
     outcome = _build_outcome(state, resolved_run_id, random_seed, turns_played, terminal_reason)
     _emit_game_ended(sink, state, resolved_run_id, outcome)
-    return SimulationResult(state=state, outcome=outcome, events=sink.events)
+    return SimulationResult(
+        state=state,
+        outcome=outcome,
+        events=sink.events,
+        public_state_snapshots=public_state_snapshots,
+    )
 
 
 def _build_outcome(
@@ -160,9 +170,17 @@ def _base_event(
         round_number=state.round_state.round_number,
         turn_number=state.round_state.turn_number,
         random_seed=state.random_seed,
-        public_state_ref=f"{state.game_id}:turn:{state.round_state.turn_number}",
+        public_state_ref=_public_state_ref(state),
         payload=payload,
     )
+
+
+def _public_state_ref(state: GameState) -> str:
+    return f"{state.game_id}:turn:{state.round_state.turn_number}"
+
+
+def _record_public_snapshot(snapshots: dict[str, dict], state: GameState) -> None:
+    snapshots[_public_state_ref(state)] = to_public_state(state).model_dump(mode="json")
 
 
 def _emit_run_started(

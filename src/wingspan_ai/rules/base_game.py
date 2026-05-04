@@ -27,6 +27,8 @@ from wingspan_ai.state.models import (
 
 STARTING_HAND_SIZE = 5
 STARTING_BONUS_CARD_COUNT = 2
+STARTING_SELECTED_BIRD_COUNT = 3
+BIRD_FOOD_SELECTION_TOTAL = 5
 BIRD_TRAY_SIZE = 3
 BIRDFEEDER_DICE_COUNT = 5
 
@@ -61,6 +63,7 @@ def setup_base_game(
     player_ids: list[str],
     random_seed: int,
     game_id: str = "game_1",
+    apply_initial_selection: bool = True,
 ) -> GameState:
     """Create a deterministic base-game state from a content catalog."""
 
@@ -76,10 +79,17 @@ def setup_base_game(
     rng.shuffle(round_goals)
 
     players: list[PlayerState] = []
+    bird_discard: list = []
+    bonus_discard: list = []
     for player_id in player_ids:
         hand = _draw_many(bird_deck, STARTING_HAND_SIZE)
         bonus_cards = _draw_many(bonus_deck, STARTING_BONUS_CARD_COUNT)
-        players.append(PlayerState(player_id=player_id, hand=hand, bonus_cards=bonus_cards))
+        player = PlayerState(player_id=player_id, hand=hand, bonus_cards=bonus_cards)
+        if apply_initial_selection:
+            discarded_birds, discarded_bonus_cards = apply_default_initial_selection(player)
+            bird_discard.extend(discarded_birds)
+            bonus_discard.extend(discarded_bonus_cards)
+        players.append(player)
 
     bird_tray = _draw_many(bird_deck, BIRD_TRAY_SIZE)
     ruleset = (
@@ -95,12 +105,47 @@ def setup_base_game(
         ),
         random_seed=random_seed,
         players=players,
-        decks=DeckState(bird_deck=bird_deck, bonus_deck=bonus_deck),
+        decks=DeckState(
+            bird_deck=bird_deck,
+            bird_discard=bird_discard,
+            bonus_deck=bonus_deck,
+            bonus_discard=bonus_discard,
+        ),
         bird_tray=bird_tray,
         birdfeeder=BirdfeederState(dice=_roll_birdfeeder(rng)),
         round_goals=round_goals[:4],
         round_state=RoundState(),
     )
+
+
+def apply_default_initial_selection(player: PlayerState) -> tuple[list, list]:
+    """Apply a deterministic v1 approximation of initial hand/food selection.
+
+    The physical game asks each player to keep any combination of bird cards and
+    starting food tokens totaling five, then keep one of two bonus cards. This
+    placeholder keeps three birds, one bonus card, and two food tokens biased
+    toward the kept birds' costs.
+    """
+
+    kept_hand = sorted(
+        player.hand,
+        key=lambda card: (card.food_cost.minimum_total, -card.victory_points, card.common_name),
+    )[:STARTING_SELECTED_BIRD_COUNT]
+    discarded_birds = [card for card in player.hand if card not in kept_hand]
+    player.hand = kept_hand
+
+    kept_bonus_cards = player.bonus_cards[:1]
+    discarded_bonus_cards = player.bonus_cards[1:]
+    player.bonus_cards = kept_bonus_cards
+
+    for food_type in BASE_FOOD_TYPES:
+        player.food_tokens[food_type] = 0
+
+    selected_food_count = BIRD_FOOD_SELECTION_TOTAL - len(player.hand)
+    for food_type in _preferred_starting_food(kept_hand)[:selected_food_count]:
+        player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
+
+    return discarded_birds, discarded_bonus_cards
 
 
 def legal_actions_for_current_player(state: GameState) -> list[LegalAction]:
@@ -166,12 +211,59 @@ def score_player(state: GameState, player_id: str) -> FinalScoreBreakdown:
     return FinalScoreBreakdown(
         player_id=player_id,
         bird_points=bird_points,
-        bonus_points=0,
-        round_goal_points=0,
+        bonus_points=_score_bonus_cards(player),
+        round_goal_points=_score_round_goals(state, player),
         egg_points=egg_points,
         cached_food_points=cached_food_points,
         tucked_card_points=tucked_card_points,
     )
+
+
+def _score_bonus_cards(player: PlayerState) -> int:
+    points = 0
+    for bonus_card in player.bonus_cards:
+        bonus_name = bonus_card.name.split("[", maxsplit=1)[0].strip()
+        played_slots = player.played_birds
+        if bonus_name == "Bird Feeder":
+            count = sum(
+                1 for slot in played_slots if FoodType.SEED in slot.card.food_cost.fixed
+            )
+            points += 7 if count >= 8 else 3 if count >= 5 else 0
+        elif bonus_name == "Backyard Birder":
+            count = sum(1 for slot in played_slots if slot.card.victory_points < 4)
+            points += 6 if count >= 7 else 3 if count >= 5 else 0
+        elif bonus_name == "Bird Counter":
+            points += 2 * sum(1 for slot in played_slots if slot.card.flocking)
+    return points
+
+
+def _score_round_goals(state: GameState, player: PlayerState) -> int:
+    points = 0
+    for goal in state.round_goals:
+        count = _count_round_goal_items(goal.name.lower(), player)
+        if count <= 0 or not goal.scoring_values:
+            continue
+        scoring_key = min(count, max(goal.scoring_values))
+        points += goal.scoring_values.get(scoring_key, 0)
+    return points
+
+
+def _count_round_goal_items(goal_name: str, player: PlayerState) -> int:
+    if "[bird]" in goal_name and "[forest]" in goal_name:
+        return len(player.habitats[Habitat.FOREST])
+    if "[bird]" in goal_name and "[grassland]" in goal_name:
+        return len(player.habitats[Habitat.GRASSLAND])
+    if "[bird]" in goal_name and "[wetland]" in goal_name:
+        return len(player.habitats[Habitat.WETLAND])
+    if "[egg]" in goal_name and "forest" in goal_name:
+        return sum(slot.eggs for slot in player.habitats[Habitat.FOREST])
+    if "[egg]" in goal_name and "grassland" in goal_name:
+        return sum(slot.eggs for slot in player.habitats[Habitat.GRASSLAND])
+    if "[egg]" in goal_name and "wetland" in goal_name:
+        return sum(slot.eggs for slot in player.habitats[Habitat.WETLAND])
+    if "[bird]" in goal_name:
+        return len(player.played_birds)
+    return 0
 
 
 def _legal_play_bird_actions(player: PlayerState) -> list[LegalAction]:
@@ -355,6 +447,19 @@ def egg_cost_for_slot(slot_index: int) -> int:
     if slot_index <= 2:
         return 1
     return 2
+
+
+def _preferred_starting_food(hand: list) -> list[FoodType]:
+    preferred: list[FoodType] = []
+    for card in hand:
+        for food_type, count in card.food_cost.fixed.items():
+            if food_type in BASE_FOOD_TYPES:
+                preferred.extend([food_type] * count)
+
+    for food_type in BASE_FOOD_TYPES:
+        if food_type not in preferred:
+            preferred.append(food_type)
+    return preferred
 
 
 def _get_player(state: GameState, player_id: str) -> PlayerState:
