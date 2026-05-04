@@ -10,9 +10,16 @@ data/
 *.xlsx
 
 rulebook_pdfs/*
+*.pdf
 
 mlruns/
 *.pkl
 *.joblib
 
 *.DS_Store
+# Large local assets
+
+rulebook_pdfs/
+
+*.pdf
+
