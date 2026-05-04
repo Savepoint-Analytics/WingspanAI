@@ -7,7 +7,7 @@ data/
 *.parquet
 *.csv
 *.zip
-*.
+*.xlsx
 
 rulebook_pdfs/*
 
