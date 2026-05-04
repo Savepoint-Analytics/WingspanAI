@@ -1,0 +1,61 @@
+from pathlib import Path
+from unittest import TestCase
+
+from wingspan_ai.agents import GreedyBaselineAgent, RandomLegalAgent
+from wingspan_ai.content.loader import load_base_game_content_catalog
+from wingspan_ai.rules.actions import ActionType, LegalAction
+from wingspan_ai.rules.base_game import legal_actions_for_current_player, score_player
+from wingspan_ai.simulation import run_single_game
+from wingspan_ai.telemetry.events import EventName
+
+
+class SimulationRunnerTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = load_base_game_content_catalog(Path("wingspan-card-list.xlsx"))
+
+    def test_single_game_runner_completes_random_vs_greedy_game(self) -> None:
+        result = run_single_game(
+            self.catalog,
+            [
+                RandomLegalAgent(agent_id="random_legal_p1", random_seed=1),
+                GreedyBaselineAgent(agent_id="greedy_p2"),
+            ],
+            random_seed=1,
+        )
+
+        self.assertEqual(result.outcome.terminal_reason, "game_over")
+        self.assertEqual(result.outcome.turns_played, 52)
+        self.assertEqual(len(result.outcome.scores), 2)
+        self.assertEqual(result.events[0].event_name, EventName.SIMULATION_RUN_STARTED)
+        self.assertEqual(result.events[-1].event_name, EventName.GAME_ENDED)
+
+    def test_greedy_agent_prefers_immediate_score_gain(self) -> None:
+        state = run_single_game(
+            self.catalog,
+            [RandomLegalAgent(random_seed=3), RandomLegalAgent(random_seed=4)],
+            random_seed=3,
+            max_turns=1,
+        ).state
+        player = state.active_player
+        playable_card = next(card for card in self.catalog.birds if card.habitats)
+        player.hand = [playable_card]
+        for food_type in player.food_tokens:
+            player.food_tokens[food_type] = 3
+
+        legal_actions = legal_actions_for_current_player(state)
+        action = GreedyBaselineAgent().select_action(state, legal_actions)
+
+        self.assertEqual(action.action_type, ActionType.PLAY_BIRD)
+        next_score = score_player(state, player.player_id).total
+        self.assertGreaterEqual(playable_card.victory_points, next_score)
+
+    def test_runner_rejects_illegal_agent_action(self) -> None:
+        class BadAgent:
+            agent_id = "bad_agent"
+
+            def choose_action(self, _state):
+                return LegalAction(action_type=ActionType.LAY_EGGS, player_id="wrong_player")
+
+        with self.assertRaises(ValueError):
+            run_single_game(self.catalog, [BadAgent()], random_seed=1, max_turns=1)

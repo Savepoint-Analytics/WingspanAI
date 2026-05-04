@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "wingspan-ai"
+version = "0.1.0"
+description = "Applied ML research environment for Wingspan simulation, telemetry, and AI-player experimentation."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openpyxl>=3.1",
+    "pydantic>=2.10",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.115",
+    "uvicorn>=0.34",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.8",
+]
+orchestration = [
+    "prefect>=3.0",
+]
+tracking = [
+    "mlflow>=2.18",
+]
+
+[project.scripts]
+wingspan-audit-workbook = "wingspan_ai.content.workbook_audit:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wingspan_ai"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
