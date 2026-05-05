@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,8 +23,8 @@ from wingspan_ai.content.schemas import (
     PowerColor,
     PowerImplementationStatus,
     RoundGoal,
-    RulesModule,
     RulesetMetadata,
+    RulesModule,
 )
 from wingspan_ai.content.workbook_audit import SET_TO_CONTENT_PACK, is_blank, read_sheet_rows
 
@@ -58,6 +59,8 @@ BEAK_DIRECTION_MAP = {
     "LL": BeakDirection.LEFT_LEFT,
 }
 
+DEFAULT_WORKBOOK_PATH = Path("data/raw/wingspan-card-list.xlsx")
+
 
 @dataclass(frozen=True)
 class ContentLoadIssue:
@@ -86,7 +89,7 @@ class ContentLoadError(ValueError):
 
 
 def load_content_catalog(
-    workbook_path: str | Path = "wingspan-card-list.xlsx",
+    workbook_path: str | Path | None = None,
     *,
     content_packs: set[ContentPack] | None = None,
     include_default_ruleset: bool = True,
@@ -99,7 +102,7 @@ def load_content_catalog(
         include_default_ruleset: Include a ruleset matching the requested content packs.
     """
 
-    path = Path(workbook_path)
+    path = resolve_workbook_path(workbook_path)
     issues: list[ContentLoadIssue] = []
     birds = _load_birds(path, content_packs, issues)
     bonus_cards = _load_bonus_cards(path, content_packs, issues)
@@ -134,11 +137,22 @@ def load_content_catalog(
 
 
 def load_base_game_content_catalog(
-    workbook_path: str | Path = "wingspan-card-list.xlsx",
+    workbook_path: str | Path | None = None,
 ) -> ContentCatalog:
     """Load only core/base-game content from the source workbook."""
 
     return load_content_catalog(workbook_path, content_packs={ContentPack.CORE})
+
+
+def resolve_workbook_path(workbook_path: str | Path | None = None) -> Path:
+    """Resolve the workbook from an explicit path, env var, or project default."""
+
+    if workbook_path is not None:
+        return Path(workbook_path)
+    env_path = os.environ.get("WINGSPAN_CARD_WORKBOOK")
+    if env_path:
+        return Path(env_path)
+    return DEFAULT_WORKBOOK_PATH
 
 
 def _load_birds(

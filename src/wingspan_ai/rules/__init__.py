@@ -3,11 +3,16 @@
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import (
     FinalScoreBreakdown,
-    apply_default_initial_selection,
+    InitialSelection,
     apply_action,
+    apply_default_initial_selection,
+    apply_initial_selection_choice,
+    choose_default_initial_selection,
     egg_cost_for_slot,
     legal_actions_for_current_player,
     legal_actions_for_player,
+    resolve_habitat_powers,
+    resolve_played_bird_power,
     score_player,
     setup_base_game,
 )
@@ -16,14 +21,19 @@ from wingspan_ai.rules.power_registry import POWER_HANDLER_REGISTRY, PowerHandle
 __all__ = [
     "ActionType",
     "FinalScoreBreakdown",
+    "InitialSelection",
     "LegalAction",
     "POWER_HANDLER_REGISTRY",
     "PowerHandlerMetadata",
     "apply_default_initial_selection",
+    "apply_initial_selection_choice",
     "apply_action",
+    "choose_default_initial_selection",
     "egg_cost_for_slot",
     "legal_actions_for_current_player",
     "legal_actions_for_player",
+    "resolve_habitat_powers",
+    "resolve_played_bird_power",
     "score_player",
     "setup_base_game",
 ]

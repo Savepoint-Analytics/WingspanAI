@@ -42,8 +42,7 @@ WingspanAI/
 ## Near-Term Implementation Order
 
 1. Finish content audit and source normalization mappings.
-2. Add a base content loader that converts `wingspan-card-list.xlsx` into typed `BirdCard`, `BonusCard`, and `RoundGoal` objects.
+2. Add a base content loader that converts `data/raw/wingspan-card-list.xlsx` into typed `BirdCard`, `BonusCard`, and `RoundGoal` objects.
 3. Add base-game state models under `state/`.
 4. Add legal action and transition skeletons under `rules/`.
 5. Add random legal agent and single-game runner once legal actions exist.
-

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import random
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import (
@@ -12,13 +13,13 @@ from wingspan_ai.content.schemas import (
     FoodCost,
     FoodType,
     Habitat,
-    RulesModule,
     RulesetMetadata,
+    RulesModule,
 )
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.state.models import (
-    BirdSlot,
     BirdfeederState,
+    BirdSlot,
     DeckState,
     GameState,
     PlayerState,
@@ -31,6 +32,16 @@ STARTING_SELECTED_BIRD_COUNT = 3
 BIRD_FOOD_SELECTION_TOTAL = 5
 BIRD_TRAY_SIZE = 3
 BIRDFEEDER_DICE_COUNT = 5
+
+
+@dataclass(frozen=True)
+class InitialSelection:
+    """Player setup choice for kept cards and starting food."""
+
+    player_id: str
+    kept_bird_names: list[str]
+    kept_bonus_card_names: list[str]
+    starting_food: list[FoodType] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -64,6 +75,7 @@ def setup_base_game(
     random_seed: int,
     game_id: str = "game_1",
     apply_initial_selection: bool = True,
+    initial_selection_strategy: Callable[[PlayerState], InitialSelection] | None = None,
 ) -> GameState:
     """Create a deterministic base-game state from a content catalog."""
 
@@ -86,7 +98,14 @@ def setup_base_game(
         bonus_cards = _draw_many(bonus_deck, STARTING_BONUS_CARD_COUNT)
         player = PlayerState(player_id=player_id, hand=hand, bonus_cards=bonus_cards)
         if apply_initial_selection:
-            discarded_birds, discarded_bonus_cards = apply_default_initial_selection(player)
+            selection = (
+                initial_selection_strategy(player)
+                if initial_selection_strategy is not None
+                else choose_default_initial_selection(player)
+            )
+            discarded_birds, discarded_bonus_cards = apply_initial_selection_choice(
+                player, selection
+            )
             bird_discard.extend(discarded_birds)
             bonus_discard.extend(discarded_bonus_cards)
         players.append(player)
@@ -118,33 +137,67 @@ def setup_base_game(
     )
 
 
-def apply_default_initial_selection(player: PlayerState) -> tuple[list, list]:
-    """Apply a deterministic v1 approximation of initial hand/food selection.
+def choose_default_initial_selection(player: PlayerState) -> InitialSelection:
+    """Choose a deterministic v1 approximation of initial hand/food selection.
 
     The physical game asks each player to keep any combination of bird cards and
     starting food tokens totaling five, then keep one of two bonus cards. This
-    placeholder keeps three birds, one bonus card, and two food tokens biased
-    toward the kept birds' costs.
+    placeholder chooses three birds, one bonus card, and two food tokens biased
+    toward the chosen birds' costs.
     """
 
     kept_hand = sorted(
         player.hand,
         key=lambda card: (card.food_cost.minimum_total, -card.victory_points, card.common_name),
     )[:STARTING_SELECTED_BIRD_COUNT]
-    discarded_birds = [card for card in player.hand if card not in kept_hand]
-    player.hand = kept_hand
+    selected_food_count = BIRD_FOOD_SELECTION_TOTAL - len(kept_hand)
+    return InitialSelection(
+        player_id=player.player_id,
+        kept_bird_names=[card.common_name for card in kept_hand],
+        kept_bonus_card_names=[card.name for card in player.bonus_cards[:1]],
+        starting_food=_preferred_starting_food(kept_hand)[:selected_food_count],
+    )
 
-    kept_bonus_cards = player.bonus_cards[:1]
-    discarded_bonus_cards = player.bonus_cards[1:]
-    player.bonus_cards = kept_bonus_cards
+
+def apply_default_initial_selection(player: PlayerState) -> tuple[list, list]:
+    """Apply the default v1 setup choice to a player."""
+
+    return apply_initial_selection_choice(player, choose_default_initial_selection(player))
+
+
+def apply_initial_selection_choice(
+    player: PlayerState,
+    selection: InitialSelection,
+) -> tuple[list, list]:
+    """Apply one player's explicit setup choice and return discarded cards."""
+
+    if selection.player_id != player.player_id:
+        raise ValueError("initial selection player_id does not match player")
+    if len(selection.kept_bird_names) + len(selection.starting_food) != BIRD_FOOD_SELECTION_TOTAL:
+        raise ValueError("kept birds plus starting food must total five")
+    if len(selection.kept_bonus_card_names) != 1:
+        raise ValueError("initial selection must keep exactly one bonus card")
+
+    hand_by_name = {card.common_name: card for card in player.hand}
+    bonus_by_name = {card.name: card for card in player.bonus_cards}
+    kept_hand = [_require_card(hand_by_name, name, "bird") for name in selection.kept_bird_names]
+    kept_bonus_cards = [
+        _require_card(bonus_by_name, name, "bonus") for name in selection.kept_bonus_card_names
+    ]
+    discarded_birds = [
+        card for card in player.hand if card.common_name not in selection.kept_bird_names
+    ]
+    discarded_bonus_cards = [
+        card for card in player.bonus_cards if card.name not in selection.kept_bonus_card_names
+    ]
 
     for food_type in BASE_FOOD_TYPES:
         player.food_tokens[food_type] = 0
-
-    selected_food_count = BIRD_FOOD_SELECTION_TOTAL - len(player.hand)
-    for food_type in _preferred_starting_food(kept_hand)[:selected_food_count]:
+    for food_type in selection.starting_food:
         player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
 
+    player.hand = kept_hand
+    player.bonus_cards = kept_bonus_cards
     return discarded_birds, discarded_bonus_cards
 
 
@@ -350,6 +403,7 @@ def _apply_play_bird(player: PlayerState, action: LegalAction) -> None:
     _spend_eggs(player, egg_cost_for_slot(len(player.habitats[action.habitat])))
     player.hand.pop(hand_index)
     player.habitats[action.habitat].append(BirdSlot(card=card))
+    resolve_played_bird_power(player, card)
 
 
 def _apply_gain_food(player: PlayerState, birdfeeder: BirdfeederState, action: LegalAction) -> None:
@@ -358,6 +412,7 @@ def _apply_gain_food(player: PlayerState, birdfeeder: BirdfeederState, action: L
     die_index = birdfeeder.dice.index(action.food_type)
     birdfeeder.dice.pop(die_index)
     player.food_tokens[action.food_type] = player.food_tokens.get(action.food_type, 0) + 1
+    resolve_habitat_powers(player, Habitat.FOREST)
 
 
 def _apply_lay_eggs(player: PlayerState, action: LegalAction) -> None:
@@ -369,6 +424,7 @@ def _apply_lay_eggs(player: PlayerState, action: LegalAction) -> None:
             added_eggs = min(slot.available_egg_capacity, eggs_to_place)
             slot.eggs += added_eggs
             eggs_to_place -= added_eggs
+    resolve_habitat_powers(player, Habitat.GRASSLAND)
 
 
 def _apply_draw_cards(player: PlayerState, state: GameState, action: LegalAction) -> None:
@@ -382,6 +438,46 @@ def _apply_draw_cards(player: PlayerState, state: GameState, action: LegalAction
     player.hand.append(state.bird_tray.pop(action.tray_index))
     if state.decks.bird_deck:
         state.bird_tray.insert(action.tray_index, state.decks.bird_deck.pop(0))
+    resolve_habitat_powers(player, Habitat.WETLAND, state)
+
+
+def resolve_played_bird_power(player: PlayerState, card) -> None:
+    """Resolve a narrow set of implemented white powers when a bird is played."""
+
+    if card.power.color.value != "white":
+        return
+    _resolve_power_text(player, card.power.text)
+
+
+def resolve_habitat_powers(
+    player: PlayerState,
+    habitat: Habitat,
+    state: GameState | None = None,
+) -> None:
+    """Resolve a narrow set of implemented brown powers in habitat order."""
+
+    for slot in player.habitats[habitat]:
+        if slot.card.power.color.value != "brown":
+            continue
+        _resolve_power_text(player, slot.card.power.text, state)
+
+
+def _resolve_power_text(
+    player: PlayerState,
+    power_text: str | None,
+    state: GameState | None = None,
+) -> None:
+    if not power_text:
+        return
+    lowered = power_text.lower()
+    for food_type in BASE_FOOD_TYPES:
+        token = f"gain 1 [{_food_power_token(food_type)}]"
+        if token in lowered:
+            player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
+            return
+
+    if "draw 1 [card]" in lowered and state is not None and state.decks.bird_deck:
+        player.hand.append(state.decks.bird_deck.pop(0))
 
 
 def _advance_turn(state: GameState) -> None:
@@ -460,6 +556,19 @@ def _preferred_starting_food(hand: list) -> list[FoodType]:
         if food_type not in preferred:
             preferred.append(food_type)
     return preferred
+
+
+def _food_power_token(food_type: FoodType) -> str:
+    if food_type == FoodType.INVERTEBRATE:
+        return "invertebrate"
+    return food_type.value
+
+
+def _require_card(cards_by_name: dict, name: str, card_type: str):
+    try:
+        return cards_by_name[name]
+    except KeyError as error:
+        raise ValueError(f"unknown {card_type} card in initial selection: {name}") from error
 
 
 def _get_player(state: GameState, player_id: str) -> PlayerState:

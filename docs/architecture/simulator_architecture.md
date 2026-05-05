@@ -12,7 +12,7 @@ This document describes the intended rules-engine shape. Detailed power handlers
 
 Implemented modules:
 
-- `src/wingspan_ai/content/loader.py`: translates `wingspan-card-list.xlsx` into typed `ContentCatalog` objects.
+- `src/wingspan_ai/content/loader.py`: translates `data/raw/wingspan-card-list.xlsx` into typed `ContentCatalog` objects.
 - `src/wingspan_ai/state/models.py`: represents full game state, player state, public state, private state, decks, tray, birdfeeder, habitats, and round state.
 - `src/wingspan_ai/rules/actions.py`: defines concrete legal action objects.
 - `src/wingspan_ai/rules/base_game.py`: handles base setup, legal actions, state transitions, round advancement, and scoring skeleton.
@@ -41,7 +41,7 @@ Base-game setup should be deterministic for a given seed:
 7. Select four round goals.
 8. Initialize round 1 with eight action cubes per player.
 
-Initial hand/food selection now has a deterministic v1 approximation: each player keeps three birds, one bonus card, and two starting food tokens biased toward the kept birds' food costs. This is not yet a full agent-choice implementation of the physical setup rule, but it gives baseline agents a consistent resource starting point and records discarded birds/bonus cards.
+Initial hand/food selection now uses an explicit `InitialSelection` object. The runner asks agents for `choose_initial_selection(player)` when available, otherwise it falls back to a deterministic v1 chooser: keep three birds, keep one bonus card, and choose two starting food tokens biased toward kept bird costs. This gives baseline agents a consistent resource starting point while leaving a clean hook for stronger setup policies.
 
 ## Legal Actions
 
@@ -83,6 +83,16 @@ The first scoring handlers are intentionally narrow:
 - Round goals: simple count-based handlers for birds or eggs in habitats.
 
 These handlers are useful for plumbing tests and early telemetry, but true competitive round-goal placement scoring still needs a multiplayer scoring pass.
+
+## Power Handlers
+
+The first executable power path is deliberately small:
+
+- White powers are checked after playing a bird.
+- Brown powers are checked after activating the matching habitat action.
+- Implemented text templates currently cover simple `Gain 1 [food]` powers and simple `Draw 1 [card]` powers.
+
+This is a scaffold, not a full parser. High-volume powers should be mapped to registry handler keys before strategic experiments treat them as faithful.
 
 ## Bird Powers
 

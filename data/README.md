@@ -8,3 +8,6 @@ Machine-readable source data and generated content artifacts.
 
 Keep raw source files unchanged. Write normalization logic in `src/wingspan_ai/content/`.
 
+Current raw source:
+
+- `raw/wingspan-card-list.xlsx`: canonical local workbook path used by loaders, audits, tests, and smoke flows. Override with `WINGSPAN_CARD_WORKBOOK` when needed.

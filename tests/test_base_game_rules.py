@@ -1,16 +1,28 @@
 from unittest import TestCase
 
-from wingspan_ai.content.schemas import FoodType, Habitat
+from wingspan_ai.content import make_sample_catalog
+from wingspan_ai.content.schemas import (
+    FoodType,
+    Habitat,
+    Power,
+    PowerColor,
+    PowerImplementationStatus,
+)
 from wingspan_ai.rules.actions import ActionType, LegalAction
-from wingspan_ai.rules.base_game import apply_action, score_player, setup_base_game
-from wingspan_ai.state.models import BirdSlot, BirdfeederState
-from fixtures import make_test_catalog
+from wingspan_ai.rules.base_game import (
+    InitialSelection,
+    apply_action,
+    apply_initial_selection_choice,
+    score_player,
+    setup_base_game,
+)
+from wingspan_ai.state.models import BirdfeederState, BirdSlot
 
 
 class BaseGameRulesTests(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.catalog = make_test_catalog()
+        cls.catalog = make_sample_catalog()
 
     def setUp(self) -> None:
         self.state = setup_base_game(
@@ -22,12 +34,38 @@ class BaseGameRulesTests(TestCase):
     def test_setup_deals_private_cards_and_public_markets(self) -> None:
         self.assertEqual([len(player.hand) for player in self.state.players], [3, 3])
         self.assertEqual([len(player.bonus_cards) for player in self.state.players], [1, 1])
-        self.assertEqual([sum(player.food_tokens.values()) for player in self.state.players], [2, 2])
+        self.assertEqual(
+            [sum(player.food_tokens.values()) for player in self.state.players],
+            [2, 2],
+        )
         self.assertEqual(len(self.state.bird_tray), 3)
         self.assertEqual(len(self.state.birdfeeder.dice), 5)
         self.assertEqual(len(self.state.round_goals), 4)
         self.assertEqual(len(self.state.decks.bird_discard), 4)
         self.assertEqual(len(self.state.decks.bonus_discard), 2)
+
+    def test_initial_selection_can_be_applied_explicitly(self) -> None:
+        state = setup_base_game(
+            self.catalog,
+            player_ids=["p1"],
+            random_seed=12,
+            apply_initial_selection=False,
+        )
+        player = state.players[0]
+        selection = InitialSelection(
+            player_id="p1",
+            kept_bird_names=[card.common_name for card in player.hand[:2]],
+            kept_bonus_card_names=[player.bonus_cards[0].name],
+            starting_food=[FoodType.SEED, FoodType.FISH, FoodType.FRUIT],
+        )
+
+        discarded_birds, discarded_bonus = apply_initial_selection_choice(player, selection)
+
+        self.assertEqual(len(player.hand), 2)
+        self.assertEqual(len(player.bonus_cards), 1)
+        self.assertEqual(sum(player.food_tokens.values()), 3)
+        self.assertEqual(len(discarded_birds), 3)
+        self.assertEqual(len(discarded_bonus), 1)
 
     def test_playing_a_bird_spends_food_and_moves_card_to_habitat(self) -> None:
         card = self.catalog.birds[0]
@@ -145,7 +183,9 @@ class BaseGameRulesTests(TestCase):
         self.assertEqual(score.bonus_points, 3)
 
     def test_first_round_goal_scoring_handler_counts_birds_in_habitat(self) -> None:
-        forest_goal = next(goal for goal in self.catalog.round_goals if goal.name == "[bird] in [forest]")
+        forest_goal = next(
+            goal for goal in self.catalog.round_goals if goal.name == "[bird] in [forest]"
+        )
         forest_bird = next(card for card in self.catalog.birds if Habitat.FOREST in card.habitats)
         self.state.round_goals = [forest_goal]
         self.state.players[0].bonus_cards = []
@@ -154,3 +194,26 @@ class BaseGameRulesTests(TestCase):
         score = score_player(self.state, "p1")
 
         self.assertEqual(score.round_goal_points, forest_goal.scoring_values[1])
+
+    def test_simple_brown_food_power_resolves_on_habitat_activation(self) -> None:
+        power_card = self.catalog.birds[0].model_copy(
+            update={
+                "common_name": "Brown Seed Gainer",
+                "power": Power(
+                    color=PowerColor.BROWN,
+                    text="Gain 1 [seed] from the supply.",
+                    implementation_status=PowerImplementationStatus.HEURISTIC_RESOLUTION,
+                ),
+            }
+        )
+        player = self.state.players[0]
+        player.habitats[Habitat.FOREST].append(BirdSlot(card=power_card))
+        self.state.birdfeeder = BirdfeederState(dice=[FoodType.FISH])
+        starting_seed = player.food_tokens[FoodType.SEED]
+
+        next_state = apply_action(
+            self.state,
+            LegalAction(action_type=ActionType.GAIN_FOOD, player_id="p1", food_type=FoodType.FISH),
+        )
+
+        self.assertEqual(next_state.players[0].food_tokens[FoodType.SEED], starting_seed + 1)

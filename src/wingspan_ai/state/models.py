@@ -22,7 +22,7 @@ BASE_GAME_FOOD = (
 )
 
 
-def empty_habitat_board() -> dict[Habitat, list["BirdSlot"]]:
+def empty_habitat_board() -> dict[Habitat, list[BirdSlot]]:
     """Create an empty three-habitat player board."""
 
     return {Habitat.FOREST: [], Habitat.GRASSLAND: [], Habitat.WETLAND: []}

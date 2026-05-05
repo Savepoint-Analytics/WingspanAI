@@ -10,6 +10,8 @@ from wingspan_ai.content.schemas import ContentCatalog
 from wingspan_ai.rules.actions import LegalAction
 from wingspan_ai.rules.base_game import (
     apply_action,
+    apply_initial_selection_choice,
+    choose_default_initial_selection,
     legal_actions_for_current_player,
     score_player,
     setup_base_game,
@@ -72,9 +74,25 @@ def run_single_game(
         player_ids=player_ids,
         random_seed=random_seed,
         game_id=resolved_game_id,
+        apply_initial_selection=False,
     )
+    bird_discards = []
+    bonus_discards = []
     for player, agent in zip(state.players, agents, strict=True):
         player.agent_id = agent.agent_id
+        selection_chooser = getattr(agent, "choose_initial_selection", None)
+        selection = (
+            selection_chooser(player)
+            if callable(selection_chooser)
+            else choose_default_initial_selection(player)
+        )
+        discarded_birds, discarded_bonus_cards = apply_initial_selection_choice(
+            player, selection
+        )
+        bird_discards.extend(discarded_birds)
+        bonus_discards.extend(discarded_bonus_cards)
+    state.decks.bird_discard.extend(bird_discards)
+    state.decks.bonus_discard.extend(bonus_discards)
 
     sink = InMemoryEventSink()
     public_state_snapshots: dict[str, dict] = {}

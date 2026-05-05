@@ -91,7 +91,7 @@ This structure should make it easier to adapt the approach to other board games 
 - Define habitats and player board slots.
 - Define scoring categories.
 - Define expansion modules and ruleset configuration.
-- Load and validate `wingspan-card-list.xlsx`.
+- Load and validate `data/raw/wingspan-card-list.xlsx`.
 
 ### 2. Rules Engine
 
@@ -172,7 +172,7 @@ This structure should make it easier to adapt the approach to other board games 
 ## Near-Term Next Steps
 
 1. Define the initial folder/package structure for source code, data, docs, tests, flows, notebooks, and analysis.
-2. Audit `wingspan-card-list.xlsx` for usable fields, missing fields, expansion coverage, and fields that need normalization.
+2. Audit `data/raw/wingspan-card-list.xlsx` for usable fields, missing fields, expansion coverage, and fields that need normalization.
 3. Create Pydantic schemas for bird cards, bonus cards, round goals, food, powers, rulesets, and simulation configuration.
 4. Draft the simulator architecture doc, including state, actions, transitions, scoring, observations, and randomness.
 5. Implement base content loading and validation.
@@ -190,11 +190,13 @@ This structure should make it easier to adapt the approach to other board games 
 ## Current Foundation Artifacts
 
 - `src/wingspan_ai/content/loader.py`: base workbook loader for typed core-game content.
+- `src/wingspan_ai/content/sample_catalog.py`: synthetic catalog for tests and smoke runs when the workbook is absent.
 - `src/wingspan_ai/content/schemas.py`: initial Pydantic schemas for game content, powers, food costs, rulesets, and content catalogs.
-- `src/wingspan_ai/content/workbook_audit.py`: reproducible audit utility for `wingspan-card-list.xlsx`.
+- `src/wingspan_ai/content/workbook_audit.py`: reproducible audit utility for `data/raw/wingspan-card-list.xlsx`.
 - `src/wingspan_ai/state/models.py`: base-game state, public state, private state, decks, tray, birdfeeder, and player board models.
 - `src/wingspan_ai/rules/actions.py`: legal action model for the base action loop.
 - `src/wingspan_ai/rules/base_game.py`: setup, legal action generation, state transitions, round advancement, and scoring skeleton.
+- `src/wingspan_ai/simulation/artifacts.py`: writes outcome, event, and public-state snapshot artifacts.
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent.
 - `src/wingspan_ai/agents/archetypes.py`: scripted strategy archetype bots for behavioural signatures.
@@ -230,7 +232,7 @@ Read these files before making major architectural or documentation changes.
 
 ## Current Resources
 
-- `wingspan-card-list.xlsx`: information about birds, bonus cards, and end-of-round goals.
+- `data/raw/wingspan-card-list.xlsx`: information about birds, bonus cards, and end-of-round goals.
 - `rulebook_pdfs/`: local rulebook PDFs for core Wingspan and expansions.
 - Tabletop Simulator Wingspan scripting reference: https://github.com/nmombo/Wingspan
 - Wingspan data reference: https://github.com/coolbutuseless/wingspan

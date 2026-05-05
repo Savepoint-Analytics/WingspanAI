@@ -234,7 +234,9 @@ class RoundGoal(BaseModel):
         invalid_keys = [key for key in value if key < 1]
         invalid_values = [score for score in value.values() if score < 0]
         if invalid_keys or invalid_values:
-            raise ValueError("round goal scoring values must use positive keys and non-negative scores")
+            raise ValueError(
+                "round goal scoring values must use positive keys and non-negative scores"
+            )
         return value
 
 

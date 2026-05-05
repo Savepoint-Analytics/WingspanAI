@@ -58,7 +58,7 @@ Project root currently includes:
 - `CLAUDE.md`
 - `COMPANY_CONTEXT.md`
 - `PROJECT_CONTEXT.md`
-- `wingspan-card-list.xlsx`
+- `data/raw/wingspan-card-list.xlsx`
 - `rulebook_pdfs/WS_Core_Rulebook.pdf`
 - `rulebook_pdfs/WS_European_Rulebook.pdf`
 - `rulebook_pdfs/WS_Oceania_Rulebook.pdf`
@@ -209,7 +209,7 @@ These tasks are scoped to be founder-manageable and reusable.
 |---|---|---|
 | 1 | Define project package structure. | A proposed folder tree exists for `src/`, `data/`, `docs/`, `notebooks/`, `analysis/`, `tests/`, and `flows/`. |
 | 1 | Create machine-readable game content schema. | Pydantic models exist for bird cards, bonus cards, round goals, food, habitats, powers, and ruleset metadata. |
-| 1 | Validate `wingspan-card-list.xlsx` fields. | A data audit documents available columns, missing fields, normalization needs, and expansion coverage. |
+| 1 | Validate `data/raw/wingspan-card-list.xlsx` fields. | A data audit documents available columns, missing fields, normalization needs, and expansion coverage. |
 | 1 | Build base content loader. | The spreadsheet can be loaded into typed objects with validation errors reported clearly. |
 | 1 | Define base-game state model. | Full game state, player state, public state, private state, decks, tray, birdfeeder, and round state are represented. |
 | 1 | Draft rules-engine design doc. | Setup, legal actions, state transitions, scoring, powers, and randomness boundaries are documented. |
@@ -248,7 +248,7 @@ These tasks are scoped to be founder-manageable and reusable.
 
 ### Data and rules
 
-- Does `wingspan-card-list.xlsx` contain enough structured information to encode all bird powers?
+- Does `data/raw/wingspan-card-list.xlsx` contain enough structured information to encode all bird powers?
   - Answer: enough for static metadata and content loading, not enough for full executable power logic without a translation layer.
   - Detailed recommendation: `docs/rules/data_and_rule_encoding_recommendations.md`.
 - Which card powers require hand-authored rule handlers?
@@ -358,7 +358,7 @@ Keep the useful working style from the Savepoint docs: practical progress, reusa
 
 ### Follow-up tasks
 - [ ] Create the initial source package and folder structure.
-- [ ] Audit `wingspan-card-list.xlsx` for schema completeness.
+- [ ] Audit `data/raw/wingspan-card-list.xlsx` for schema completeness.
 - [ ] Draft `docs/architecture/simulator_architecture.md`.
 - [ ] Draft `docs/events/simulation_event_taxonomy.md`.
 
@@ -378,7 +378,7 @@ The project now has an importable package boundary and an explicit content model
 Represent expansions as `ContentPack` values and game-changing expansion behavior as separate `RulesModule` values. Represent unsupported powers and scoring logic explicitly with `PowerImplementationStatus` so v1 experiments can filter or report unsupported mechanics instead of silently ignoring them.
 
 ### Follow-up tasks
-- [ ] Build the base content loader from `wingspan-card-list.xlsx` into typed content objects.
+- [ ] Build the base content loader from `data/raw/wingspan-card-list.xlsx` into typed content objects.
 - [ ] Add normalization mappings for workbook set labels, power colors, beak directions, variable wingspans, blank nest types, and duet/map goals.
 - [ ] Draft `docs/architecture/simulator_architecture.md`.
 - [ ] Define base-game state models.
@@ -464,12 +464,52 @@ The project now has interpretable strategy variants, a rollout planning baseline
 Keep these agents intentionally simple until rule fidelity improves. Archetype bots are for behavioural signatures; Monte Carlo is for value-estimation plumbing; tournament metrics are useful for smoke tests but should not be treated as strategic findings until powers, scoring, setup, and workbook content are fully restored and validated.
 
 ### Follow-up tasks
-- [ ] Restore or relocate `wingspan-card-list.xlsx`; workbook-backed tests now skip when the root workbook is absent.
+- [x] Restore or relocate `wingspan-card-list.xlsx`; workbook-backed tests now run from `data/raw/`.
 - [ ] Replace deterministic setup approximation with agent-selectable initial hand/food choices.
 - [ ] Expand bonus-card and round-goal scoring beyond the first narrow handlers.
 - [ ] Implement high-volume base-game power handlers from the power registry.
 - [ ] Persist public state snapshots as artifacts alongside simulation events.
 - [ ] Add real PostgreSQL integration tests once a local service is available.
+
+## Update: 2026-05-05 - Setup choices, first power resolution, and snapshot artifacts improved
+
+### What changed
+Added `InitialSelection`, `choose_default_initial_selection`, and `apply_initial_selection_choice` in `src/wingspan_ai/rules/base_game.py`. The single-game runner now deals full setup hands, assigns agent IDs, asks agents for `choose_initial_selection(player)` when available, and otherwise applies the default selection.
+
+Added first executable power resolution scaffolding for simple `Gain 1 [food]` and `Draw 1 [card]` text templates. White powers are checked when a bird is played, and brown powers are checked when the matching habitat action is activated.
+
+Added `src/wingspan_ai/content/sample_catalog.py` so tests and smoke flows can run without the missing source workbook. Updated `flows/simulation_batch.py` to use the workbook when present and the sample catalog otherwise.
+
+Added `src/wingspan_ai/simulation/artifacts.py` to write `outcome.json`, `events.jsonl`, and `public_state_snapshots.json` artifacts for a simulation result.
+
+### Why it matters
+Setup is now an explicit policy boundary instead of hidden simulator behavior. This makes it possible to later compare opening-hand strategies and lets stronger agents reason about keep/discard and starting food choices. Power resolution and snapshot artifacts are still narrow, but they move the simulator closer to replayable, inspectable games.
+
+### Decision
+Use the synthetic sample catalog only for tests and smoke runs when `data/raw/wingspan-card-list.xlsx` is absent. Strategic experiments should use the real workbook.
+
+### Follow-up tasks
+- [x] Restore `wingspan-card-list.xlsx` or update loader tests to the new canonical source path.
+- [ ] Add setup-choice telemetry events.
+- [ ] Convert power text template matching into registry-backed handler keys during content loading.
+- [ ] Add exact replay hashes and RNG draw records.
+- [ ] Add database integration tests once PostgreSQL is available locally.
+
+## Update: 2026-05-05 - Workbook restored under data/raw and tests re-enabled
+
+### What changed
+The source workbook is restored at `data/raw/wingspan-card-list.xlsx`. Updated the content loader default path, workbook audit default CLI path, tests, flow defaults, and docs to use this canonical raw-data location. The loader also supports `WINGSPAN_CARD_WORKBOOK` as an override.
+
+### Why it matters
+Workbook-backed loader and audit tests now run against the real content again instead of skipping. Smoke flows use real workbook content by default and only fall back to the sample catalog when the workbook is absent.
+
+### Decision
+Use `data/raw/wingspan-card-list.xlsx` as the canonical local workbook path. Keep Google Drive or other external storage as an archive/source-of-truth backup, but keep local simulation and tests file-based for reproducibility.
+
+### Follow-up tasks
+- [ ] Decide whether `data/raw/wingspan-card-list.xlsx` should be committed, Git-LFS tracked, or gitignored before public release.
+- [ ] Add checksum/version metadata for the workbook.
+- [ ] Add setup docs for restoring the workbook from Google Drive if the repo is cloned fresh.
 
 ## Decision log
 
@@ -486,6 +526,7 @@ Keep these agents intentionally simple until rule fidelity improves. Archetype b
 | 2026-05-03 | Keep first rules loop explicit and minimal: setup, legal actions, transitions, round advancement, score skeleton, and random legal agent. | Gives the project a tested simulator foundation before adding powers, telemetry, scoring handlers, single-game runners, or ML agents. |
 | 2026-05-04 | Keep external service/orchestration/tracking integrations optional around a testable core simulator. | Lets the runner, events, and agents stay usable before FastAPI, Prefect, MLflow, PostgreSQL, and dev tools are installed locally. |
 | 2026-05-04 | Treat archetype bots and Monte Carlo rollouts as experimental baselines, not strategic conclusions. | Current rule fidelity is enough for plumbing and behavioural signatures, but not enough for claims about optimal Wingspan play. |
+| 2026-05-05 | Make initial setup choice an explicit policy boundary. | Opening hand and starting food choices matter strategically, so agents need a hook to control them before advanced modelling. |
 
 ## Things to avoid repeating
 

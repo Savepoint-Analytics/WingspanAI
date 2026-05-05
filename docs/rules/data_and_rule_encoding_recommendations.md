@@ -8,14 +8,14 @@ This note answers the current data and rules open questions for the Wingspan AI 
 
 | Question | Recommendation |
 |---|---|
-| Does `wingspan-card-list.xlsx` contain enough structured information to encode all bird powers? | It is enough for card metadata and static scoring inputs, but not enough to execute every power without a translation layer. |
+| Does `data/raw/wingspan-card-list.xlsx` contain enough structured information to encode all bird powers? | It is enough for card metadata and static scoring inputs, but not enough to execute every power without a translation layer. |
 | Which card powers require hand-authored rule handlers? | Any timing-sensitive, conditional, choice-heavy, opponent-dependent, placement-changing, or expansion-specific power. |
 | How should expansions be represented? | Use content packs plus rules modules. Avoid one giant alternate ruleset. |
 | How should official rulebook references be tracked? | Use a rule registry that links encoded rules and power handlers to source documents, workbook fields, implementation modules, tests, and implementation status. |
 
 ## Workbook Sufficiency
 
-`wingspan-card-list.xlsx` is strong enough to seed the content catalog.
+`data/raw/wingspan-card-list.xlsx` is strong enough to seed the content catalog.
 
 It contains structured fields for:
 - Bird identity.
@@ -72,7 +72,7 @@ handler_key: discard_egg_gain_wild_food
 rules_modules:
   - base_game
 source_refs:
-  - workbook: wingspan-card-list.xlsx
+  - workbook: data/raw/wingspan-card-list.xlsx
     sheet: Birds
     field: Power text
 ```
@@ -248,7 +248,7 @@ card_name: Chihuahuan Raven
 power_handler_key: discard_egg_gain_wild_food
 implementation_status: ready
 source_refs:
-  - workbook: wingspan-card-list.xlsx
+  - workbook: data/raw/wingspan-card-list.xlsx
     sheet: Birds
     field: Power text
 implementation:

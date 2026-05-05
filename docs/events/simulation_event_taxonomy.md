@@ -50,6 +50,12 @@ Events default to public or aggregate information. Any event that includes playe
 
 `SimulationResult.public_state_snapshots` stores JSON-serializable public observations keyed by `public_state_ref`. This gives analysis notebooks and future replay tools a stable handle for the public state around each emitted event without including private hands, bonus cards, or deck order.
 
+`write_simulation_artifacts(result, output_dir)` writes:
+
+- `outcome.json`
+- `events.jsonl`
+- `public_state_snapshots.json`
+
 ## Replay Direction
 
 The first runner stores enough action-level history and public snapshots to inspect decisions, but exact replay will also need deck-order references and stochastic resolution records once bird powers are implemented.

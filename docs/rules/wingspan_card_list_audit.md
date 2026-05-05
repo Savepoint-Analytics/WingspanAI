@@ -2,7 +2,7 @@
 
 Status: source audit, 2026-05-03
 
-Source workbook: `wingspan-card-list.xlsx`
+Source workbook: `data/raw/wingspan-card-list.xlsx`
 
 ## Sheets
 
@@ -97,5 +97,5 @@ See `docs/rules/data_and_rule_encoding_recommendations.md` for the recommended i
 ## Reproducible Audit Command
 
 ```bash
-PYTHONPATH=src python -m wingspan_ai.content.workbook_audit wingspan-card-list.xlsx
+PYTHONPATH=src python -m wingspan_ai.content.workbook_audit data/raw/wingspan-card-list.xlsx
 ```

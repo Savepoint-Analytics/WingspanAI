@@ -261,12 +261,18 @@ def _audit_bird_domains(path: Path, sheet_audit: SheetAudit, issues: list[FieldI
                         row_number=row_number,
                         field=column,
                         value=value,
-                        message="unexpected domain value; add normalization mapping or review source",
+                        message=(
+                            "unexpected domain value; add normalization mapping "
+                            "or review source"
+                        ),
                     )
                 )
 
         for column, message in {
-            "Color": "blank power color; normalize to none only after confirming the card has no power",
+            "Color": (
+                "blank power color; normalize to none only after confirming "
+                "the card has no power"
+            ),
             "Nest type": "blank nest type; normalize to explicit special/non-nesting category",
         }.items():
             if is_blank(row.get(column)):
@@ -356,7 +362,10 @@ def format_markdown_report(audit: WorkbookAudit) -> str:
     for sheet in audit.sheets.values():
         missing = ", ".join(str(value) for value in sheet.missing_columns) or "None"
         extra = ", ".join(str(value) for value in sheet.extra_columns) or "None"
-        lines.append(f"| {sheet.name} | {sheet.row_count} | {sheet.column_count} | {missing} | {extra} |")
+        lines.append(
+            f"| {sheet.name} | {sheet.row_count} | {sheet.column_count} | "
+            f"{missing} | {extra} |"
+        )
 
     lines.extend(["", "Ignored workbook artifact sheets: " + ", ".join(audit.ignored_sheets), ""])
     lines.extend(["## Expansion Coverage", ""])
@@ -374,7 +383,9 @@ def format_markdown_report(audit: WorkbookAudit) -> str:
     if not audit.issues:
         lines.append("No field issues found.")
     else:
-        issue_counts = Counter(f"{issue.sheet}:{issue.field}:{issue.message}" for issue in audit.issues)
+        issue_counts = Counter(
+            f"{issue.sheet}:{issue.field}:{issue.message}" for issue in audit.issues
+        )
         lines.append("| Count | Sheet | Field | Issue |")
         lines.append("|---:|---|---|---|")
         for key, count in issue_counts.most_common():
@@ -390,14 +401,19 @@ def format_markdown_report(audit: WorkbookAudit) -> str:
 def _format_normalization_notes(audit: WorkbookAudit) -> list[str]:
     bird_sheet = audit.sheets["Birds"]
     notes = [
-        "- Map workbook set labels such as `promoUS` and `promoEurope` to snake-case content packs.",
-        "- Treat `Color` blanks as `PowerColor.NONE` only after confirming those birds have no power.",
-        "- Treat blank `Nest type` values as an explicit non-nesting or special nest category decision.",
+        "- Map workbook set labels such as `promoUS` and `promoEurope` "
+        "to snake-case content packs.",
+        "- Treat `Color` blanks as `PowerColor.NONE` only after confirming "
+        "those birds have no power.",
+        "- Treat blank `Nest type` values as an explicit non-nesting or special "
+        "nest category decision.",
         "- Convert `Wingspan` value `*` to `wingspan_is_variable=true` with `wingspan_cm=null`.",
         "- Convert `Beak direction` values `L`, `R`, and `N` to normalized enum values.",
-        "- Decide whether multi-direction values such as `LR` and `LL` are valid Asia metadata or source errors.",
+        "- Decide whether multi-direction values such as `LR` and `LL` are valid "
+        "Asia metadata or source errors.",
         "- Parse `VP` scoring text on bonus cards into hand-authored scoring handlers over time.",
-        "- Split duet/map goals from standard end-of-round goals because they do not use columns `1` through `4`.",
+        "- Split duet/map goals from standard end-of-round goals because they do "
+        "not use columns `1` through `4`.",
     ]
 
     set_counts = bird_sheet.value_counts.get("Set")
@@ -415,7 +431,7 @@ def main() -> None:
     parser.add_argument(
         "workbook",
         nargs="?",
-        default="wingspan-card-list.xlsx",
+        default="data/raw/wingspan-card-list.xlsx",
         help="Path to the workbook to audit.",
     )
     args = parser.parse_args()

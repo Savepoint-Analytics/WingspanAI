@@ -1,12 +1,12 @@
-from pathlib import Path
 from unittest import TestCase, skipIf
 
+from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH
 from wingspan_ai.content.workbook_audit import audit_workbook
 
-WORKBOOK_PATH = Path("wingspan-card-list.xlsx")
+WORKBOOK_PATH = DEFAULT_WORKBOOK_PATH
 
 
-@skipIf(not WORKBOOK_PATH.exists(), "wingspan-card-list.xlsx is not present in the repo root")
+@skipIf(not WORKBOOK_PATH.exists(), f"{WORKBOOK_PATH} is not present")
 class WorkbookAuditTests(TestCase):
     def test_card_workbook_shape_is_recognized(self) -> None:
         audit = audit_workbook(WORKBOOK_PATH)

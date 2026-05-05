@@ -12,8 +12,8 @@ from wingspan_ai.content.schemas import (
     Power,
     PowerColor,
     PowerImplementationStatus,
-    RulesModule,
     RulesetMetadata,
+    RulesModule,
 )
 
 

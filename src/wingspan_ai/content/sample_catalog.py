@@ -1,3 +1,7 @@
+"""Small synthetic content catalog for tests and smoke runs."""
+
+from __future__ import annotations
+
 from wingspan_ai.content.schemas import (
     BirdCard,
     BonusCard,
@@ -11,12 +15,14 @@ from wingspan_ai.content.schemas import (
     PowerColor,
     PowerImplementationStatus,
     RoundGoal,
-    RulesModule,
     RulesetMetadata,
+    RulesModule,
 )
 
 
-def make_test_catalog(card_count: int = 80) -> ContentCatalog:
+def make_sample_catalog(card_count: int = 80) -> ContentCatalog:
+    """Create a deterministic synthetic catalog without workbook dependencies."""
+
     birds = []
     for index in range(card_count):
         birds.append(
@@ -41,7 +47,7 @@ def make_test_catalog(card_count: int = 80) -> ContentCatalog:
         birds=birds,
         bonus_cards=[
             BonusCard(
-                name=f"Bird Feeder" if index == 0 else f"Test Bonus {index}",
+                name="Bird Feeder" if index == 0 else f"Test Bonus {index}",
                 content_packs={ContentPack.CORE},
                 condition="Birds that eat [seed]",
                 victory_point_text="5 to 7 birds: 3; 8+ birds: 7",
@@ -64,7 +70,7 @@ def make_test_catalog(card_count: int = 80) -> ContentCatalog:
         ],
         rulesets=[
             RulesetMetadata(
-                ruleset_id="test_core",
+                ruleset_id="sample_core",
                 content_packs=[ContentPack.CORE],
                 rules_modules=[RulesModule.BASE_GAME],
                 player_count=2,

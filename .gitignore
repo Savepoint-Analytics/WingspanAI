@@ -1,6 +1,9 @@
 __pycache__/
 *.pyc
 .venv/
+.uv-cache/
+.pytest_cache/
+.ruff_cache/
 .env
 
 data/
@@ -22,4 +25,3 @@ mlruns/
 rulebook_pdfs/
 
 *.pdf
-

@@ -1,17 +1,18 @@
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from wingspan_ai.agents import GreedyBaselineAgent, RandomLegalAgent
+from wingspan_ai.content import make_sample_catalog
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import legal_actions_for_current_player, score_player
-from wingspan_ai.simulation import run_single_game
+from wingspan_ai.simulation import run_single_game, write_simulation_artifacts
 from wingspan_ai.telemetry.events import EventName
-from fixtures import make_test_catalog
 
 
 class SimulationRunnerTests(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.catalog = make_test_catalog()
+        cls.catalog = make_sample_catalog()
 
     def test_single_game_runner_completes_random_vs_greedy_game(self) -> None:
         result = run_single_game(
@@ -59,3 +60,18 @@ class SimulationRunnerTests(TestCase):
 
         with self.assertRaises(ValueError):
             run_single_game(self.catalog, [BadAgent()], random_seed=1, max_turns=1)
+
+    def test_simulation_artifacts_write_public_snapshots(self) -> None:
+        result = run_single_game(
+            self.catalog,
+            [RandomLegalAgent(random_seed=8), GreedyBaselineAgent()],
+            random_seed=8,
+            max_turns=2,
+        )
+
+        with TemporaryDirectory() as tmp_dir:
+            output_dir = write_simulation_artifacts(result, tmp_dir)
+
+            self.assertTrue((output_dir / "outcome.json").exists())
+            self.assertTrue((output_dir / "events.jsonl").exists())
+            self.assertTrue((output_dir / "public_state_snapshots.json").exists())

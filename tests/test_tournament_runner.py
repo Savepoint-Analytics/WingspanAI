@@ -1,14 +1,14 @@
 from unittest import TestCase
 
 from wingspan_ai.agents import GreedyBaselineAgent, RandomLegalAgent
+from wingspan_ai.content import make_sample_catalog
 from wingspan_ai.simulation import run_tournament
-from fixtures import make_test_catalog
 
 
 class TournamentRunnerTests(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.catalog = make_test_catalog()
+        cls.catalog = make_sample_catalog()
 
     def test_tournament_runner_summarizes_matchup(self) -> None:
         result = run_tournament(

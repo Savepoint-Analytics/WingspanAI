@@ -5,16 +5,16 @@ from wingspan_ai.agents import (
     StrategyArchetype,
     StrategyArchetypeAgent,
 )
-from wingspan_ai.rules.actions import ActionType, LegalAction
+from wingspan_ai.content import make_sample_catalog
+from wingspan_ai.rules.actions import ActionType
 from wingspan_ai.rules.base_game import legal_actions_for_current_player, setup_base_game
 from wingspan_ai.state.models import BirdSlot
-from fixtures import make_test_catalog
 
 
 class StrategyAgentTests(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.catalog = make_test_catalog()
+        cls.catalog = make_sample_catalog()
 
     def test_egg_focus_agent_prefers_laying_eggs_when_available(self) -> None:
         state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=5)
