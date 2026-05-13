@@ -40,15 +40,15 @@ The project owner is Alex Oswald. Alex is the sole current contributor and final
 
 ## Current phase
 
-The project is in early foundation-building.
+The project is in rule-fidelity and smoke-experiment validation.
 
 Current focus:
-1. Replace Savepoint-specific context docs with Wingspan AI-specific project context.
-2. Normalize project goals around simulator, analytics, ML experiments, and reusable board-game AI templates.
-3. Define the minimum viable data model for game content.
-4. Define the minimum viable rules engine and state transition architecture.
-5. Establish initial analytics event contracts.
-6. Plan baseline agents and first experiment flows.
+1. Tighten the base-game economy loop so simulations are strategically credible.
+2. Expand high-volume bird power handling, bonus-card scoring, and competitive round-goal scoring.
+3. Keep legal actions concrete enough for habitat scaling, optional conversions, rerolls, and agent choice policies.
+4. Preserve deterministic seeded runs, replayable telemetry, and hidden-information boundaries.
+5. Use smoke batches to catch regressions before interpreting tournament results.
+6. Prepare the analysis layer for baseline and heuristic comparisons once rule coverage is sufficient.
 
 ## Current assets
 
@@ -65,7 +65,7 @@ Project root currently includes:
 - `rulebook_pdfs/WS_Asia_Rulebook_r9.pdf`
 - `rulebook_pdfs/WS_AE_AutoRulebook_r5.pdf`
 
-The project is not currently a git repository in this directory.
+The project is a git repository in this directory.
 
 ## Important decisions made
 
@@ -511,6 +511,26 @@ Use `data/raw/wingspan-card-list.xlsx` as the canonical local workbook path. Kee
 - [ ] Add checksum/version metadata for the workbook.
 - [ ] Add setup docs for restoring the workbook from Google Drive if the repo is cloned fresh.
 
+## Update: 2026-05-13 - Core economy rule fidelity expanded
+
+### What changed
+Extended the base-game rules loop so legal actions now model habitat action scaling, multi-food and multi-card choices, optional player-mat conversions, deterministic birdfeeder rerolls, right-to-left brown power activation, first pink reaction hooks, first-player rotation, end-of-round tray refresh, competitive round-goal scoring, and broader base-game bonus-card scoring.
+
+Updated greedy and archetype baselines so food choices are biased toward visible hand deficits instead of treating every food die as equal. Added regression tests for habitat scaling, rerolls, brown activation order, pink birdfeeder food preference, competitive goal scoring, and expanded bonus scoring.
+
+### Why it matters
+The simulator is still not full Wingspan fidelity, but the core economy loop now better preserves the real tradeoffs between food, cards, eggs, habitat engines, round goals, and final scoring. Smoke simulations are more useful for regression and baseline comparison, though results should still be labelled as early until more bird powers are implemented and audited.
+
+### Decision
+Keep rule-fidelity improvements in the rules engine and action models, with baseline agents consuming richer legal actions rather than hardcoding shortcuts. Treat high-volume powers and scoring handlers as the next blocker before strategy claims.
+
+### Follow-up tasks
+- [ ] Convert supported power text templates into registry-backed handler keys during content loading.
+- [ ] Expand brown, white, and pink power handlers beyond the current deterministic templates.
+- [ ] Add setup-choice telemetry and richer agent decision summaries.
+- [ ] Add exact replay hashes and explicit RNG draw records.
+- [ ] Audit competitive round-goal scoring against the local rulebook PDFs before publishing results.
+
 ## Decision log
 
 | Date | Decision | Notes |
@@ -527,6 +547,7 @@ Use `data/raw/wingspan-card-list.xlsx` as the canonical local workbook path. Kee
 | 2026-05-04 | Keep external service/orchestration/tracking integrations optional around a testable core simulator. | Lets the runner, events, and agents stay usable before FastAPI, Prefect, MLflow, PostgreSQL, and dev tools are installed locally. |
 | 2026-05-04 | Treat archetype bots and Monte Carlo rollouts as experimental baselines, not strategic conclusions. | Current rule fidelity is enough for plumbing and behavioural signatures, but not enough for claims about optimal Wingspan play. |
 | 2026-05-05 | Make initial setup choice an explicit policy boundary. | Opening hand and starting food choices matter strategically, so agents need a hook to control them before advanced modelling. |
+| 2026-05-13 | Represent richer habitat actions as concrete `LegalAction` values. | Agents can now choose scaled food/card/egg outputs, conversion choices, and reroll options through the normal rules boundary. |
 
 ## Things to avoid repeating
 

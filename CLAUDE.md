@@ -268,16 +268,16 @@ Avoid:
 
 Unless superseded by newer project context, prioritize:
 
-1. Define machine-readable game content for birds, bonus cards, food, habitats, goals, and rulesets.
-2. Build the base-game rules engine and deterministic simulator.
-3. Add strong unit tests for legal actions, transitions, scoring, and hidden information boundaries.
-4. Define the simulation event taxonomy and FastAPI/PostgreSQL ingestion path.
-5. Build baseline agents and heuristic strategy archetypes.
-6. Create a reusable board-game AI template around state, actions, policies, rewards, observations, and beliefs.
-7. Add Prefect flows for simulation batches and tournaments.
-8. Add MLflow tracking for strategy/model versions and evaluation results.
-9. Use R and Python analysis to identify dominant, dominated, and situational strategies.
-10. Turn findings into a credible research case study.
+1. Tighten base-game rule fidelity before treating simulation outputs as strategic evidence.
+2. Keep legal actions concrete enough to represent player-mat scaling, conversion choices, birdfeeder rerolls, and card/food/egg tradeoffs.
+3. Expand high-volume bird power handlers and keep unsupported powers explicitly tagged.
+4. Expand bonus-card and competitive round-goal scoring with focused regression tests.
+5. Preserve deterministic seeded simulation, replayable telemetry, and public/private information boundaries.
+6. Build baseline agents and heuristic strategy archetypes that make resource choices from visible hand/board needs.
+7. Use Prefect, MLflow, PostgreSQL, Python, SQL, and R to compare reproducible batches once fidelity is sufficient.
+8. Create a reusable board-game AI template around state, actions, policies, rewards, observations, and beliefs.
+9. Use analysis to identify dominant, dominated, situational, and opponent-dependent strategies.
+10. Turn validated findings into a credible research case study.
 
 ## How to update this file
 

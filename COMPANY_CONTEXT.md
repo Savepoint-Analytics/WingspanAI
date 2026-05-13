@@ -196,21 +196,20 @@ When writing public-facing or case-study material:
 
 ## Current stage
 
-The project is in early foundation-building.
+The project is moving from foundation-building into rule-fidelity and smoke-experiment validation.
 
 Current assets:
 - `README.md` with objectives, roadmap, next steps, and resources.
-- `wingspan-card-list.xlsx` with card/bonus/goal information.
+- `data/raw/wingspan-card-list.xlsx` with card, bonus-card, and round-goal information.
 - Rulebook PDFs in `rulebook_pdfs/`.
-- Context docs now scoped to Wingspan AI.
+- A seeded simulator with scaled core actions, baseline agents, telemetry events, tournaments, artifact writing, and workbook-backed smoke batches.
 
 Near-term goal:
-1. Convert game content and rules into machine-readable structures.
-2. Build and test the base-game simulator.
-3. Add event logging and batch simulation infrastructure.
-4. Implement baseline agents.
-5. Run first controlled experiments.
-6. Convert findings into reusable architecture and case-study material.
+1. Continue tightening base-game fidelity around high-volume powers, scoring, and choice policies.
+2. Use smoke batches to catch simulator regressions before interpreting strategy results.
+3. Expand event/replay detail so game traces can explain why an agent chose an action.
+4. Compare baseline and heuristic agents only when the relevant mechanics are implemented or explicitly filtered.
+5. Convert validated findings into reusable architecture and case-study material.
 
 ## Things to avoid repeating
 

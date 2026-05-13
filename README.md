@@ -194,11 +194,11 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/content/schemas.py`: initial Pydantic schemas for game content, powers, food costs, rulesets, and content catalogs.
 - `src/wingspan_ai/content/workbook_audit.py`: reproducible audit utility for `data/raw/wingspan-card-list.xlsx`.
 - `src/wingspan_ai/state/models.py`: base-game state, public state, private state, decks, tray, birdfeeder, and player board models.
-- `src/wingspan_ai/rules/actions.py`: legal action model for the base action loop.
-- `src/wingspan_ai/rules/base_game.py`: setup, legal action generation, state transitions, round advancement, and scoring skeleton.
+- `src/wingspan_ai/rules/actions.py`: concrete legal action model, including scaled habitat choices, rerolls, and conversion options.
+- `src/wingspan_ai/rules/base_game.py`: setup, legal action generation, state transitions, habitat activation, power scaffolding, round advancement, and scoring.
 - `src/wingspan_ai/simulation/artifacts.py`: writes outcome, event, and public-state snapshot artifacts.
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
-- `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent.
+- `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
 - `src/wingspan_ai/agents/archetypes.py`: scripted strategy archetype bots for behavioural signatures.
 - `src/wingspan_ai/agents/monte_carlo.py`: first Monte Carlo rollout agent.
 - `src/wingspan_ai/simulation/tournament.py`: seeded tournament runner and matchup summaries.

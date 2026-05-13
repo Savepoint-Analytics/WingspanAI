@@ -2,8 +2,11 @@ from unittest import TestCase
 
 from wingspan_ai.content import make_sample_catalog
 from wingspan_ai.content.schemas import (
+    BonusCard,
+    ContentPack,
     FoodType,
     Habitat,
+    NestType,
     Power,
     PowerColor,
     PowerImplementationStatus,
@@ -13,7 +16,9 @@ from wingspan_ai.rules.base_game import (
     InitialSelection,
     apply_action,
     apply_initial_selection_choice,
+    legal_actions_for_current_player,
     score_player,
+    score_round_goal_competitive,
     setup_base_game,
 )
 from wingspan_ai.state.models import BirdfeederState, BirdSlot
@@ -149,7 +154,7 @@ class BaseGameRulesTests(TestCase):
             [player.action_cubes_available for player in state_after_p2.players],
             [7, 7],
         )
-        self.assertEqual(state_after_p2.round_state.active_player_index, 0)
+        self.assertEqual(state_after_p2.round_state.active_player_index, 1)
 
     def test_final_score_skeleton_counts_implemented_categories(self) -> None:
         card = next(card for card in self.catalog.birds if card.victory_points > 0)
@@ -217,3 +222,145 @@ class BaseGameRulesTests(TestCase):
         )
 
         self.assertEqual(next_state.players[0].food_tokens[FoodType.SEED], starting_seed + 1)
+
+    def test_forest_action_scales_food_choices_with_birds_in_habitat(self) -> None:
+        player = self.state.players[0]
+        forest_birds = [
+            card for card in self.catalog.birds if Habitat.FOREST in card.habitats
+        ][:2]
+        for card in forest_birds:
+            player.habitats[Habitat.FOREST].append(BirdSlot(card=card))
+        self.state.birdfeeder = BirdfeederState(dice=[FoodType.SEED, FoodType.FISH])
+
+        legal_actions = legal_actions_for_current_player(self.state)
+        gain_food_actions = [
+            action for action in legal_actions if action.action_type == ActionType.GAIN_FOOD
+        ]
+
+        self.assertIn(
+            (FoodType.SEED, FoodType.FISH),
+            [action.food_types for action in gain_food_actions],
+        )
+
+    def test_birdfeeder_reroll_is_available_when_all_remaining_dice_match(self) -> None:
+        self.state.birdfeeder = BirdfeederState(dice=[FoodType.SEED])
+
+        legal_actions = legal_actions_for_current_player(self.state)
+
+        self.assertTrue(
+            any(
+                action.action_type == ActionType.GAIN_FOOD and action.reroll_birdfeeder
+                for action in legal_actions
+            )
+        )
+
+    def test_brown_powers_resolve_right_to_left_after_habitat_action(self) -> None:
+        first_card = self.catalog.birds[0].model_copy(
+            update={
+                "common_name": "Left Tucking Bird",
+                "power": Power(
+                    color=PowerColor.BROWN,
+                    text="Tuck 1 [card] from your hand behind this bird.",
+                    implementation_status=PowerImplementationStatus.HEURISTIC_RESOLUTION,
+                ),
+            }
+        )
+        second_card = self.catalog.birds[1].model_copy(
+            update={
+                "common_name": "Right Drawing Bird",
+                "power": Power(
+                    color=PowerColor.BROWN,
+                    text="Draw 1 [card].",
+                    implementation_status=PowerImplementationStatus.HEURISTIC_RESOLUTION,
+                ),
+            }
+        )
+        player = self.state.players[0]
+        player.hand = []
+        player.habitats[Habitat.WETLAND].extend(
+            [BirdSlot(card=first_card), BirdSlot(card=second_card)]
+        )
+
+        action = next(
+            action
+            for action in legal_actions_for_current_player(self.state)
+            if action.action_type == ActionType.DRAW_CARDS and action.draw_from_deck_count == 2
+        )
+        next_state = apply_action(self.state, action)
+
+        next_player = next_state.players[0]
+        self.assertEqual(next_player.habitats[Habitat.WETLAND][0].tucked_cards, 1)
+
+    def test_pink_birdfeeder_reaction_prioritizes_food_needed_for_hand(self) -> None:
+        pink_card = self.catalog.birds[0].model_copy(
+            update={
+                "common_name": "Helpful Pink Bird",
+                "power": Power(
+                    color=PowerColor.PINK,
+                    text=(
+                        "When another player's [predator] succeeds, "
+                        "gain 1 [die] from the birdfeeder."
+                    ),
+                    implementation_status=PowerImplementationStatus.HEURISTIC_RESOLUTION,
+                ),
+            }
+        )
+        fish_card = self.catalog.birds[1].model_copy(
+            update={
+                "common_name": "Fish Hungry Bird",
+                "food_cost": self.catalog.birds[1].food_cost.model_copy(
+                    update={"fixed": {FoodType.FISH: 1}}
+                ),
+            }
+        )
+        self.state.players[1].habitats[Habitat.FOREST].append(BirdSlot(card=pink_card))
+        self.state.players[1].hand = [fish_card]
+        self.state.birdfeeder = BirdfeederState(
+            dice=[FoodType.SEED, FoodType.FISH, FoodType.FRUIT]
+        )
+
+        next_state = apply_action(
+            self.state,
+            LegalAction(action_type=ActionType.GAIN_FOOD, player_id="p1", food_type=FoodType.SEED),
+        )
+
+        self.assertEqual(next_state.players[1].food_tokens[FoodType.FISH], 1)
+
+    def test_competitive_round_goal_scores_by_rank(self) -> None:
+        forest_goal = next(
+            goal for goal in self.catalog.round_goals if goal.name == "[bird] in [forest]"
+        )
+        self.state.round_goals = [forest_goal]
+        forest_birds = [
+            card for card in self.catalog.birds if Habitat.FOREST in card.habitats
+        ][:3]
+        self.state.players[0].habitats[Habitat.FOREST].extend(
+            [BirdSlot(card=forest_birds[0]), BirdSlot(card=forest_birds[1])]
+        )
+        self.state.players[1].habitats[Habitat.FOREST].append(BirdSlot(card=forest_birds[2]))
+
+        scores = score_round_goal_competitive(self.state, 0)
+
+        self.assertEqual(scores, {"p1": 4, "p2": 1})
+
+    def test_expanded_bonus_card_scoring_counts_common_nest_bonus(self) -> None:
+        wildlife_gardener = BonusCard(
+            name="Wildlife Gardener",
+            content_packs={ContentPack.CORE},
+            condition="Birds with [bowl] nests",
+            victory_point_text="4 to 5 birds: 4; 6+ birds: 7",
+        )
+        player = self.state.players[0]
+        player.bonus_cards = [wildlife_gardener]
+        player.round_goal_points = 0
+        self.state.round_goals = []
+        bowl_birds = [
+            card.model_copy(update={"nest_type": NestType.BOWL})
+            for card in self.catalog.birds[:4]
+        ]
+        for card in bowl_birds:
+            player.habitats[Habitat.GRASSLAND].append(BirdSlot(card=card))
+
+        score = score_player(self.state, "p1")
+
+        self.assertEqual(score.bonus_points, 4)

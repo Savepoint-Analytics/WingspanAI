@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -62,7 +63,7 @@ def _score_action_for_archetype(
     if archetype == StrategyArchetype.ENGINE_BUILDER:
         return score + _engine_builder_bonus(state, action)
     if archetype == StrategyArchetype.FOOD_ACCELERATION:
-        return score + _food_acceleration_bonus(action)
+        return score + _food_acceleration_bonus(state, action)
     if archetype == StrategyArchetype.CARD_DRAW:
         return score + _card_draw_bonus(action)
     if archetype == StrategyArchetype.BONUS_CARD_FOCUS:
@@ -93,9 +94,9 @@ def _engine_builder_bonus(state: GameState, action: LegalAction) -> float:
     return 6 - len(player.habitats[action.habitat])
 
 
-def _food_acceleration_bonus(action: LegalAction) -> float:
+def _food_acceleration_bonus(state: GameState, action: LegalAction) -> float:
     if action.action_type == ActionType.GAIN_FOOD:
-        return 8
+        return 8 + _food_need_score(state, action)
     if action.action_type == ActionType.PLAY_BIRD:
         return 2
     return 0
@@ -126,3 +127,13 @@ def _round_goal_chase_bonus(state: GameState, action: LegalAction) -> float:
     if action.habitat and "[bird]" in goal_text:
         return 3
     return 0
+
+
+def _food_need_score(state: GameState, action: LegalAction) -> float:
+    player = state.active_player
+    deficits: Counter = Counter()
+    for card in player.hand:
+        for food_type, count in card.food_cost.fixed.items():
+            deficits[food_type] += max(count - player.food_tokens.get(food_type, 0), 0)
+    selected_foods = action.food_types or ((action.food_type,) if action.food_type else ())
+    return float(sum(deficits.get(food_type, 0) for food_type in selected_foods))

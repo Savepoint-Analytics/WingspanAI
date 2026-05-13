@@ -61,6 +61,7 @@ class PlayerState(BaseModel):
     food_tokens: dict[FoodType, int] = Field(default_factory=empty_food_tokens)
     habitats: dict[Habitat, list[BirdSlot]] = Field(default_factory=empty_habitat_board)
     action_cubes_available: int = Field(default=8, ge=0)
+    round_goal_points: int = Field(default=0, ge=0)
 
     @property
     def total_eggs(self) -> int:
@@ -137,6 +138,7 @@ class PublicPlayerState(BaseModel):
     food_tokens: dict[FoodType, int]
     habitats: dict[Habitat, list[BirdSlot]]
     action_cubes_available: int
+    round_goal_points: int
     hand_count: int
     bonus_card_count: int
 
@@ -180,6 +182,7 @@ def to_public_state(state: GameState) -> PublicGameState:
                 food_tokens=dict(player.food_tokens),
                 habitats=player.habitats,
                 action_cubes_available=player.action_cubes_available,
+                round_goal_points=player.round_goal_points,
                 hand_count=len(player.hand),
                 bonus_card_count=len(player.bonus_cards),
             )

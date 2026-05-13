@@ -61,28 +61,25 @@ Legal action generation should remain pure: given a `GameState` and player, it r
 Current transition rules:
 
 - Playing a bird spends food, spends required eggs, removes the bird from hand, and appends a `BirdSlot` to the selected habitat.
-- Gaining food removes one die from the birdfeeder and increments the player's food token count.
-- Laying eggs fills played birds in deterministic habitat order up to capacity.
-- Drawing from the tray adds the selected card to hand and replenishes the tray from the deck when possible.
-- Drawing from the deck adds the top bird-deck card to hand.
-- Round transition resets action cubes to 7, 6, and 5 for rounds 2, 3, and 4.
+- Gaining food uses habitat-scaled food counts, optional discard-card conversions, and deterministic reroll choices when the birdfeeder can be rerolled.
+- Laying eggs uses habitat-scaled egg counts and optional spend-food conversions, then fills played birds in deterministic habitat order up to capacity.
+- Drawing cards uses habitat-scaled card counts, tray/deck choice tuples, and optional spend-egg conversions.
+- Habitat powers resolve right-to-left after the base habitat action.
+- Round transition scores the completed competitive round goal, refreshes the public bird tray, rotates first player, and resets action cubes to 7, 6, and 5 for rounds 2, 3, and 4.
 - The game is marked over after all round-4 action cubes are spent.
 
 ## Scoring
 
-The current final-score skeleton counts:
+The current final-score implementation counts:
 
 - Bird victory points.
 - Eggs.
 - Cached food.
 - Tucked cards.
+- Accumulated competitive round-goal placement points.
+- A broader slice of base-game bonus-card handlers.
 
-The first scoring handlers are intentionally narrow:
-
-- Bonus cards: `Bird Feeder`, `Backyard Birder`, and `Bird Counter`.
-- Round goals: simple count-based handlers for birds or eggs in habitats.
-
-These handlers are useful for plumbing tests and early telemetry, but true competitive round-goal placement scoring still needs a multiplayer scoring pass.
+The bonus-card handlers are still not exhaustive, but common base-game categories such as nest type, food cost, predator/flocking tags, habitat-only birds, wingspan thresholds, egg thresholds, and some name-based cards are now covered for smoke experiments.
 
 ## Power Handlers
 
@@ -90,7 +87,9 @@ The first executable power path is deliberately small:
 
 - White powers are checked after playing a bird.
 - Brown powers are checked after activating the matching habitat action.
-- Implemented text templates currently cover simple `Gain 1 [food]` powers and simple `Draw 1 [card]` powers.
+- Brown powers resolve right-to-left.
+- Pink powers have first deterministic reaction hooks for egg laying, food gain, caching, and tuck reactions.
+- Implemented text templates currently cover simple `Gain 1 [food]`, `Gain 1 [die]`, `Draw 1 [card]`, `Lay 1 [egg]`, simple tuck/draw, cache, and all-player food powers.
 
 This is a scaffold, not a full parser. High-volume powers should be mapped to registry handler keys before strategic experiments treat them as faithful.
 
