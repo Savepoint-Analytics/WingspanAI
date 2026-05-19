@@ -16,6 +16,7 @@ rulebook_pdfs/*
 *.pdf
 
 mlruns/
+artifacts/
 *.pkl
 *.joblib
 

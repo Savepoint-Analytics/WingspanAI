@@ -1212,6 +1212,7 @@ def _roll_birdfeeder_for_state(
                 result=list(result),
                 round_number=state.round_state.round_number,
                 turn_number=state.round_state.turn_number,
+                round_turn_number=state.round_state.round_turn_number,
                 player_id=player_id,
                 action_type=action_type,
             )
@@ -1261,6 +1262,7 @@ def _record_deck_draw(
             result=card_names,
             round_number=state.round_state.round_number,
             turn_number=state.round_state.turn_number,
+            round_turn_number=state.round_state.round_turn_number,
             player_id=player_id,
             action_type="draw_cards",
         )
@@ -1360,6 +1362,7 @@ def _advance_turn(state: GameState) -> None:
             candidate.action_cubes_available = cubes_for_round
         state.round_state.active_player_index = completed_round % len(state.players)
         state.round_state.turn_number += 1
+        state.round_state.round_turn_number = 1
         return
 
     next_index = (state.round_state.active_player_index + 1) % len(state.players)
@@ -1367,6 +1370,7 @@ def _advance_turn(state: GameState) -> None:
         next_index = (next_index + 1) % len(state.players)
     state.round_state.active_player_index = next_index
     state.round_state.turn_number += 1
+    state.round_state.round_turn_number += 1
 
 
 def _score_completed_round_goal(state: GameState) -> None:

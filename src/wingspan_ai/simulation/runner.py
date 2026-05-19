@@ -164,12 +164,14 @@ def run_single_game(
             legal_actions,
             action,
         )
+        action_state = state
         previous_round = state.round_state.round_number
         state = apply_action(state, action)
         _record_public_snapshot(public_state_snapshots, state)
         turns_played += 1
         _emit_action_resolved(
             sink,
+            action_state,
             state,
             resolved_run_id,
             active_player.player_id,
@@ -237,6 +239,7 @@ def _base_event(
         agent_id=state.active_player.agent_id,
         round_number=state.round_state.round_number,
         turn_number=state.round_state.turn_number,
+        round_turn_number=state.round_state.round_turn_number,
         random_seed=state.random_seed,
         public_state_ref=_public_state_ref(state),
         payload=payload,
@@ -299,6 +302,7 @@ def _emit_setup_selection_applied(
             agent_id=payload["agent_id"],
             round_number=state.round_state.round_number,
             turn_number=state.round_state.turn_number,
+            round_turn_number=state.round_state.round_turn_number,
             random_seed=state.random_seed,
             public_state_ref=_public_state_ref(state),
             private_state_included=True,
@@ -391,7 +395,8 @@ def _emit_agent_decision_summary(
 
 def _emit_action_resolved(
     sink: InMemoryEventSink,
-    state: GameState,
+    action_state: GameState,
+    next_state: GameState,
     simulation_run_id: str,
     player_id: str,
     action: LegalAction,
@@ -403,12 +408,17 @@ def _emit_action_resolved(
     sink.emit(
         _base_event(
             EventName.ACTION_RESOLVED,
-            state,
+            action_state,
             simulation_run_id,
             acting_player_id=player_id,
             action=action.model_dump(mode="json"),
             state_hash_before=state_hash_before,
             state_hash_after=state_hash_after,
+            next_public_state_ref=_public_state_ref(next_state),
+            next_round_number=next_state.round_state.round_number,
+            next_turn_number=next_state.round_state.turn_number,
+            next_round_turn_number=next_state.round_state.round_turn_number,
+            next_active_player_id=next_state.active_player.player_id,
             rng_draws=rng_draws,
         )
     )

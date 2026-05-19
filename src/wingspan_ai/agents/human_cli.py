@@ -58,7 +58,11 @@ class HumanCliAgent:
             raise ValueError("HumanCliAgent cannot select from an empty action list")
 
         player = state.active_player
-        print(f"\nRound {state.round_state.round_number}, turn {state.round_state.turn_number}")
+        print(
+            f"\nRound {state.round_state.round_number}, "
+            f"round turn {state.round_state.round_turn_number} "
+            f"(global turn {state.round_state.turn_number})"
+        )
         print(f"Active player: {player.player_id}")
         print(f"Food: {dict(player.food_tokens)}")
         print(f"Hand: {[card.common_name for card in player.hand]}")

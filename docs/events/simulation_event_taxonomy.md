@@ -22,7 +22,8 @@ Every event uses a stable envelope:
 | `player_id` | Current active player where applicable. |
 | `agent_id` | Current active agent where applicable. |
 | `round_number` | Current round. |
-| `turn_number` | Current turn. |
+| `turn_number` | Global player-action index across the whole game. |
+| `round_turn_number` | Player-action index within the current round. For a 2-player base game this tops out at 16, 14, 12, and 10 across rounds 1-4. |
 | `random_seed` | Seed used for setup and reproducibility. |
 | `public_state_ref` | Reference key for a public state snapshot or replay frame. |
 | `private_state_included` | Explicit flag for private/debug payloads. |
@@ -39,7 +40,7 @@ Every event uses a stable envelope:
 | `turn_started` | The active player starts a turn. | none yet |
 | `legal_actions_generated` | Rules engine returns concrete legal actions. | `legal_action_count`, `legal_actions` |
 | `action_selected` | Agent selects an action. | `agent_id`, `action`, `state_hash_before` |
-| `action_resolved` | Transition has been applied. | `acting_player_id`, `action`, `state_hash_before`, `state_hash_after`, `rng_draws` |
+| `action_resolved` | Transition has been applied. Its envelope uses the same action-start round/turn as `action_selected`; next-state counters live in the payload. | `acting_player_id`, `action`, `state_hash_before`, `state_hash_after`, `next_round_number`, `next_turn_number`, `next_round_turn_number`, `rng_draws` |
 | `game_ended` | Runner builds final outcome. | `outcome`, `score_breakdowns` |
 | `agent_decision_summary` | Agent provides policy diagnostics for the selected action. | `policy`, `legal_action_count`, `selected_action_type`, policy-specific fields |
 
@@ -50,6 +51,8 @@ Events default to public or aggregate information. Any event that includes playe
 ## Public State Snapshots
 
 `SimulationResult.public_state_snapshots` stores JSON-serializable public observations keyed by `public_state_ref`. This gives analysis notebooks and future replay tools a stable handle for the public state around each emitted event without including private hands, bonus cards, or deck order.
+
+Multiple telemetry events are emitted for one player action (`turn_started`, `legal_actions_generated`, `action_selected`, `agent_decision_summary`, `action_resolved`). Count `action_selected` or `action_resolved` events, not all events, when auditing Wingspan action-cube turn limits.
 
 `write_simulation_artifacts(result, output_dir)` writes:
 

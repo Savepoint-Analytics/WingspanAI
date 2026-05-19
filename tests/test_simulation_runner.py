@@ -105,6 +105,41 @@ class SimulationRunnerTests(TestCase):
         )
         self.assertTrue(setup_event.private_state_included)
 
+    def test_runner_round_turn_counts_match_base_game_action_cubes(self) -> None:
+        result = run_single_game(
+            self.catalog,
+            [RandomLegalAgent(random_seed=12), GreedyBaselineAgent()],
+            random_seed=12,
+        )
+
+        selected_events = [
+            event for event in result.events if event.event_name == EventName.ACTION_SELECTED
+        ]
+        resolved_events = [
+            event for event in result.events if event.event_name == EventName.ACTION_RESOLVED
+        ]
+        round_counts = {
+            round_number: sum(1 for event in selected_events if event.round_number == round_number)
+            for round_number in range(1, 5)
+        }
+        max_round_turns = {
+            round_number: max(
+                event.round_turn_number or 0
+                for event in selected_events
+                if event.round_number == round_number
+            )
+            for round_number in range(1, 5)
+        }
+
+        self.assertEqual(round_counts, {1: 16, 2: 14, 3: 12, 4: 10})
+        self.assertEqual(max_round_turns, round_counts)
+        self.assertEqual(len(selected_events), 52)
+        for selected_event, resolved_event in zip(selected_events, resolved_events, strict=True):
+            self.assertEqual(resolved_event.turn_number, selected_event.turn_number)
+            self.assertEqual(resolved_event.round_turn_number, selected_event.round_turn_number)
+            self.assertIn("next_turn_number", resolved_event.payload)
+            self.assertIn("next_round_turn_number", resolved_event.payload)
+
     def test_replay_validator_reconstructs_smoke_game_hashes(self) -> None:
         result = run_single_game(
             self.catalog,
