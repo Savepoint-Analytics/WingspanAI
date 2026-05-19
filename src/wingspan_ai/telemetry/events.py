@@ -15,6 +15,7 @@ class EventName(StrEnum):
 
     SIMULATION_RUN_STARTED = "simulation_run_started"
     GAME_STARTED = "game_started"
+    SETUP_SELECTION_APPLIED = "setup_selection_applied"
     ROUND_STARTED = "round_started"
     TURN_STARTED = "turn_started"
     LEGAL_ACTIONS_GENERATED = "legal_actions_generated"

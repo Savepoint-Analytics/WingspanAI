@@ -16,6 +16,7 @@ from wingspan_ai.rules.base_game import (
     score_player,
     setup_base_game,
 )
+from wingspan_ai.simulation.replay import state_hash
 from wingspan_ai.state.models import GameState, to_public_state
 from wingspan_ai.telemetry.events import EventName, InMemoryEventSink, SimulationEvent
 
@@ -78,19 +79,37 @@ def run_single_game(
     )
     bird_discards = []
     bonus_discards = []
+    setup_selection_events: list[dict] = []
     for player, agent in zip(state.players, agents, strict=True):
         player.agent_id = agent.agent_id
         selection_chooser = getattr(agent, "choose_initial_selection", None)
+        selection_source = "agent" if callable(selection_chooser) else "default"
         selection = (
             selection_chooser(player)
             if callable(selection_chooser)
             else choose_default_initial_selection(player)
         )
-        discarded_birds, discarded_bonus_cards = apply_initial_selection_choice(
+        discarded_birds_for_player, discarded_bonus_for_player = apply_initial_selection_choice(
             player, selection
         )
-        bird_discards.extend(discarded_birds)
-        bonus_discards.extend(discarded_bonus_cards)
+        bird_discards.extend(discarded_birds_for_player)
+        bonus_discards.extend(discarded_bonus_for_player)
+        setup_selection_events.append(
+            {
+                "player_id": player.player_id,
+                "agent_id": agent.agent_id,
+                "selection_source": selection_source,
+                "kept_bird_names": list(selection.kept_bird_names),
+                "kept_bonus_card_names": list(selection.kept_bonus_card_names),
+                "starting_food": [food.value for food in selection.starting_food],
+                "discarded_bird_names": [
+                    card.common_name for card in discarded_birds_for_player
+                ],
+                "discarded_bonus_card_names": [
+                    card.name for card in discarded_bonus_for_player
+                ],
+            }
+        )
     state.decks.bird_discard.extend(bird_discards)
     state.decks.bonus_discard.extend(bonus_discards)
 
@@ -98,6 +117,8 @@ def run_single_game(
     public_state_snapshots: dict[str, dict] = {}
     _record_public_snapshot(public_state_snapshots, state)
     _emit_run_started(sink, state, resolved_run_id, agents)
+    for setup_payload in setup_selection_events:
+        _emit_setup_selection_applied(sink, state, resolved_run_id, setup_payload)
     _emit_game_started(sink, state, resolved_run_id)
     _emit_round_started(sink, state, resolved_run_id)
 
@@ -125,12 +146,41 @@ def run_single_game(
         if action not in legal_actions:
             raise ValueError(f"agent {agent.agent_id} selected an illegal action: {action}")
 
-        _emit_action_selected(sink, state, resolved_run_id, active_player.agent_id, action)
+        state_hash_before = state_hash(state)
+        rng_record_count_before = len(state.rng_draw_records)
+        _emit_action_selected(
+            sink,
+            state,
+            resolved_run_id,
+            active_player.agent_id,
+            action,
+            state_hash_before=state_hash_before,
+        )
+        _emit_agent_decision_summary(
+            sink,
+            state,
+            resolved_run_id,
+            agent,
+            legal_actions,
+            action,
+        )
         previous_round = state.round_state.round_number
         state = apply_action(state, action)
         _record_public_snapshot(public_state_snapshots, state)
         turns_played += 1
-        _emit_action_resolved(sink, state, resolved_run_id, active_player.player_id, action)
+        _emit_action_resolved(
+            sink,
+            state,
+            resolved_run_id,
+            active_player.player_id,
+            action,
+            state_hash_before=state_hash_before,
+            state_hash_after=state_hash(state),
+            rng_draws=[
+                record.model_dump(mode="json")
+                for record in state.rng_draw_records[rng_record_count_before:]
+            ],
+        )
 
         if state.round_state.round_number != previous_round and not state.round_state.game_over:
             _emit_round_started(sink, state, resolved_run_id)
@@ -233,6 +283,30 @@ def _emit_game_started(sink: InMemoryEventSink, state: GameState, simulation_run
     )
 
 
+def _emit_setup_selection_applied(
+    sink: InMemoryEventSink,
+    state: GameState,
+    simulation_run_id: str,
+    payload: dict,
+) -> None:
+    sink.emit(
+        SimulationEvent(
+            event_name=EventName.SETUP_SELECTION_APPLIED,
+            simulation_run_id=simulation_run_id,
+            game_id=state.game_id,
+            ruleset_id=state.ruleset.ruleset_id,
+            player_id=payload["player_id"],
+            agent_id=payload["agent_id"],
+            round_number=state.round_state.round_number,
+            turn_number=state.round_state.turn_number,
+            random_seed=state.random_seed,
+            public_state_ref=_public_state_ref(state),
+            private_state_included=True,
+            payload=payload,
+        )
+    )
+
+
 def _emit_round_started(sink: InMemoryEventSink, state: GameState, simulation_run_id: str) -> None:
     sink.emit(
         _base_event(
@@ -273,6 +347,8 @@ def _emit_action_selected(
     simulation_run_id: str,
     agent_id: str | None,
     action: LegalAction,
+    *,
+    state_hash_before: str,
 ) -> None:
     sink.emit(
         _base_event(
@@ -281,6 +357,34 @@ def _emit_action_selected(
             simulation_run_id,
             agent_id=agent_id,
             action=action.model_dump(mode="json"),
+            state_hash_before=state_hash_before,
+        )
+    )
+
+
+def _emit_agent_decision_summary(
+    sink: InMemoryEventSink,
+    state: GameState,
+    simulation_run_id: str,
+    agent: AgentPolicy,
+    legal_actions: list[LegalAction],
+    action: LegalAction,
+) -> None:
+    summarizer = getattr(agent, "summarize_decision", None)
+    if callable(summarizer):
+        payload = summarizer(state, legal_actions, action)
+    else:
+        payload = {
+            "policy": "unknown",
+            "legal_action_count": len(legal_actions),
+            "selected_action_type": action.action_type.value,
+        }
+    sink.emit(
+        _base_event(
+            EventName.AGENT_DECISION_SUMMARY,
+            state,
+            simulation_run_id,
+            **payload,
         )
     )
 
@@ -291,6 +395,10 @@ def _emit_action_resolved(
     simulation_run_id: str,
     player_id: str,
     action: LegalAction,
+    *,
+    state_hash_before: str,
+    state_hash_after: str,
+    rng_draws: list[dict],
 ) -> None:
     sink.emit(
         _base_event(
@@ -299,6 +407,9 @@ def _emit_action_resolved(
             simulation_run_id,
             acting_player_id=player_id,
             action=action.model_dump(mode="json"),
+            state_hash_before=state_hash_before,
+            state_hash_after=state_hash_after,
+            rng_draws=rng_draws,
         )
     )
 

@@ -7,3 +7,4 @@ Keep orchestration here and core simulator/rules logic in `src/wingspan_ai/`.
 Current flows:
 
 - `simulation_batch.py`: runs a small seeded random-vs-greedy batch. It uses Prefect decorators when Prefect is installed and falls back to plain Python functions for local smoke tests. If `data/raw/wingspan-card-list.xlsx` is absent, it uses the package sample catalog.
+- `human_vs_greedy.py`: runs an interactive terminal game with `HumanCliAgent` against the greedy baseline. It uses the same legal action generation as automated agents, so human play is feasible without a separate UI.

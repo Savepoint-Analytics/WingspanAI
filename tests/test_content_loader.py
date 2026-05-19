@@ -35,8 +35,9 @@ class ContentLoaderTests(TestCase):
         self.assertIn("Gain 1 [seed]", acorn_woodpecker.power.text or "")
         self.assertEqual(
             acorn_woodpecker.power.implementation_status,
-            PowerImplementationStatus.NOT_IMPLEMENTED,
+            PowerImplementationStatus.HEURISTIC_RESOLUTION,
         )
+        self.assertEqual(acorn_woodpecker.power.handler_key, "gain_food_from_birdfeeder")
 
     def test_loader_can_load_all_known_workbook_content(self) -> None:
         catalog = load_content_catalog(WORKBOOK_PATH)

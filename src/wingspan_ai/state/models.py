@@ -108,6 +108,20 @@ class RoundState(BaseModel):
     game_over: bool = False
 
 
+class RngDrawRecord(BaseModel):
+    """Auditable record of a deterministic stochastic draw."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    draw_type: str
+    seed_material: str
+    result: list[FoodType] | list[str]
+    round_number: int
+    turn_number: int
+    player_id: str | None = None
+    action_type: str | None = None
+
+
 class GameState(BaseModel):
     """Full simulator state for a seeded Wingspan game."""
 
@@ -122,6 +136,7 @@ class GameState(BaseModel):
     birdfeeder: BirdfeederState = Field(default_factory=BirdfeederState)
     round_goals: list[RoundGoal] = Field(default_factory=list, max_length=4)
     round_state: RoundState = Field(default_factory=RoundState)
+    rng_draw_records: list[RngDrawRecord] = Field(default_factory=list)
 
     @property
     def active_player(self) -> PlayerState:

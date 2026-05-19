@@ -531,6 +531,45 @@ Keep rule-fidelity improvements in the rules engine and action models, with base
 - [ ] Add exact replay hashes and explicit RNG draw records.
 - [ ] Audit competitive round-goal scoring against the local rulebook PDFs before publishing results.
 
+## Update: 2026-05-16 - Replay telemetry and registry-backed power slice added
+
+### What changed
+Added registry-backed power text classification during workbook loading and runtime resolution. The first expanded handler slice now covers predator hunt approximations, discard-egg-to-gain-food, discard-food-to-tuck, fixed food from supply, and the existing draw/lay/tuck/cache/pink hooks through stable handler keys.
+
+Added replay/debug support with full-state hashes, RNG draw records on stochastic rerolls and predator approximations, `replay_debug.json` artifacts, setup-selection telemetry, and emitted agent decision summaries. Added `src/wingspan_ai/rules/scoring_audit.py` plus `docs/rules/scoring_handler_audit.md` to expose bonus-card and round-goal scoring coverage.
+
+### Why it matters
+Simulation traces are now easier to audit: action events carry before/after state hashes, stochastic approximations are recorded, and setup choices are visible as private telemetry. Power and scoring support is still incomplete, but unsupported scoring/power areas are easier to identify and avoid overclaiming.
+
+### Decision
+Keep moving power behavior behind stable registry handler keys rather than expanding ad hoc text matching. Treat replay hashes and decision summaries as required smoke-batch telemetry from this point forward.
+
+### Follow-up tasks
+- [x] Add a replay validator that reconstructs event traces and checks state hashes.
+- [x] Add exact deck draw records if private full-game replay becomes required.
+- [x] Expand opponent-choice, "all players may", and deck-search power handlers.
+- [x] Add per-handler rulebook/source-section references for scoring and powers.
+- [ ] Add exact rulebook page numbers once PDF page mapping is audited.
+- [ ] Add scoring audit output to batch/tournament summaries.
+
+## Update: 2026-05-16 - Replay validator and human CLI path added
+
+### What changed
+Added `validate_simulation_replay` in `src/wingspan_ai/simulation/replay.py` to reconstruct setup and action transitions from telemetry, then verify `state_hash_before` and `state_hash_after` on every resolved action. Added exact deck draw records for direct deck draws, tray replenishment, round-end tray refresh, tuck-from-deck powers, and deck-search powers.
+
+Expanded handler metadata with rulebook path and source-section fields. Added handler coverage for all-player gain-food, all-player lay-egg, and deck-search tuck-by-wingspan templates. Added `HumanCliAgent` and `flows/human_vs_greedy.py`, confirming a human can participate through the same legal-action interface as automated agents.
+
+### Why it matters
+The simulator can now audit a telemetry trace by replaying it, and human play is feasible without a separate UI because policies are already pluggable. This makes manual spot-checking and future human-vs-agent experiments possible while preserving the same rules boundary.
+
+### Decision
+Treat human play as a local terminal workflow for now. A richer UI can wait until the rules engine is more complete.
+
+### Follow-up tasks
+- [ ] Add a friendlier action renderer for human play instead of raw `LegalAction` JSON.
+- [ ] Add exact rulebook page numbers for each handler after PDF page mapping.
+- [ ] Add scoring audit output to batch/tournament summaries.
+
 ## Decision log
 
 | Date | Decision | Notes |

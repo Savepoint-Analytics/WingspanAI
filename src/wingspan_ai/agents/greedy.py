@@ -34,6 +34,26 @@ class GreedyBaselineAgent:
     def choose_action(self, state: GameState) -> LegalAction:
         return self.select_action(state, legal_actions_for_current_player(state))
 
+    def summarize_decision(
+        self,
+        state: GameState,
+        legal_actions: list[LegalAction],
+        selected_action: LegalAction,
+    ) -> dict:
+        """Explain the greedy action in terms of immediate score and resource need."""
+
+        player_id = state.active_player.player_id
+        before_score = score_player(state, player_id).total
+        next_state = apply_action(state, selected_action)
+        score_delta = score_player(next_state, player_id).total - before_score
+        return {
+            "policy": "greedy_immediate_score",
+            "legal_action_count": len(legal_actions),
+            "selected_action_type": selected_action.action_type.value,
+            "score_delta": score_delta,
+            "food_need_score": _food_need_score(state, selected_action),
+        }
+
 
 def _heuristic_tiebreaker(state: GameState, action: LegalAction) -> int:
     if action.action_type == ActionType.PLAY_BIRD:

@@ -49,6 +49,30 @@ class StrategyArchetypeAgent:
         ]
         return max(scored_actions, key=lambda item: item[0])[1]
 
+    def summarize_decision(
+        self,
+        state: GameState,
+        legal_actions: list[LegalAction],
+        selected_action: LegalAction,
+    ) -> dict:
+        """Explain the archetype-weighted action for telemetry."""
+
+        player_id = state.active_player.player_id
+        before_score = score_player(state, player_id).total
+        return {
+            "policy": "strategy_archetype",
+            "archetype": self.archetype.value,
+            "legal_action_count": len(legal_actions),
+            "selected_action_type": selected_action.action_type.value,
+            "action_score": _score_action_for_archetype(
+                state,
+                selected_action,
+                self.archetype,
+                before_score,
+            ),
+            "food_need_score": _food_need_score(state, selected_action),
+        }
+
 
 def _score_action_for_archetype(
     state: GameState,

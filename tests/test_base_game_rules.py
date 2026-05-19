@@ -104,10 +104,12 @@ class BaseGameRulesTests(TestCase):
         self.state.birdfeeder = BirdfeederState(dice=[FoodType.SEED])
         starting_seed = self.state.players[0].food_tokens[FoodType.SEED]
 
-        next_state = apply_action(
-            self.state,
-            LegalAction(action_type=ActionType.GAIN_FOOD, player_id="p1", food_type=FoodType.SEED),
+        action = next(
+            action
+            for action in legal_actions_for_current_player(self.state)
+            if action.action_type == ActionType.GAIN_FOOD and FoodType.SEED in action.food_types
         )
+        next_state = apply_action(self.state, action)
 
         self.assertEqual(next_state.players[0].food_tokens[FoodType.SEED], starting_seed + 1)
         self.assertEqual(next_state.birdfeeder.dice, [])
@@ -319,10 +321,12 @@ class BaseGameRulesTests(TestCase):
             dice=[FoodType.SEED, FoodType.FISH, FoodType.FRUIT]
         )
 
-        next_state = apply_action(
-            self.state,
-            LegalAction(action_type=ActionType.GAIN_FOOD, player_id="p1", food_type=FoodType.SEED),
+        action = next(
+            action
+            for action in legal_actions_for_current_player(self.state)
+            if action.action_type == ActionType.GAIN_FOOD and FoodType.SEED in action.food_types
         )
+        next_state = apply_action(self.state, action)
 
         self.assertEqual(next_state.players[1].food_tokens[FoodType.FISH], 1)
 
@@ -364,3 +368,98 @@ class BaseGameRulesTests(TestCase):
         score = score_player(self.state, "p1")
 
         self.assertEqual(score.bonus_points, 4)
+
+    def test_discard_egg_gain_wild_food_power_uses_needed_hand_food(self) -> None:
+        raven_card = self.catalog.birds[0].model_copy(
+            update={
+                "common_name": "Egg Discard Food Bird",
+                "power": Power(
+                    color=PowerColor.BROWN,
+                    text=(
+                        "Discard 1 [egg] from any of your other birds to gain "
+                        "1 [wild] from the supply."
+                    ),
+                    implementation_status=PowerImplementationStatus.HEURISTIC_RESOLUTION,
+                    handler_key="discard_egg_gain_wild_food",
+                ),
+            }
+        )
+        egg_source = self.catalog.birds[1]
+        fish_card = self.catalog.birds[2].model_copy(
+            update={
+                "food_cost": self.catalog.birds[2].food_cost.model_copy(
+                    update={"fixed": {FoodType.FISH: 1}}
+                )
+            }
+        )
+        player = self.state.players[0]
+        player.hand = [fish_card]
+        player.habitats[Habitat.GRASSLAND].append(BirdSlot(card=egg_source, eggs=1))
+        player.habitats[Habitat.FOREST].append(BirdSlot(card=raven_card))
+        self.state.birdfeeder = BirdfeederState(dice=[FoodType.SEED])
+
+        action = next(
+            action
+            for action in legal_actions_for_current_player(self.state)
+            if action.action_type == ActionType.GAIN_FOOD and FoodType.SEED in action.food_types
+        )
+        next_state = apply_action(self.state, action)
+
+        self.assertEqual(next_state.players[0].food_tokens[FoodType.FISH], 1)
+
+    def test_predator_power_records_rng_and_caches_on_success(self) -> None:
+        predator_card = self.catalog.birds[0].model_copy(
+            update={
+                "common_name": "Predator Bird",
+                "predator": True,
+                "power": Power(
+                    color=PowerColor.BROWN,
+                    text="Roll all dice not in birdfeeder. If any are [rodent], cache 1 [rodent].",
+                    implementation_status=PowerImplementationStatus.HEURISTIC_RESOLUTION,
+                    handler_key="predator_hunt",
+                ),
+            }
+        )
+        player = self.state.players[0]
+        player.habitats[Habitat.FOREST].append(BirdSlot(card=predator_card))
+        self.state.birdfeeder = BirdfeederState(dice=[FoodType.SEED])
+
+        next_state = apply_action(
+            self.state,
+            LegalAction(action_type=ActionType.GAIN_FOOD, player_id="p1", food_type=FoodType.SEED),
+        )
+
+        self.assertTrue(next_state.rng_draw_records)
+        self.assertEqual(next_state.rng_draw_records[-1].draw_type, "predator_hunt")
+
+    def test_deck_search_power_records_revealed_card(self) -> None:
+        search_card = self.catalog.birds[0].model_copy(
+            update={
+                "common_name": "Deck Search Bird",
+                "power": Power(
+                    color=PowerColor.BROWN,
+                    text=(
+                        "Look at a [card] from the deck. If less than 75cm, "
+                        "tuck it behind this bird. If not, discard it."
+                    ),
+                    implementation_status=PowerImplementationStatus.HEURISTIC_RESOLUTION,
+                    handler_key="deck_search_tuck_by_wingspan",
+                ),
+            }
+        )
+        player = self.state.players[0]
+        player.habitats[Habitat.WETLAND].append(BirdSlot(card=search_card))
+
+        action = next(
+            action
+            for action in legal_actions_for_current_player(self.state)
+            if action.action_type == ActionType.DRAW_CARDS
+        )
+        next_state = apply_action(self.state, action)
+
+        self.assertTrue(
+            any(
+                record.draw_type == "bird_power_deck_search"
+                for record in next_state.rng_draw_records
+            )
+        )

@@ -32,3 +32,17 @@ class RandomLegalAgent:
         """Choose an action for the active player in the provided game state."""
 
         return self.select_action(legal_actions_for_current_player(state))
+
+    def summarize_decision(
+        self,
+        _state: GameState,
+        legal_actions: list[LegalAction],
+        selected_action: LegalAction,
+    ) -> dict:
+        """Return a lightweight explanation for telemetry."""
+
+        return {
+            "policy": "uniform_random",
+            "legal_action_count": len(legal_actions),
+            "selected_action_type": selected_action.action_type.value,
+        }

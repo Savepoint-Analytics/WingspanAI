@@ -19,6 +19,10 @@ The first registry lives in `src/wingspan_ai/rules/power_registry.py`.
 | `tuck_card` | `heuristic_resolution` | Deterministic handler for simple tuck-one-card templates, including tuck-then-draw variants. |
 | `cache_food` | `heuristic_resolution` | Deterministic handler for simple cache-one-food templates. |
 | `pink_reaction` | `heuristic_resolution` | First deterministic hooks for opponent-turn lay-egg, gain-food, cache, and tuck reactions. |
+| `predator_hunt` | `heuristic_resolution` | Deterministic seeded approximation for predator hunt rolls. |
+| `discard_egg_gain_wild_food` | `heuristic_resolution` | Spends an egg and gains food prioritized by visible hand needs. |
+| `discard_to_tuck` | `heuristic_resolution` | Spends required food and tucks cards from the deck when available. |
+| `gain_food_from_supply` | `heuristic_resolution` | Adds fixed food directly to the player's supply. |
 
 ## Registry Fields
 
@@ -32,6 +36,6 @@ The first registry lives in `src/wingspan_ai/rules/power_registry.py`.
 ## Near-Term Additions
 
 - Add handler keys during content normalization for cards whose power text matches known templates.
-- Move current text-template checks behind registry-backed handler keys.
-- Implement remaining high-volume base powers first, especially predator hunt and discard-to-gain/discard-to-tuck choices.
+- Continue moving current text-template checks behind registry-backed handler keys.
+- Implement remaining high-volume base powers first, especially opponent-choice powers, "all players may" choices, deck-search powers, and exact predator constraints.
 - Let experiment configs filter by handler status before running strategic comparisons.

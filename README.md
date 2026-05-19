@@ -199,6 +199,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/simulation/artifacts.py`: writes outcome, event, and public-state snapshot artifacts.
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
+- `src/wingspan_ai/agents/human_cli.py`: terminal-backed human player policy for local human-vs-agent smoke games.
 - `src/wingspan_ai/agents/archetypes.py`: scripted strategy archetype bots for behavioural signatures.
 - `src/wingspan_ai/agents/monte_carlo.py`: first Monte Carlo rollout agent.
 - `src/wingspan_ai/simulation/tournament.py`: seeded tournament runner and matchup summaries.
@@ -206,6 +207,8 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/telemetry/api.py`: draft FastAPI event ingestion service.
 - `src/wingspan_ai/telemetry/postgres.py`: optional PostgreSQL event repository.
 - `src/wingspan_ai/simulation/runner.py`: single-game runner with event emission and outcomes.
+- `src/wingspan_ai/simulation/replay.py`: deterministic state hashing helpers for replay/debug audits.
+- `src/wingspan_ai/rules/scoring_audit.py`: bonus-card and round-goal scoring coverage audit helper.
 - `src/wingspan_ai/experiments/mlflow_tracking.py`: MLflow logging skeleton for simulation results.
 - `flows/simulation_batch.py`: Prefect-compatible seeded simulation batch flow.
 - `analysis/simulation_summary.py`: first reusable analysis helpers for outcomes and action frequency.

@@ -33,18 +33,19 @@ Every event uses a stable envelope:
 | Event | Emitted when | Key payload fields |
 |---|---|---|
 | `simulation_run_started` | A runner starts one game or batch member. | `player_count`, `agents` |
+| `setup_selection_applied` | A player keeps/discards opening cards and starting food. | `selection_source`, `kept_bird_names`, `kept_bonus_card_names`, `starting_food` |
 | `game_started` | Setup has produced initial public game state. | `bird_deck_count`, `bonus_deck_count`, `bird_tray`, `round_goals` |
 | `round_started` | A new round begins. | `action_cubes` |
 | `turn_started` | The active player starts a turn. | none yet |
 | `legal_actions_generated` | Rules engine returns concrete legal actions. | `legal_action_count`, `legal_actions` |
-| `action_selected` | Agent selects an action. | `agent_id`, `action` |
-| `action_resolved` | Transition has been applied. | `acting_player_id`, `action` |
+| `action_selected` | Agent selects an action. | `agent_id`, `action`, `state_hash_before` |
+| `action_resolved` | Transition has been applied. | `acting_player_id`, `action`, `state_hash_before`, `state_hash_after`, `rng_draws` |
 | `game_ended` | Runner builds final outcome. | `outcome`, `score_breakdowns` |
-| `agent_decision_summary` | Reserved for richer policy diagnostics. | not emitted yet |
+| `agent_decision_summary` | Agent provides policy diagnostics for the selected action. | `policy`, `legal_action_count`, `selected_action_type`, policy-specific fields |
 
 ## Private Information Rule
 
-Events default to public or aggregate information. Any event that includes player hands, bonus cards, deck order, hidden scoring estimates, or training-only labels must set `private_state_included=true` and document why the payload is acceptable for the destination.
+Events default to public or aggregate information. Any event that includes player hands, bonus cards, deck order, hidden scoring estimates, or training-only labels must set `private_state_included=true` and document why the payload is acceptable for the destination. Setup-selection events intentionally include private opening-hand choices and are marked private.
 
 ## Public State Snapshots
 
@@ -55,12 +56,13 @@ Events default to public or aggregate information. Any event that includes playe
 - `outcome.json`
 - `events.jsonl`
 - `public_state_snapshots.json`
+- `replay_debug.json`
 
 ## Replay Direction
 
-The first runner stores enough action-level history and public snapshots to inspect decisions, but exact replay will also need deck-order references and stochastic resolution records once bird powers are implemented.
+The runner stores action-level history, public snapshots, state hashes, and explicit RNG draw records for deterministic rerolls and stochastic power approximations.
 
-Near-term replay additions:
+Replay validation:
 
-- Add `state_hash_before` and `state_hash_after`.
-- Add explicit RNG draw records for birdfeeder rerolls, predator powers, deck draws, and stochastic power handlers.
+- `validate_simulation_replay(catalog, events)` reconstructs setup and transitions from telemetry, then verifies recorded state hashes.
+- Deck draw records are emitted for direct deck draws, tray replenishment, tray refresh, tuck-from-deck powers, and deck-search powers.

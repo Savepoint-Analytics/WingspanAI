@@ -375,18 +375,27 @@ def _parse_food_cost(row: dict[Any, Any]) -> FoodCost:
 
 
 def _parse_power(row: dict[Any, Any]) -> Power:
+    from wingspan_ai.rules.power_registry import (
+        POWER_HANDLER_REGISTRY,
+        classify_power_handler_key,
+    )
+
     raw_color = row.get("Color")
     raw_text = row.get("Power text")
     color = PowerColor.NONE if is_blank(raw_color) else PowerColor(str(raw_color).strip().lower())
+    text = None if is_blank(raw_text) else str(raw_text)
+    handler_key = classify_power_handler_key(text, color)
+    handler = POWER_HANDLER_REGISTRY.get(handler_key or "")
     status = (
-        PowerImplementationStatus.NO_OP_FOR_V1
-        if color == PowerColor.NONE and is_blank(raw_text)
+        handler.implementation_status
+        if handler is not None
         else PowerImplementationStatus.NOT_IMPLEMENTED
     )
     return Power(
         color=color,
-        text=None if is_blank(raw_text) else str(raw_text),
+        text=text,
         implementation_status=status,
+        handler_key=handler_key,
     )
 
 

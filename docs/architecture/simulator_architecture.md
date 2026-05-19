@@ -89,9 +89,10 @@ The first executable power path is deliberately small:
 - Brown powers are checked after activating the matching habitat action.
 - Brown powers resolve right-to-left.
 - Pink powers have first deterministic reaction hooks for egg laying, food gain, caching, and tuck reactions.
-- Implemented text templates currently cover simple `Gain 1 [food]`, `Gain 1 [die]`, `Draw 1 [card]`, `Lay 1 [egg]`, simple tuck/draw, cache, and all-player food powers.
+- Workbook loading and runtime resolution now classify common power text into stable registry handler keys.
+- Implemented handler keys currently cover simple `Gain 1 [food]`, `Gain 1 [die]`, `Draw 1 [card]`, `Lay 1 [egg]`, simple tuck/draw, cache, all-player food powers, discard-egg-to-gain-food, discard-food-to-tuck, and deterministic predator approximations.
 
-This is a scaffold, not a full parser. High-volume powers should be mapped to registry handler keys before strategic experiments treat them as faithful.
+This is a scaffold, not a full parser. More high-volume powers should continue moving behind registry handler keys before strategic experiments treat them as faithful.
 
 ## Bird Powers
 

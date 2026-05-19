@@ -20,12 +20,14 @@ from wingspan_ai.content.schemas import (
     RulesModule,
 )
 from wingspan_ai.rules.actions import ActionType, LegalAction
+from wingspan_ai.rules.power_registry import classify_power_handler_key
 from wingspan_ai.state.models import (
     BirdfeederState,
     BirdSlot,
     DeckState,
     GameState,
     PlayerState,
+    RngDrawRecord,
     RoundState,
 )
 
@@ -751,12 +753,20 @@ def _apply_gain_food(player: PlayerState, state: GameState, action: LegalAction)
         _discard_card_for_action(player, action.discard_card_common_name)
     if action.reroll_birdfeeder or not state.birdfeeder.dice:
         state.birdfeeder.dice = _roll_birdfeeder_for_state(
-            state, f"legal_{len(food_types)}"
+            state,
+            f"legal_{len(food_types)}",
+            player_id=player.player_id,
+            action_type=action.action_type.value,
+            record=True,
         )
     for food_type in food_types:
         if food_type not in state.birdfeeder.dice and _can_reroll_birdfeeder(state.birdfeeder):
             state.birdfeeder.dice = _roll_birdfeeder_for_state(
-                state, f"gain_food_action_{food_type}"
+                state,
+                f"gain_food_action_{food_type}",
+                player_id=player.player_id,
+                action_type=action.action_type.value,
+                record=True,
             )
         if food_type not in state.birdfeeder.dice:
             raise ValueError(f"selected food is not available in the birdfeeder: {food_type}")
@@ -797,10 +807,27 @@ def _apply_draw_cards(player: PlayerState, state: GameState, action: LegalAction
     for tray_index in sorted(tray_indices, reverse=True):
         player.hand.append(state.bird_tray.pop(tray_index))
         if state.decks.bird_deck:
-            state.bird_tray.insert(tray_index, state.decks.bird_deck.pop(0))
+            replacement_card = state.decks.bird_deck.pop(0)
+            _record_deck_draw(
+                state,
+                player.player_id,
+                "bird_tray_replenish",
+                [replacement_card.common_name],
+            )
+            state.bird_tray.insert(tray_index, replacement_card)
+    drawn_from_deck = []
     for _index in range(deck_count):
         if state.decks.bird_deck:
-            player.hand.append(state.decks.bird_deck.pop(0))
+            drawn_card = state.decks.bird_deck.pop(0)
+            player.hand.append(drawn_card)
+            drawn_from_deck.append(drawn_card.common_name)
+    if drawn_from_deck:
+        _record_deck_draw(
+            state,
+            player.player_id,
+            "draw_cards_from_deck",
+            drawn_from_deck,
+        )
     resolve_habitat_powers(player, Habitat.WETLAND, state)
 
 
@@ -837,25 +864,49 @@ def _resolve_power_text(
 ) -> None:
     if not power_text:
         return
-    lowered = power_text.lower()
-    if "tuck 1 [card] from your hand behind this bird" in lowered and player.hand:
-        _discard_card_for_action(player, _choose_discard_card_for_food(player))
-        slot.tucked_cards += 1
-        if "draw 1 [card]" in lowered:
-            _draw_cards_from_deck(player, state, 1)
-        if "lay 1 [egg]" in lowered:
-            _place_eggs_on_player_birds(player, 1, preferred_slot=slot)
+    handler_key = slot.card.power.handler_key or classify_power_handler_key(
+        power_text,
+        slot.card.power.color,
+    )
+    if handler_key == "tuck_card":
+        _resolve_tuck_card_power(player, slot, power_text, state)
         return
-
-    cache_match = re.search(r"cache 1 \[(invertebrate|seed|fish|fruit|rodent)\]", lowered)
-    if cache_match:
+    if handler_key == "cache_food":
         slot.cached_food += 1
         return
-
-    if "gain 1 [die] from the birdfeeder" in lowered and state is not None:
+    if handler_key == "predator_hunt":
+        _resolve_predator_hunt_power(player, slot, state)
+        return
+    if handler_key == "discard_egg_gain_wild_food":
+        _resolve_discard_egg_gain_wild_food_power(player, state)
+        return
+    if handler_key == "discard_to_tuck":
+        _resolve_discard_to_tuck_power(player, slot, power_text, state)
+        return
+    if handler_key == "draw_card":
+        _draw_cards_from_deck(player, state, 1)
+        return
+    if handler_key == "lay_egg":
+        _place_eggs_on_player_birds(player, 1)
+        return
+    if handler_key == "gain_food_from_birdfeeder" and state is not None:
         _gain_preferred_food_from_birdfeeder(player, state)
         return
+    if handler_key == "gain_food_from_supply":
+        _resolve_gain_food_from_supply_power(player, power_text)
+        return
+    if handler_key == "all_players_gain_food" and state is not None:
+        _resolve_all_players_gain_food_power(state, power_text)
+        return
+    if handler_key == "all_players_lay_eggs" and state is not None:
+        for candidate in state.players:
+            _place_eggs_on_player_birds(candidate, 1)
+        return
+    if handler_key == "deck_search_tuck_by_wingspan":
+        _resolve_deck_search_tuck_by_wingspan_power(player, slot, power_text, state)
+        return
 
+    lowered = power_text.lower()
     for food_type in BASE_FOOD_TYPES:
         token = f"gain 1 [{_food_power_token(food_type)}]"
         if token in lowered:
@@ -877,6 +928,125 @@ def _resolve_power_text(
 
     if "lay 1 [egg]" in lowered:
         _place_eggs_on_player_birds(player, 1)
+
+
+def _resolve_tuck_card_power(
+    player: PlayerState,
+    slot: BirdSlot,
+    power_text: str,
+    state: GameState | None,
+) -> None:
+    if not player.hand:
+        return
+    _discard_card_for_action(player, _choose_discard_card_for_food(player))
+    slot.tucked_cards += 1
+    lowered = power_text.lower()
+    if "draw 1 [card]" in lowered:
+        _draw_cards_from_deck(player, state, 1)
+    if "lay 1 [egg]" in lowered:
+        _place_eggs_on_player_birds(player, 1, preferred_slot=slot)
+
+
+def _resolve_predator_hunt_power(
+    player: PlayerState,
+    slot: BirdSlot,
+    state: GameState | None,
+) -> None:
+    if state is None:
+        return
+    dice = _roll_birdfeeder_for_state(
+        state,
+        f"predator_hunt_{player.player_id}_{slot.card.common_name}",
+        draw_type="predator_hunt",
+        player_id=player.player_id,
+        action_type="bird_power",
+        record=True,
+    )
+    target_food = FoodType.RODENT if FoodType.RODENT in dice else FoodType.FISH
+    if target_food in dice:
+        slot.cached_food += 1
+
+
+def _resolve_discard_egg_gain_wild_food_power(
+    player: PlayerState,
+    state: GameState | None,
+) -> None:
+    if player.total_eggs <= 0:
+        return
+    _spend_eggs(player, 1)
+    preferred_food = _preferred_food_for_hand(player)[0]
+    player.food_tokens[preferred_food] = player.food_tokens.get(preferred_food, 0) + 1
+
+
+def _resolve_discard_to_tuck_power(
+    player: PlayerState,
+    slot: BirdSlot,
+    power_text: str,
+    state: GameState | None,
+) -> None:
+    lowered = power_text.lower()
+    food_match = re.search(r"discard 1 \[(invertebrate|seed|fish|fruit|rodent)\]", lowered)
+    if food_match is None or state is None:
+        return
+    food_type = _food_type_from_power_token(food_match.group(1))
+    if player.food_tokens.get(food_type, 0) <= 0:
+        return
+    player.food_tokens[food_type] -= 1
+    tuck_count_match = re.search(r"tuck (\d+) \[card\]", lowered)
+    tuck_count = int(tuck_count_match.group(1)) if tuck_count_match else 1
+    actual_tucks = min(tuck_count, len(state.decks.bird_deck))
+    tucked_cards = state.decks.bird_deck[:actual_tucks]
+    _record_deck_draw(
+        state,
+        player.player_id,
+        "bird_power_tuck_from_deck",
+        [card.common_name for card in tucked_cards],
+    )
+    del state.decks.bird_deck[:actual_tucks]
+    slot.tucked_cards += actual_tucks
+
+
+def _resolve_gain_food_from_supply_power(player: PlayerState, power_text: str) -> None:
+    lowered = power_text.lower()
+    for food_type in BASE_FOOD_TYPES:
+        if f"gain 1 [{_food_power_token(food_type)}]" in lowered:
+            player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
+            return
+    if "gain 1 [wild]" in lowered:
+        preferred_food = _preferred_food_for_hand(player)[0]
+        player.food_tokens[preferred_food] = player.food_tokens.get(preferred_food, 0) + 1
+
+
+def _resolve_all_players_gain_food_power(state: GameState, power_text: str) -> None:
+    lowered = power_text.lower()
+    for food_type in BASE_FOOD_TYPES:
+        if f"gain 1 [{_food_power_token(food_type)}]" in lowered:
+            for candidate in state.players:
+                candidate.food_tokens[food_type] = candidate.food_tokens.get(food_type, 0) + 1
+            return
+
+
+def _resolve_deck_search_tuck_by_wingspan_power(
+    player: PlayerState,
+    slot: BirdSlot,
+    power_text: str,
+    state: GameState | None,
+) -> None:
+    if state is None or not state.decks.bird_deck:
+        return
+    revealed_card = state.decks.bird_deck.pop(0)
+    _record_deck_draw(
+        state,
+        player.player_id,
+        "bird_power_deck_search",
+        [revealed_card.common_name],
+    )
+    threshold_match = re.search(r"less than (\d+)cm", power_text.lower())
+    threshold = int(threshold_match.group(1)) if threshold_match else 100
+    if revealed_card.wingspan_cm is not None and revealed_card.wingspan_cm < threshold:
+        slot.tucked_cards += 1
+    else:
+        state.decks.bird_discard.append(revealed_card)
 
 
 def resolve_opponent_reaction_powers(
@@ -1023,9 +1193,30 @@ def _can_reroll_birdfeeder(birdfeeder: BirdfeederState) -> bool:
     return len(set(birdfeeder.dice)) <= 1
 
 
-def _roll_birdfeeder_for_state(state: GameState, salt: str) -> list[FoodType]:
+def _roll_birdfeeder_for_state(
+    state: GameState,
+    salt: str,
+    *,
+    draw_type: str = "birdfeeder_reroll",
+    player_id: str | None = None,
+    action_type: str | None = None,
+    record: bool = False,
+) -> list[FoodType]:
     seed = f"{state.random_seed}:{state.game_id}:{state.round_state.turn_number}:{salt}"
-    return _roll_birdfeeder(random.Random(seed))
+    result = _roll_birdfeeder(random.Random(seed))
+    if record:
+        state.rng_draw_records.append(
+            RngDrawRecord(
+                draw_type=draw_type,
+                seed_material=seed,
+                result=list(result),
+                round_number=state.round_state.round_number,
+                turn_number=state.round_state.turn_number,
+                player_id=player_id,
+                action_type=action_type,
+            )
+        )
+    return result
 
 
 def _choose_discard_card_for_food(player: PlayerState) -> str:
@@ -1047,9 +1238,33 @@ def _discard_card_for_action(player: PlayerState, card_name: str | None) -> None
 def _draw_cards_from_deck(player: PlayerState, state: GameState | None, count: int) -> None:
     if state is None:
         return
+    drawn_cards = []
     for _index in range(count):
         if state.decks.bird_deck:
-            player.hand.append(state.decks.bird_deck.pop(0))
+            drawn_card = state.decks.bird_deck.pop(0)
+            player.hand.append(drawn_card)
+            drawn_cards.append(drawn_card.common_name)
+    if drawn_cards:
+        _record_deck_draw(state, player.player_id, "bird_power_draw_cards", drawn_cards)
+
+
+def _record_deck_draw(
+    state: GameState,
+    player_id: str | None,
+    draw_type: str,
+    card_names: list[str],
+) -> None:
+    state.rng_draw_records.append(
+        RngDrawRecord(
+            draw_type=draw_type,
+            seed_material=f"{state.random_seed}:{state.game_id}:deck_order",
+            result=card_names,
+            round_number=state.round_state.round_number,
+            turn_number=state.round_state.turn_number,
+            player_id=player_id,
+            action_type="draw_cards",
+        )
+    )
 
 
 def _place_eggs_on_player_birds(
@@ -1084,7 +1299,12 @@ def _gain_preferred_food_from_birdfeeder(player: PlayerState, state: GameState) 
     preferred_foods = _preferred_food_for_hand(player)
     if not state.birdfeeder.dice or _can_reroll_birdfeeder(state.birdfeeder):
         state.birdfeeder.dice = _roll_birdfeeder_for_state(
-            state, f"reaction_{player.player_id}"
+            state,
+            f"reaction_{player.player_id}",
+            draw_type="pink_reaction_birdfeeder",
+            player_id=player.player_id,
+            action_type="bird_power",
+            record=True,
         )
     for food_type in preferred_foods:
         if food_type in state.birdfeeder.dice:
@@ -1159,6 +1379,13 @@ def _score_completed_round_goal(state: GameState) -> None:
 def _refresh_bird_tray(state: GameState) -> None:
     state.decks.bird_discard.extend(state.bird_tray)
     state.bird_tray = _draw_many(state.decks.bird_deck, BIRD_TRAY_SIZE)
+    if state.bird_tray:
+        _record_deck_draw(
+            state,
+            None,
+            "round_end_bird_tray_refresh",
+            [card.common_name for card in state.bird_tray],
+        )
 
 
 def _can_pay_food_cost(player: PlayerState, food_cost: FoodCost) -> bool:
@@ -1220,6 +1447,12 @@ def _food_power_token(food_type: FoodType) -> str:
     if food_type == FoodType.INVERTEBRATE:
         return "invertebrate"
     return food_type.value
+
+
+def _food_type_from_power_token(token: str) -> FoodType:
+    if token == "invertebrate":
+        return FoodType.INVERTEBRATE
+    return FoodType(token)
 
 
 def _require_card(cards_by_name: dict, name: str, card_type: str):

@@ -19,5 +19,6 @@ Key rules docs:
 - `experiments/case_study_outline.md`: public case-study narrative outline.
 - `rules/game_content_schema.md`: current content schema and enum design.
 - `rules/power_handler_registry.md`: registry metadata approach for bird power handlers.
+- `rules/scoring_handler_audit.md`: current scoring coverage audit utility and remaining validation work.
 - `rules/wingspan_card_list_audit.md`: source workbook audit and normalization needs.
 - `rules/data_and_rule_encoding_recommendations.md`: recommendations for power fidelity, handler mapping, expansion representation, and rule traceability.
