@@ -7,7 +7,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from wingspan_ai.content.schemas import ContentCatalog
-from wingspan_ai.rules.actions import LegalAction
+from wingspan_ai.rules.actions import LegalAction, render_action
 from wingspan_ai.rules.base_game import (
     apply_action,
     apply_initial_selection_choice,
@@ -239,7 +239,8 @@ def _base_event(
         agent_id=state.active_player.agent_id,
         round_number=state.round_state.round_number,
         turn_number=state.round_state.turn_number,
-        round_turn_number=state.round_state.round_turn_number,
+        round_action_number=state.round_state.round_action_number,
+        global_turn_number=state.round_state.global_turn_number,
         random_seed=state.random_seed,
         public_state_ref=_public_state_ref(state),
         payload=payload,
@@ -247,7 +248,7 @@ def _base_event(
 
 
 def _public_state_ref(state: GameState) -> str:
-    return f"{state.game_id}:turn:{state.round_state.turn_number}"
+    return f"{state.game_id}:global_turn:{state.round_state.global_turn_number}"
 
 
 def _record_public_snapshot(snapshots: dict[str, dict], state: GameState) -> None:
@@ -302,7 +303,8 @@ def _emit_setup_selection_applied(
             agent_id=payload["agent_id"],
             round_number=state.round_state.round_number,
             turn_number=state.round_state.turn_number,
-            round_turn_number=state.round_state.round_turn_number,
+            round_action_number=state.round_state.round_action_number,
+            global_turn_number=state.round_state.global_turn_number,
             random_seed=state.random_seed,
             public_state_ref=_public_state_ref(state),
             private_state_included=True,
@@ -341,6 +343,7 @@ def _emit_legal_actions(
             simulation_run_id,
             legal_action_count=len(legal_actions),
             legal_actions=[action.model_dump(mode="json") for action in legal_actions],
+            legal_action_labels=[render_action(action) for action in legal_actions],
         )
     )
 
@@ -361,6 +364,7 @@ def _emit_action_selected(
             simulation_run_id,
             agent_id=agent_id,
             action=action.model_dump(mode="json"),
+            action_label=render_action(action),
             state_hash_before=state_hash_before,
         )
     )
@@ -412,12 +416,14 @@ def _emit_action_resolved(
             simulation_run_id,
             acting_player_id=player_id,
             action=action.model_dump(mode="json"),
+            action_label=render_action(action),
             state_hash_before=state_hash_before,
             state_hash_after=state_hash_after,
             next_public_state_ref=_public_state_ref(next_state),
             next_round_number=next_state.round_state.round_number,
             next_turn_number=next_state.round_state.turn_number,
-            next_round_turn_number=next_state.round_state.round_turn_number,
+            next_round_action_number=next_state.round_state.round_action_number,
+            next_global_turn_number=next_state.round_state.global_turn_number,
             next_active_player_id=next_state.active_player.player_id,
             rng_draws=rng_draws,
         )

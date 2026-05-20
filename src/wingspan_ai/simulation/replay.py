@@ -100,7 +100,7 @@ def validate_simulation_replay(
         actual_before = state_hash(state)
         if expected_before != actual_before:
             errors.append(
-                f"turn {event.turn_number}: before hash mismatch "
+                f"global turn {event.global_turn_number}: before hash mismatch "
                 f"expected={expected_before} actual={actual_before}"
             )
             break
@@ -111,7 +111,7 @@ def validate_simulation_replay(
         actual_after = state_hash(state)
         if expected_after != actual_after:
             errors.append(
-                f"turn {event.turn_number}: after hash mismatch "
+                f"global turn {event.global_turn_number}: after hash mismatch "
                 f"expected={expected_after} actual={actual_after}"
             )
             break

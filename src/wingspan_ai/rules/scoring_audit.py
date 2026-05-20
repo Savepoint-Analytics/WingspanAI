@@ -40,12 +40,12 @@ SUPPORTED_BASE_BONUS_NAMES = {
 SCORING_SOURCE_REFERENCES: dict[str, dict[str, str | int | None]] = {
     "bonus_cards": {
         "rulebook": CORE_RULEBOOK,
-        "page": None,
+        "page": 11,
         "section": "Bonus cards and end-of-game scoring",
     },
     "round_goals": {
         "rulebook": CORE_RULEBOOK,
-        "page": None,
+        "page": 11,
         "section": "End-of-round goals",
     },
 }

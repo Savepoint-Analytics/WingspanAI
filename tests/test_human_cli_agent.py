@@ -2,7 +2,8 @@ from unittest import TestCase
 
 from wingspan_ai.agents import HumanCliAgent
 from wingspan_ai.content import make_sample_catalog
-from wingspan_ai.rules.actions import LegalAction
+from wingspan_ai.content.schemas import FoodType
+from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import setup_base_game
 
 
@@ -29,3 +30,20 @@ class HumanCliAgentTests(TestCase):
         summary = agent.summarize_decision(None, [action], action)  # type: ignore[arg-type]
 
         self.assertEqual(summary["policy"], "human_cli")
+
+    def test_human_action_renderer_describes_concrete_choices(self) -> None:
+        action = LegalAction(
+            action_type=ActionType.GAIN_FOOD,
+            player_id="p1",
+            food_types=(FoodType.SEED, FoodType.FISH),
+            reroll_birdfeeder=True,
+            spend_card_for_extra_food=True,
+            discard_card_common_name="Canada Goose",
+        )
+
+        rendered = render_action(action)
+
+        self.assertEqual(
+            rendered,
+            "Gain seed and fish after rerolling the birdfeeder by discarding a card (Canada Goose)",
+        )

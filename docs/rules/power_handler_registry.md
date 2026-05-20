@@ -29,6 +29,7 @@ The first registry lives in `src/wingspan_ai/rules/power_registry.py`.
 - `handler_key`: stable key referenced by content.
 - `implementation_status`: same enum used by card powers and scoring rules.
 - `source_reference`: rulebook, workbook, or design source.
+- `rulebook_page`: printed rulebook page used for the current handler's source reference.
 - `module_path`: implementation location once available.
 - `test_reference`: test file or case once covered.
 - `notes`: implementation notes or simplification warnings.

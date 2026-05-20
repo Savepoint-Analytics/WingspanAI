@@ -17,3 +17,5 @@ class ScoringAuditTests(TestCase):
             audit.source_references["round_goals"]["rulebook"],
             "rulebook_pdfs/WS_Core_Rulebook.pdf",
         )
+        self.assertEqual(audit.source_references["round_goals"]["page"], 11)
+        self.assertEqual(audit.source_references["bonus_cards"]["page"], 11)

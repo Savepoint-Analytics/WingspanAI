@@ -11,6 +11,7 @@ class PowerRegistryTests(TestCase):
         self.assertEqual(handler.implementation_status, PowerImplementationStatus.NO_OP_FOR_V1)
         self.assertIn("rulebook", handler.source_reference.lower())
         self.assertEqual(handler.rulebook, "rulebook_pdfs/WS_Core_Rulebook.pdf")
+        self.assertIsNotNone(handler.rulebook_page)
 
     def test_power_text_classifier_maps_supported_templates(self) -> None:
         handler_key = classify_power_handler_key(

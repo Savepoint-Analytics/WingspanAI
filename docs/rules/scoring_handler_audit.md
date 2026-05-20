@@ -29,6 +29,6 @@ print(audit.round_goal_coverage, audit.unsupported_round_goals)
 ## Remaining Work
 
 - Compare every supported handler against the local rulebook PDFs before using results in public case-study claims.
-- Source references currently identify the core rulebook path and source section; add exact page numbers after PDF page mapping.
+- Source references now identify the core rulebook path, printed page 11, and source section for base bonus-card and end-of-round scoring.
 - Add test references per scoring handler.
 - Extend the audit to expansion-specific scoring once expansion rules modules are active.

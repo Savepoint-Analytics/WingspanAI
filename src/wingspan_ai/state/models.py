@@ -103,9 +103,10 @@ class RoundState(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     round_number: int = Field(default=1, ge=1, le=4)
-    # Global player-action index across the game, not a Wingspan round-local turn count.
+    # Active player's turn count within the current round, matching the player-facing game.
     turn_number: int = Field(default=1, ge=1)
-    round_turn_number: int = Field(default=1, ge=1)
+    round_action_number: int = Field(default=1, ge=1)
+    global_turn_number: int = Field(default=1, ge=1)
     active_player_index: int = Field(default=0, ge=0)
     game_over: bool = False
 
@@ -120,7 +121,8 @@ class RngDrawRecord(BaseModel):
     result: list[FoodType] | list[str]
     round_number: int
     turn_number: int
-    round_turn_number: int
+    round_action_number: int
+    global_turn_number: int
     player_id: str | None = None
     action_type: str | None = None
 

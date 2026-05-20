@@ -37,6 +37,23 @@ STARTING_SELECTED_BIRD_COUNT = 3
 BIRD_FOOD_SELECTION_TOTAL = 5
 BIRD_TRAY_SIZE = 3
 BIRDFEEDER_DICE_COUNT = 5
+CORE_RULEBOOK = "rulebook_pdfs/WS_Core_Rulebook.pdf"
+TURN_STRUCTURE_RULE_SOURCE = {
+    "rulebook": CORE_RULEBOOK,
+    "page": 4,
+    "section": "Overview / Turn Structure",
+}
+ROUND_STRUCTURE_RULE_SOURCE = {
+    "rulebook": CORE_RULEBOOK,
+    "page": 5,
+    "section": "Round Structure",
+}
+BASE_ACTION_CUBES_BY_ROUND: dict[int, int] = {
+    1: 8,
+    2: 7,
+    3: 6,
+    4: 5,
+}
 ROUND_GOAL_GREEN_SCORES: dict[int, tuple[int, ...]] = {
     1: (4, 1, 0, 0, 0),
     2: (5, 2, 1, 0, 0),
@@ -1202,7 +1219,7 @@ def _roll_birdfeeder_for_state(
     action_type: str | None = None,
     record: bool = False,
 ) -> list[FoodType]:
-    seed = f"{state.random_seed}:{state.game_id}:{state.round_state.turn_number}:{salt}"
+    seed = f"{state.random_seed}:{state.game_id}:{state.round_state.global_turn_number}:{salt}"
     result = _roll_birdfeeder(random.Random(seed))
     if record:
         state.rng_draw_records.append(
@@ -1212,7 +1229,8 @@ def _roll_birdfeeder_for_state(
                 result=list(result),
                 round_number=state.round_state.round_number,
                 turn_number=state.round_state.turn_number,
-                round_turn_number=state.round_state.round_turn_number,
+                round_action_number=state.round_state.round_action_number,
+                global_turn_number=state.round_state.global_turn_number,
                 player_id=player_id,
                 action_type=action_type,
             )
@@ -1262,7 +1280,8 @@ def _record_deck_draw(
             result=card_names,
             round_number=state.round_state.round_number,
             turn_number=state.round_state.turn_number,
-            round_turn_number=state.round_state.round_turn_number,
+            round_action_number=state.round_state.round_action_number,
+            global_turn_number=state.round_state.global_turn_number,
             player_id=player_id,
             action_type="draw_cards",
         )
@@ -1357,20 +1376,24 @@ def _advance_turn(state: GameState) -> None:
             return
         completed_round = state.round_state.round_number
         state.round_state.round_number += 1
-        cubes_for_round = 9 - state.round_state.round_number
+        cubes_for_round = BASE_ACTION_CUBES_BY_ROUND[state.round_state.round_number]
         for candidate in state.players:
             candidate.action_cubes_available = cubes_for_round
         state.round_state.active_player_index = completed_round % len(state.players)
-        state.round_state.turn_number += 1
-        state.round_state.round_turn_number = 1
+        state.round_state.turn_number = 1
+        state.round_state.round_action_number = 1
+        state.round_state.global_turn_number += 1
         return
 
     next_index = (state.round_state.active_player_index + 1) % len(state.players)
     while state.players[next_index].action_cubes_available == 0:
         next_index = (next_index + 1) % len(state.players)
     state.round_state.active_player_index = next_index
-    state.round_state.turn_number += 1
-    state.round_state.round_turn_number += 1
+    next_player = state.players[next_index]
+    action_cubes_for_round = BASE_ACTION_CUBES_BY_ROUND[state.round_state.round_number]
+    state.round_state.turn_number = action_cubes_for_round - next_player.action_cubes_available + 1
+    state.round_state.round_action_number += 1
+    state.round_state.global_turn_number += 1
 
 
 def _score_completed_round_goal(state: GameState) -> None:

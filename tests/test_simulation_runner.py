@@ -122,9 +122,17 @@ class SimulationRunnerTests(TestCase):
             round_number: sum(1 for event in selected_events if event.round_number == round_number)
             for round_number in range(1, 5)
         }
-        max_round_turns = {
+        max_turns_by_round = {
             round_number: max(
-                event.round_turn_number or 0
+                event.turn_number or 0
+                for event in selected_events
+                if event.round_number == round_number
+            )
+            for round_number in range(1, 5)
+        }
+        max_round_actions = {
+            round_number: max(
+                event.round_action_number or 0
                 for event in selected_events
                 if event.round_number == round_number
             )
@@ -132,13 +140,17 @@ class SimulationRunnerTests(TestCase):
         }
 
         self.assertEqual(round_counts, {1: 16, 2: 14, 3: 12, 4: 10})
-        self.assertEqual(max_round_turns, round_counts)
+        self.assertEqual(max_turns_by_round, {1: 8, 2: 7, 3: 6, 4: 5})
+        self.assertEqual(max_round_actions, round_counts)
         self.assertEqual(len(selected_events), 52)
         for selected_event, resolved_event in zip(selected_events, resolved_events, strict=True):
             self.assertEqual(resolved_event.turn_number, selected_event.turn_number)
-            self.assertEqual(resolved_event.round_turn_number, selected_event.round_turn_number)
+            self.assertEqual(resolved_event.round_action_number, selected_event.round_action_number)
+            self.assertEqual(resolved_event.global_turn_number, selected_event.global_turn_number)
+            self.assertIn("action_label", selected_event.payload)
             self.assertIn("next_turn_number", resolved_event.payload)
-            self.assertIn("next_round_turn_number", resolved_event.payload)
+            self.assertIn("next_round_action_number", resolved_event.payload)
+            self.assertIn("next_global_turn_number", resolved_event.payload)
 
     def test_replay_validator_reconstructs_smoke_game_hashes(self) -> None:
         result = run_single_game(

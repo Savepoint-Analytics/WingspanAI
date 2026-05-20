@@ -50,7 +50,8 @@ create table simulation_events (
     agent_id text,
     round_number integer,
     turn_number integer,
-    round_turn_number integer,
+    round_action_number integer,
+    global_turn_number integer,
     random_seed integer,
     public_state_ref text,
     private_state_included boolean not null default false,
@@ -84,7 +85,10 @@ create index simulation_events_name_time_idx
     on simulation_events (event_name, occurred_at);
 
 create index simulation_events_turn_idx
-    on simulation_events (game_id, round_number, round_turn_number, turn_number);
+    on simulation_events (game_id, round_number, turn_number, round_action_number);
+
+create index simulation_events_global_turn_idx
+    on simulation_events (game_id, global_turn_number);
 
 create index simulation_events_payload_gin_idx
     on simulation_events using gin (payload);

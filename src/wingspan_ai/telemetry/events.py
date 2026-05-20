@@ -41,7 +41,8 @@ class SimulationEvent(BaseModel):
     agent_id: str | None = None
     round_number: int | None = Field(default=None, ge=1)
     turn_number: int | None = Field(default=None, ge=1)
-    round_turn_number: int | None = Field(default=None, ge=1)
+    round_action_number: int | None = Field(default=None, ge=1)
+    global_turn_number: int | None = Field(default=None, ge=1)
     random_seed: int | None = None
     public_state_ref: str | None = None
     private_state_included: bool = False

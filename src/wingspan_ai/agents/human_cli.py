@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import FoodType
-from wingspan_ai.rules.actions import LegalAction
+from wingspan_ai.rules.actions import LegalAction, render_action
 from wingspan_ai.rules.base_game import (
     BIRD_FOOD_SELECTION_TOTAL,
     InitialSelection,
@@ -60,15 +60,16 @@ class HumanCliAgent:
         player = state.active_player
         print(
             f"\nRound {state.round_state.round_number}, "
-            f"round turn {state.round_state.round_turn_number} "
-            f"(global turn {state.round_state.turn_number})"
+            f"turn {state.round_state.turn_number} "
+            f"(action {state.round_state.round_action_number} this round, "
+            f"global action {state.round_state.global_turn_number})"
         )
         print(f"Active player: {player.player_id}")
         print(f"Food: {dict(player.food_tokens)}")
         print(f"Hand: {[card.common_name for card in player.hand]}")
         print("Legal actions:")
         for index, action in enumerate(legal_actions, start=1):
-            print(f"{index}. {action.model_dump(mode='json')}")
+            print(f"{index}. {render_action(action)}")
 
         while True:
             raw_value = input("Choose action number: ").strip()

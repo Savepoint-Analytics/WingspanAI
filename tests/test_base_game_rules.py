@@ -157,6 +157,25 @@ class BaseGameRulesTests(TestCase):
             [7, 7],
         )
         self.assertEqual(state_after_p2.round_state.active_player_index, 1)
+        self.assertEqual(state_after_p2.round_state.turn_number, 1)
+        self.assertEqual(state_after_p2.round_state.round_action_number, 1)
+
+    def test_turn_number_tracks_active_players_turn_within_round(self) -> None:
+        state_after_p1 = apply_action(
+            self.state,
+            LegalAction(action_type=ActionType.DRAW_CARDS, player_id="p1", draw_from_deck=True),
+        )
+        state_after_p2 = apply_action(
+            state_after_p1,
+            LegalAction(action_type=ActionType.DRAW_CARDS, player_id="p2", draw_from_deck=True),
+        )
+
+        self.assertEqual(state_after_p1.round_state.turn_number, 1)
+        self.assertEqual(state_after_p1.round_state.round_action_number, 2)
+        self.assertEqual(state_after_p1.round_state.global_turn_number, 2)
+        self.assertEqual(state_after_p2.round_state.turn_number, 2)
+        self.assertEqual(state_after_p2.round_state.round_action_number, 3)
+        self.assertEqual(state_after_p2.round_state.global_turn_number, 3)
 
     def test_final_score_skeleton_counts_implemented_categories(self) -> None:
         card = next(card for card in self.catalog.birds if card.victory_points > 0)

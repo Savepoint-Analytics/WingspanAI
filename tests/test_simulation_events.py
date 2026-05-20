@@ -14,13 +14,15 @@ class SimulationEventTests(TestCase):
             agent_id="random_legal",
             round_number=1,
             turn_number=1,
-            round_turn_number=1,
+            round_action_number=1,
+            global_turn_number=1,
             random_seed=11,
             payload={"action": {"action_type": "draw_cards"}},
         )
 
         self.assertEqual(event.event_version, "1.0")
-        self.assertEqual(event.round_turn_number, 1)
+        self.assertEqual(event.round_action_number, 1)
+        self.assertEqual(event.global_turn_number, 1)
         self.assertFalse(event.private_state_included)
         self.assertEqual(event.payload["action"]["action_type"], "draw_cards")
 
