@@ -611,3 +611,30 @@ COMPANY_CONTEXT.md
 PROJECT_CONTEXT.md
 docs/
 ```
+
+
+## Update: 2026-08-24 - Persistence regression, workload namespaces, and batch manifests
+
+### What changed
+Added an opt-in live persistence regression in `tests/test_persistence_integration.py`, gated by
+`RUN_DB_INTEGRATION=1`. It runs one seeded game and verifies its PostgreSQL run, game, event, and
+score rows plus its MinIO game artifacts and batch manifest.
+
+Simulation batches now require a `smoke`, `experiment`, or `production` workload namespace and use
+unique batch IDs. Local artifacts and MinIO keys follow
+`<root-or-prefix>/<batch_kind>/<batch_label>/<batch_id>/`. Game IDs are batch-scoped to prevent
+repeated seeds from overwriting earlier persisted game summaries.
+
+Each batch writes `batch_manifest.json` with batch timing, source catalog, seeds, rulesets, outcomes,
+event counts, PostgreSQL insertion results, local paths, and MinIO URIs.
+
+### Why it matters
+Persisted smoke runs can now be checked end to end, and every batch has a durable index joining its
+local files, object-storage objects, and database run IDs. Workload namespaces keep exploratory and
+production artifacts from becoming indistinguishable.
+
+### Decision
+Keep the normal test suite service-independent. Run the gated persistence test before sizeable
+persisted batches or after schema, artifact, environment configuration, or object-storage changes.
+Use `smoke` for regression batches, `experiment` for analysis inputs, and `production` only for
+validated repeatable workloads.

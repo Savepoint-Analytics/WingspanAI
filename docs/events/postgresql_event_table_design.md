@@ -111,3 +111,22 @@ The draft FastAPI service at `src/wingspan_ai/telemetry/api.py` accepts an `Even
 - Game length distribution by terminal reason.
 - Card play frequency and immediate score delta.
 - Private/debug-only training views with explicit access separation.
+
+
+## Local `.env` Wiring
+
+The batch flow loads `.env` from the repository root and persists simulation results when
+connection settings are available.
+
+PostgreSQL connection resolution order:
+
+1. `SAVEPOINT_DATABASE_URL`
+2. `DATABASE_URL`
+3. Composed URL from `SAVEPOINT_PG_HOST`, `SAVEPOINT_PG_PORT`, `SAVEPOINT_PG_USER`, `SAVEPOINT_PG_PWD`, and optional `SAVEPOINT_PG_DB`.
+
+If `SAVEPOINT_PG_DB` is omitted, the database name defaults to `SAVEPOINT_PG_USER`.
+The repository bootstraps the tables and indexes above before inserting telemetry.
+
+MinIO/S3 artifact upload uses `SAVEPOINT_LOCAL_MINIO_USR` and
+`SAVEPOINT_LOCAL_MINIO_PWD`, plus optional endpoint, bucket, and prefix variables documented
+in `flows/README.md`.

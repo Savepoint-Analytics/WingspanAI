@@ -205,12 +205,14 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/simulation/tournament.py`: seeded tournament runner and matchup summaries.
 - `src/wingspan_ai/telemetry/events.py`: versioned simulation event schema and in-memory event sink.
 - `src/wingspan_ai/telemetry/api.py`: draft FastAPI event ingestion service.
-- `src/wingspan_ai/telemetry/postgres.py`: optional PostgreSQL event repository.
+- `src/wingspan_ai/telemetry/postgres.py`: PostgreSQL repository for simulation runs, games, agents, events, and final scores.
+- `src/wingspan_ai/storage/object_storage.py`: S3-compatible MinIO artifact upload helper.
+- `src/wingspan_ai/config.py`: local `.env` loader and connection config helpers.
 - `src/wingspan_ai/simulation/runner.py`: single-game runner with event emission and outcomes.
 - `src/wingspan_ai/simulation/replay.py`: deterministic state hashing helpers for replay/debug audits.
 - `src/wingspan_ai/rules/scoring_audit.py`: bonus-card and round-goal scoring coverage audit helper.
 - `src/wingspan_ai/experiments/mlflow_tracking.py`: MLflow logging skeleton for simulation results.
-- `flows/simulation_batch.py`: Prefect-compatible seeded simulation batch flow.
+- `flows/simulation_batch.py`: Prefect-compatible seeded batch flow with workload namespaces, batch-scoped game IDs, PostgreSQL/MinIO persistence, and a batch manifest.
 - `analysis/simulation_summary.py`: first reusable analysis helpers for outcomes and action frequency.
 - `notebooks/first_simulation_analysis.ipynb`: first Python notebook for tiny simulation-batch review.
 - `docs/architecture/project_package_structure.md`: recommended package and project folder structure.
