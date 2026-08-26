@@ -14,7 +14,12 @@ from wingspan_ai.agents import GreedyBaselineAgent, RandomLegalAgent
 from wingspan_ai.config import database_url_from_env, load_dotenv, object_storage_config_from_env
 from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH, load_base_game_content_catalog
 from wingspan_ai.content.sample_catalog import make_sample_catalog
-from wingspan_ai.simulation import run_single_game, write_simulation_artifacts
+from wingspan_ai.rules import audit_rule_coverage
+from wingspan_ai.simulation import (
+    run_single_game,
+    validate_simulation_replay,
+    write_simulation_artifacts,
+)
 from wingspan_ai.storage import (
     upload_directory_to_object_storage,
     upload_file_to_object_storage,
@@ -55,6 +60,7 @@ def run_seeded_game(
     batch_kind: BatchKind = "smoke",
     batch_label: str = DEFAULT_RUN_LABEL,
     batch_id: str | None = None,
+    require_valid_replay: bool = True,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch."""
 
@@ -78,6 +84,14 @@ def run_seeded_game(
         random_seed=random_seed,
         game_id=f"{resolved_batch_id}_seed_{random_seed}",
     )
+    replay_validation = validate_simulation_replay(catalog, result.events)
+    replay_validation_payload = asdict(replay_validation)
+    if require_valid_replay and not replay_validation.is_valid:
+        error_summary = "; ".join(replay_validation.errors[:3])
+        raise RuntimeError(f"Replay validation failed for seed {random_seed}: {error_summary}")
+
+    rule_audits = audit_rule_coverage(catalog)
+
     artifact_dir = None
     if artifact_root is not None:
         artifact_dir = write_simulation_artifacts(
@@ -97,6 +111,8 @@ def run_seeded_game(
         "batch_kind": resolved_batch_kind,
         "batch_label": resolved_batch_label,
         "catalog_source": str(resolved_workbook_path) if workbook_exists else "sample_catalog",
+        "replay_validation": replay_validation_payload,
+        "rule_audits": rule_audits,
     }
     database_url = database_url_from_env()
     should_persist_postgres = bool(database_url) if persist_postgres is None else persist_postgres
@@ -161,6 +177,8 @@ def run_seeded_game(
         "ruleset_id": result.state.ruleset.ruleset_id,
         "outcome": asdict(result.outcome),
         "event_count": len(result.events),
+        "replay_validation": replay_validation_payload,
+        "rule_audits": rule_audits,
         "artifact_dir": str(artifact_dir) if artifact_dir is not None else None,
         "postgres": postgres_result,
         "object_storage": storage_result,
@@ -238,11 +256,24 @@ def _write_batch_manifest(
         "seeds": seeds,
         "game_count": len(results),
         "event_count": sum(result["event_count"] for result in results),
+        "replay_validation": {
+            "all_valid": all(
+                result["replay_validation"]["is_valid"] for result in results
+            ),
+            "valid_game_count": sum(
+                1 for result in results if result["replay_validation"]["is_valid"]
+            ),
+            "invalid_game_count": sum(
+                1 for result in results if not result["replay_validation"]["is_valid"]
+            ),
+        },
+        "rule_audits": results[0].get("rule_audits") if results else None,
         "games": [
             {
                 "outcome": result["outcome"],
                 "event_count": result["event_count"],
                 "ruleset_id": result["ruleset_id"],
+                "replay_validation": result["replay_validation"],
                 "artifact_dir": result["artifact_dir"],
                 "postgres": result["postgres"],
                 "object_storage": result["object_storage"],
@@ -270,6 +301,7 @@ def run_simulation_batch(
     batch_kind: BatchKind = "smoke",
     batch_label: str = DEFAULT_RUN_LABEL,
     batch_id: str | None = None,
+    require_valid_replay: bool = True,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -289,6 +321,7 @@ def run_simulation_batch(
             batch_kind=resolved_batch_kind,
             batch_label=resolved_batch_label,
             batch_id=resolved_batch_id,
+            require_valid_replay=require_valid_replay,
         )
         for seed in resolved_seeds
     ]

@@ -38,9 +38,11 @@ uploaded to object storage. Local and object-storage paths use the same workload
 ```
 
 `batch_kind` must be `smoke`, `experiment`, or `production`. Every flow invocation receives a
-unique `batch_id` unless one is supplied. The batch manifest records seeds, outcomes, ruleset IDs,
-event counts, local artifact paths, PostgreSQL insertion results, and uploaded object URIs. Game
-IDs are batch-scoped so rerunning a seed cannot overwrite an earlier game's summary row.
+unique `batch_id` unless one is supplied. Each game is replay-validated before artifacts,
+PostgreSQL rows, or MinIO objects are written by default. The batch manifest records seeds,
+outcomes, ruleset IDs, replay-validation status, scoring/power audit coverage, event counts, local
+artifact paths, PostgreSQL insertion results, and uploaded object URIs. Game IDs are batch-scoped
+so rerunning a seed cannot overwrite an earlier game's summary row.
 
 Supported variables:
 
@@ -62,6 +64,13 @@ For local artifact-only smoke tests, disable persistence explicitly:
 run_simulation_batch(persist_postgres=False, upload_artifacts=False)
 ```
 
+
+
+Replay validation can be disabled only for debugging malformed traces:
+
+```python
+run_simulation_batch(require_valid_replay=False, persist_postgres=False, upload_artifacts=False)
+```
 
 Run the opt-in live persistence regression against the configured PostgreSQL and MinIO services:
 

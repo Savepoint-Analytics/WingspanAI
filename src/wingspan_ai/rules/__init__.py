@@ -1,6 +1,7 @@
 """Rules modules, legal action generation, and state transitions."""
 
 from wingspan_ai.rules.actions import ActionType, LegalAction
+from wingspan_ai.rules.audit import audit_rule_coverage
 from wingspan_ai.rules.base_game import (
     FinalScoreBreakdown,
     InitialSelection,
@@ -16,7 +17,12 @@ from wingspan_ai.rules.base_game import (
     score_player,
     setup_base_game,
 )
-from wingspan_ai.rules.power_registry import POWER_HANDLER_REGISTRY, PowerHandlerMetadata
+from wingspan_ai.rules.power_registry import (
+    POWER_HANDLER_REGISTRY,
+    PowerAuditResult,
+    PowerHandlerMetadata,
+    audit_power_coverage,
+)
 from wingspan_ai.rules.scoring_audit import (
     SCORING_SOURCE_REFERENCES,
     ScoringAuditResult,
@@ -29,12 +35,15 @@ __all__ = [
     "InitialSelection",
     "LegalAction",
     "POWER_HANDLER_REGISTRY",
+    "PowerAuditResult",
     "PowerHandlerMetadata",
     "ScoringAuditResult",
     "SCORING_SOURCE_REFERENCES",
     "apply_default_initial_selection",
     "apply_initial_selection_choice",
     "apply_action",
+    "audit_power_coverage",
+    "audit_rule_coverage",
     "audit_scoring_coverage",
     "choose_default_initial_selection",
     "egg_cost_for_slot",

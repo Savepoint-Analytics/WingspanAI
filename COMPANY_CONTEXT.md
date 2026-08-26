@@ -202,7 +202,7 @@ Current assets:
 - `README.md` with objectives, roadmap, next steps, and resources.
 - `data/raw/wingspan-card-list.xlsx` with card, bonus-card, and round-goal information.
 - Rulebook PDFs in `rulebook_pdfs/`.
-- A seeded simulator with scaled core actions, baseline agents, telemetry events, tournaments, workload-namespaced PostgreSQL/MinIO persistence, batch manifests, and workbook-backed smoke batches.
+- A seeded simulator with scaled core actions, baseline agents, telemetry events, replay-gated batches, scoring/power audit summaries, tournaments, workload-namespaced PostgreSQL/MinIO persistence, batch manifests, and workbook-backed smoke batches.
 
 Near-term goal:
 1. Continue tightening base-game fidelity around high-volume powers, scoring, and choice policies.

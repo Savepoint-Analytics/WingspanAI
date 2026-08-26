@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from wingspan_ai.content.schemas import ContentCatalog
+from wingspan_ai.rules import audit_rule_coverage
 from wingspan_ai.simulation.runner import AgentPolicy, SimulationResult, run_single_game
 
 AgentFactory = Callable[[int, int], AgentPolicy]
@@ -20,6 +22,7 @@ class TournamentSummary:
     win_rates: dict[str, float]
     mean_scores: dict[str, float]
     mean_turns_played: float
+    rule_audits: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -64,11 +67,15 @@ def run_tournament(
     return TournamentResult(
         tournament_id=tournament_id,
         results=results,
-        summary=summarize_tournament(results),
+        summary=summarize_tournament(results, catalog=catalog),
     )
 
 
-def summarize_tournament(results: list[SimulationResult]) -> TournamentSummary:
+def summarize_tournament(
+    results: list[SimulationResult],
+    *,
+    catalog: ContentCatalog | None = None,
+) -> TournamentSummary:
     """Summarize scores, wins, and game lengths by agent id."""
 
     score_totals: dict[str, int] = {}
@@ -100,4 +107,5 @@ def summarize_tournament(results: list[SimulationResult]) -> TournamentSummary:
             for agent_id in sorted(score_totals)
         },
         mean_turns_played=sum(result.outcome.turns_played for result in results) / games_played,
+        rule_audits=audit_rule_coverage(catalog) if catalog is not None else None,
     )

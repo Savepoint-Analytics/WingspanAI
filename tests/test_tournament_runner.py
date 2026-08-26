@@ -27,3 +27,6 @@ class TournamentRunnerTests(TestCase):
         self.assertIn("random_legal", result.summary.mean_scores)
         self.assertIn("greedy", result.summary.mean_scores)
         self.assertGreaterEqual(sum(result.summary.win_counts.values()), 2)
+        self.assertIsNotNone(result.summary.rule_audits)
+        self.assertIn("powers", result.summary.rule_audits or {})
+        self.assertIn("scoring", result.summary.rule_audits or {})

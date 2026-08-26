@@ -2,9 +2,21 @@
 
 from __future__ import annotations
 
+from collections import Counter
+from dataclasses import dataclass
+
 from pydantic import BaseModel, ConfigDict
 
-from wingspan_ai.content.schemas import PowerColor, PowerImplementationStatus
+from wingspan_ai.content.schemas import ContentCatalog, PowerColor, PowerImplementationStatus
+
+IMPLEMENTED_POWER_STATUSES = frozenset(
+    {
+        PowerImplementationStatus.READY,
+        PowerImplementationStatus.NO_OP_FOR_V1,
+        PowerImplementationStatus.EXPECTED_VALUE_APPROXIMATION,
+        PowerImplementationStatus.HEURISTIC_RESOLUTION,
+    }
+)
 
 
 class PowerHandlerMetadata(BaseModel):
@@ -21,6 +33,35 @@ class PowerHandlerMetadata(BaseModel):
     module_path: str | None = None
     test_reference: str | None = None
     notes: str | None = None
+
+
+@dataclass(frozen=True)
+class PowerAuditResult:
+    """Coverage summary for bird power handler classification and implementation."""
+
+    total_birds: int
+    powered_card_count: int
+    no_power_count: int
+    classified_power_count: int
+    implemented_power_count: int
+    unclassified_power_count: int
+    unsupported_power_count: int
+    handler_counts: dict[str, int]
+    status_counts: dict[str, int]
+    unsupported_power_cards: list[dict[str, str | int | None]]
+    handler_source_references: dict[str, dict[str, str | int | None]]
+
+    @property
+    def handler_coverage(self) -> float:
+        if not self.powered_card_count:
+            return 1.0
+        return self.classified_power_count / self.powered_card_count
+
+    @property
+    def implementation_coverage(self) -> float:
+        if not self.powered_card_count:
+            return 1.0
+        return self.implemented_power_count / self.powered_card_count
 
 
 POWER_HANDLER_REGISTRY: dict[str, PowerHandlerMetadata] = {
@@ -182,6 +223,86 @@ POWER_HANDLER_REGISTRY: dict[str, PowerHandlerMetadata] = {
         ),
     ),
 }
+
+
+def audit_power_coverage(catalog: ContentCatalog) -> PowerAuditResult:
+    """Audit handler-key and implementation coverage for loaded bird powers."""
+
+    handler_counts: Counter[str] = Counter()
+    status_counts: Counter[str] = Counter()
+    unsupported_power_cards: list[dict[str, str | int | None]] = []
+    powered_card_count = 0
+    no_power_count = 0
+    classified_power_count = 0
+    implemented_power_count = 0
+
+    for bird in catalog.birds:
+        handler_key = bird.power.handler_key or classify_power_handler_key(
+            bird.power.text,
+            bird.power.color,
+        )
+        metadata = POWER_HANDLER_REGISTRY.get(handler_key or "")
+        has_power = bird.power.color != PowerColor.NONE and bool(bird.power.text)
+        if has_power:
+            powered_card_count += 1
+        else:
+            no_power_count += 1
+
+        counted_handler_key = handler_key or "unclassified"
+        handler_counts[counted_handler_key] += 1
+        status = (
+            metadata.implementation_status
+            if metadata is not None
+            else bird.power.implementation_status
+        )
+        status_counts[status.value] += 1
+
+        if not has_power:
+            continue
+        if metadata is not None:
+            classified_power_count += 1
+        if metadata is not None and metadata.implementation_status in IMPLEMENTED_POWER_STATUSES:
+            implemented_power_count += 1
+            continue
+
+        unsupported_power_cards.append(
+            {
+                "common_name": bird.common_name,
+                "power_color": bird.power.color.value,
+                "handler_key": handler_key,
+                "implementation_status": status.value,
+                "source_row": bird.source_row,
+            }
+        )
+
+    handler_source_references = {
+        key: {
+            "implementation_status": metadata.implementation_status.value,
+            "rulebook": metadata.rulebook,
+            "page": metadata.rulebook_page,
+            "section": metadata.source_section,
+            "module_path": metadata.module_path,
+            "test_reference": metadata.test_reference,
+        }
+        for key, metadata in sorted(POWER_HANDLER_REGISTRY.items())
+    }
+
+    return PowerAuditResult(
+        total_birds=len(catalog.birds),
+        powered_card_count=powered_card_count,
+        no_power_count=no_power_count,
+        classified_power_count=classified_power_count,
+        implemented_power_count=implemented_power_count,
+        unclassified_power_count=powered_card_count - classified_power_count,
+        unsupported_power_count=len(unsupported_power_cards),
+        handler_counts=dict(sorted(handler_counts.items())),
+        status_counts=dict(sorted(status_counts.items())),
+        unsupported_power_cards=sorted(
+            unsupported_power_cards,
+            key=lambda card: (str(card["common_name"]), str(card["handler_key"])),
+        ),
+        handler_source_references=handler_source_references,
+    )
 
 
 def classify_power_handler_key(power_text: str | None, power_color: PowerColor) -> str | None:

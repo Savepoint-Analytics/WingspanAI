@@ -211,8 +211,9 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/simulation/runner.py`: single-game runner with event emission and outcomes.
 - `src/wingspan_ai/simulation/replay.py`: deterministic state hashing helpers for replay/debug audits.
 - `src/wingspan_ai/rules/scoring_audit.py`: bonus-card and round-goal scoring coverage audit helper.
+- `src/wingspan_ai/rules/audit.py`: combined scoring and power coverage summary for batches and tournaments.
 - `src/wingspan_ai/experiments/mlflow_tracking.py`: MLflow logging skeleton for simulation results.
-- `flows/simulation_batch.py`: Prefect-compatible seeded batch flow with workload namespaces, batch-scoped game IDs, PostgreSQL/MinIO persistence, and a batch manifest.
+- `flows/simulation_batch.py`: Prefect-compatible seeded batch flow with replay validation, rule-fidelity audits, workload namespaces, batch-scoped game IDs, PostgreSQL/MinIO persistence, and a batch manifest.
 - `analysis/simulation_summary.py`: first reusable analysis helpers for outcomes and action frequency.
 - `notebooks/first_simulation_analysis.ipynb`: first Python notebook for tiny simulation-batch review.
 - `docs/architecture/project_package_structure.md`: recommended package and project folder structure.

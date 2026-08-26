@@ -638,3 +638,34 @@ Keep the normal test suite service-independent. Run the gated persistence test b
 persisted batches or after schema, artifact, environment configuration, or object-storage changes.
 Use `smoke` for regression batches, `experiment` for analysis inputs, and `production` only for
 validated repeatable workloads.
+
+## Update: 2026-08-26 - Replay-gated batches and rule audit summaries
+
+### What changed
+Checkpointed the PostgreSQL/MinIO persistence baseline in git before adding the next layer.
+
+Simulation batches now run `validate_simulation_replay` after each seeded game and before artifact
+writing, PostgreSQL persistence, or MinIO upload. Replay validation is required by default and each
+game result plus `batch_manifest.json` records checked transition counts and validation errors.
+
+Added combined rule-fidelity audit output for batches and tournaments. The audit reports power
+handler classification/implementation coverage, unsupported power cards, handler source references,
+bonus-card scoring coverage, round-goal scoring coverage, unsupported scoring items, and scoring
+source references.
+
+### Why it matters
+Persisted batches are now labelled by trace validity and current rule coverage. This prevents
+invalid replays or unsupported rule areas from being silently mixed into analysis datasets.
+
+### Decision
+Keep replay validation enabled by default for smoke, experiment, and production batches. Disable it
+only when deliberately capturing malformed traces for debugging. Treat rule-audit summaries as
+required metadata for any batch or tournament used in strategy analysis.
+
+### Next
+- [ ] Create analysis-ready PostgreSQL views or reusable SQL over decision, setup, power, score,
+      replay-validation, and batch-outcome telemetry.
+- [ ] Run a labelled 25-game persisted smoke batch and inspect replay/audit summaries before larger
+      experiments.
+- [ ] Use audit frequencies from that smoke batch to prioritize the next power/scoring fidelity sprint.
+
