@@ -10,7 +10,12 @@ from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
-from wingspan_ai.agents import GreedyBaselineAgent, RandomLegalAgent
+from wingspan_ai.agents import (
+    GreedyBaselineAgent,
+    GuardrailedAgent,
+    RandomLegalAgent,
+    load_guardrail_config,
+)
 from wingspan_ai.config import database_url_from_env, load_dotenv, object_storage_config_from_env
 from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH, load_base_game_content_catalog
 from wingspan_ai.content.sample_catalog import make_sample_catalog
@@ -61,6 +66,7 @@ def run_seeded_game(
     batch_label: str = DEFAULT_RUN_LABEL,
     batch_id: str | None = None,
     require_valid_replay: bool = True,
+    guardrail_config_path: str | None = None,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch."""
 
@@ -75,11 +81,22 @@ def run_seeded_game(
         if workbook_exists
         else make_sample_catalog()
     )
+    greedy_agent = GreedyBaselineAgent(agent_id="greedy_immediate_p2")
+    guardrail_config = (
+        load_guardrail_config(guardrail_config_path)
+        if guardrail_config_path is not None
+        else None
+    )
+    player_two_agent = (
+        GuardrailedAgent(greedy_agent, guardrail_config, agent_id="guardrailed_greedy_p2")
+        if guardrail_config is not None
+        else greedy_agent
+    )
     result = run_single_game(
         catalog,
         [
             RandomLegalAgent(agent_id="random_legal_p1", random_seed=random_seed),
-            GreedyBaselineAgent(agent_id="greedy_immediate_p2"),
+            player_two_agent,
         ],
         random_seed=random_seed,
         game_id=f"{resolved_batch_id}_seed_{random_seed}",
@@ -111,6 +128,8 @@ def run_seeded_game(
         "batch_kind": resolved_batch_kind,
         "batch_label": resolved_batch_label,
         "catalog_source": str(resolved_workbook_path) if workbook_exists else "sample_catalog",
+        "guardrail_config_path": guardrail_config_path,
+        "guardrail_config_name": guardrail_config.name if guardrail_config is not None else None,
         "replay_validation": replay_validation_payload,
         "rule_audits": rule_audits,
     }
@@ -174,6 +193,8 @@ def run_seeded_game(
         "batch_kind": resolved_batch_kind,
         "batch_label": resolved_batch_label,
         "catalog_source": batch_metadata["catalog_source"],
+        "guardrail_config_path": guardrail_config_path,
+        "guardrail_config_name": batch_metadata["guardrail_config_name"],
         "ruleset_id": result.state.ruleset.ruleset_id,
         "outcome": asdict(result.outcome),
         "event_count": len(result.events),
@@ -242,6 +263,7 @@ def _write_batch_manifest(
     completed_at: str,
     seeds: list[int],
     results: list[dict[str, Any]],
+    guardrail_config_path: str | None,
 ) -> Path:
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -253,6 +275,14 @@ def _write_batch_manifest(
         "completed_at": completed_at,
         "workbook_path": workbook_path,
         "catalog_sources": sorted({result["catalog_source"] for result in results}),
+        "guardrail_config_path": guardrail_config_path,
+        "guardrail_config_names": sorted(
+            {
+                result["guardrail_config_name"]
+                for result in results
+                if result["guardrail_config_name"] is not None
+            }
+        ),
         "seeds": seeds,
         "game_count": len(results),
         "event_count": sum(result["event_count"] for result in results),
@@ -273,6 +303,7 @@ def _write_batch_manifest(
                 "outcome": result["outcome"],
                 "event_count": result["event_count"],
                 "ruleset_id": result["ruleset_id"],
+                "guardrail_config_name": result["guardrail_config_name"],
                 "replay_validation": result["replay_validation"],
                 "artifact_dir": result["artifact_dir"],
                 "postgres": result["postgres"],
@@ -302,6 +333,7 @@ def run_simulation_batch(
     batch_label: str = DEFAULT_RUN_LABEL,
     batch_id: str | None = None,
     require_valid_replay: bool = True,
+    guardrail_config_path: str | None = None,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -322,6 +354,7 @@ def run_simulation_batch(
             batch_label=resolved_batch_label,
             batch_id=resolved_batch_id,
             require_valid_replay=require_valid_replay,
+            guardrail_config_path=guardrail_config_path,
         )
         for seed in resolved_seeds
     ]
@@ -345,6 +378,7 @@ def run_simulation_batch(
             completed_at=datetime.now(UTC).isoformat(),
             seeds=resolved_seeds,
             results=results,
+            guardrail_config_path=guardrail_config_path,
         )
         storage_config = object_storage_config_from_env()
         should_upload_manifest = (

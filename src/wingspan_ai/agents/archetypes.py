@@ -33,8 +33,7 @@ class StrategyArchetypeAgent:
         if self.agent_id is None:
             self.agent_id = f"archetype_{self.archetype.value}"
 
-    def choose_action(self, state: GameState) -> LegalAction:
-        legal_actions = legal_actions_for_current_player(state)
+    def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
         if not legal_actions:
             raise ValueError("StrategyArchetypeAgent cannot select from an empty action list")
 
@@ -48,6 +47,9 @@ class StrategyArchetypeAgent:
             for action in legal_actions
         ]
         return max(scored_actions, key=lambda item: item[0])[1]
+
+    def choose_action(self, state: GameState) -> LegalAction:
+        return self.select_action(state, legal_actions_for_current_player(state))
 
     def summarize_decision(
         self,

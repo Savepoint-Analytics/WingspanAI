@@ -199,6 +199,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/simulation/artifacts.py`: writes outcome, event, and public-state snapshot artifacts.
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
+- `src/wingspan_ai/agents/guardrails.py`: YAML-configured policy guardrails that filter or rescore legal actions before agent selection.
 - `src/wingspan_ai/agents/human_cli.py`: terminal-backed human player policy for local human-vs-agent smoke games.
 - `src/wingspan_ai/agents/archetypes.py`: scripted strategy archetype bots for behavioural signatures.
 - `src/wingspan_ai/agents/monte_carlo.py`: first Monte Carlo rollout agent.
@@ -219,6 +220,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `docs/architecture/project_package_structure.md`: recommended package and project folder structure.
 - `docs/architecture/simulator_architecture.md`: initial rules-engine and simulator architecture draft.
 - `docs/agents/baseline_agents.md`: current baseline and strategy archetype definitions.
+- `docs/agents/guardrail_policies.md`: YAML guardrail policy schema, telemetry, and usage notes.
 - `docs/agents/bayesian_belief_model_plan.md`: first Bayesian belief model plan.
 - `docs/events/simulation_event_taxonomy.md`: event envelope, current event names, and replay direction.
 - `docs/events/postgresql_event_table_design.md`: draft PostgreSQL tables and indexes for events/outcomes.

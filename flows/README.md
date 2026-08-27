@@ -10,6 +10,23 @@ Current flows:
 - `human_vs_greedy.py`: runs an interactive terminal game with `HumanCliAgent` against the greedy baseline. It uses the same legal action generation as automated agents, so human play is feasible without a separate UI.
 
 
+## Guardrailed Batches
+
+Pass a YAML guardrail config to wrap the greedy baseline with `GuardrailedAgent`:
+
+```python
+run_simulation_batch(
+    batch_label="guardrailed_greedy_trial",
+    guardrail_config_path="configs/guardrails/base_heuristic.yaml",
+)
+```
+
+The manifest records the guardrail config path and loaded config name. Decision telemetry from the
+wrapped player includes guardrail allowed/excluded/candidate counts, rule hits, selected-action
+modifiers, selected guardrail reasons, and the wrapped agent's decision summary over the narrowed
+candidate set.
+
+
 ## Persistence
 
 `simulation_batch.py` loads `.env` from the repository root. When PostgreSQL settings are

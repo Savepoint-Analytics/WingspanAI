@@ -27,8 +27,7 @@ class MonteCarloRolloutAgent:
     def __post_init__(self) -> None:
         self._rng = random.Random(self.random_seed)
 
-    def choose_action(self, state: GameState) -> LegalAction:
-        legal_actions = legal_actions_for_current_player(state)
+    def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
         if not legal_actions:
             raise ValueError("MonteCarloRolloutAgent cannot select from an empty action list")
 
@@ -38,6 +37,9 @@ class MonteCarloRolloutAgent:
             for action in legal_actions
         ]
         return max(scored_actions, key=lambda item: item[0])[1]
+
+    def choose_action(self, state: GameState) -> LegalAction:
+        return self.select_action(state, legal_actions_for_current_player(state))
 
     def _estimate_action_value(
         self,

@@ -669,3 +669,35 @@ required metadata for any batch or tournament used in strategy analysis.
       experiments.
 - [ ] Use audit frequencies from that smoke batch to prioritize the next power/scoring fidelity sprint.
 
+## Update: 2026-08-26 - YAML policy guardrails added
+
+### What changed
+Added `src/wingspan_ai/agents/guardrails.py`, a YAML-configured guardrail layer that evaluates
+state/action predicates over legal actions and can exclude, penalize, or boost choices before an
+agent selects. The rules engine remains the only source of legal actions.
+
+Added `GuardrailedAgent`, which wraps agents exposing `select_action` and delegates final selection
+over the guardrail-pruned candidate set. Strategy archetype and Monte Carlo agents now expose
+`select_action` so they can be constrained by guardrails as well as used directly.
+
+Added `configs/guardrails/base_heuristic.yaml` with first base-game guardrails for food deficits,
+low egg capacity, scarce eggs, small hands, and early engine building. Batch flows accept
+`guardrail_config_path` and record guardrail config metadata in manifests. Decision summaries emit
+rule-hit counts, candidate counts, selected modifiers, selected guardrail reasons, and wrapped-agent
+summaries.
+
+### Why it matters
+Guardrails provide explainable strategy constraints without contaminating legal-action generation.
+They make it practical to narrow obvious low-value choices before deeper heuristic, rollout, or
+Bayesian selection while preserving telemetry that explains how the action set was narrowed.
+
+### Decision
+Use guardrails as policy-level configuration, not rules-engine logic. Prefer boosts and penalties
+over hard exclusions until simulation evidence shows an action class is consistently dominated.
+Keep fail-open enabled by default so misconfigured guardrails do not dead-end a game.
+
+### Next
+- [ ] Run paired smoke batches comparing plain greedy and guardrailed greedy under fixed seeds.
+- [ ] Add SQL/Python analysis for guardrail rule hits, excluded action counts, and score impact.
+- [ ] Promote only evidence-backed guardrails from exploratory configs into reusable defaults.
+

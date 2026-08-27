@@ -1,0 +1,58 @@
+schema_version: wingspan.guardrails.v1
+name: base_heuristic_guardrails
+fail_open_when_all_excluded: true
+use_score_modifiers_for_pruning: true
+rules:
+  - id: prefer_food_for_visible_hand_deficits
+    description: Prefer food that helps pay for birds already in hand.
+    when:
+      hand_has_playable_bird_missing_food: true
+    action:
+      type: gain_food
+    guardrail:
+      boost_if_food_matches_hand_deficit: 10
+      penalize_if_food_unneeded: 5
+      reason: Food choices should support visible birds in hand.
+
+  - id: avoid_low_capacity_lay_eggs
+    description: Avoid choosing lay-eggs when most nests are already full.
+    when:
+      available_egg_capacity_lte: 1
+    action:
+      type: lay_eggs
+    guardrail:
+      penalize: 8
+      reason: Low open nest capacity makes egg actions inefficient.
+
+  - id: avoid_extra_card_draw_spending_last_eggs
+    description: Avoid spending eggs for extra cards when egg supply is thin.
+    when:
+      total_eggs_lte: 2
+    action:
+      type: draw_cards
+      uses_extra_conversion: true
+    guardrail:
+      penalize: 6
+      reason: Eggs are scarce and spending one for a card can block later bird plays.
+
+  - id: avoid_extra_food_spending_when_hand_small
+    description: Avoid discarding a card for extra food when the hand is already small.
+    when:
+      hand_size_lte: 2
+    action:
+      type: gain_food
+      uses_extra_conversion: true
+    guardrail:
+      penalize: 6
+      reason: With a small hand, cards are too scarce to convert casually.
+
+  - id: boost_engine_building_early
+    description: In early rounds, prefer playing birds over pure scoring actions when possible.
+    when:
+      round_lte: 2
+      hand_has_playable_bird: true
+    action:
+      type: play_bird
+    guardrail:
+      boost: 4
+      reason: Early bird plays increase later habitat action value.

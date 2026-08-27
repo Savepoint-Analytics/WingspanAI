@@ -64,6 +64,37 @@ class SimulationBatchFlowTests(TestCase):
                 {"enabled": False, "uploaded": None},
             )
 
+
+    def test_simulation_batch_can_wrap_greedy_with_guardrails(self) -> None:
+        guardrail_path = (
+            Path(__file__).parents[1]
+            / "configs"
+            / "guardrails"
+            / "base_heuristic.yaml"
+        )
+        with TemporaryDirectory() as tmp_dir:
+            results = simulation_batch.run_simulation_batch(
+                workbook_path="missing-workbook.xlsx",
+                seeds=[1],
+                artifact_root=tmp_dir,
+                persist_postgres=False,
+                upload_artifacts=False,
+                batch_kind="smoke",
+                batch_label="guardrail_trial",
+                batch_id="guardrail_batch",
+                guardrail_config_path=str(guardrail_path),
+            )
+
+            manifest_path = Path(results[0]["batch_manifest"]["path"])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(results[0]["guardrail_config_name"], "base_heuristic_guardrails")
+            self.assertEqual(manifest["guardrail_config_names"], ["base_heuristic_guardrails"])
+            self.assertEqual(
+                manifest["games"][0]["guardrail_config_name"],
+                "base_heuristic_guardrails",
+            )
+
     def test_replay_gate_rejects_invalid_replay_before_writing_artifacts(self) -> None:
         invalid_replay = ReplayValidationResult(
             is_valid=False,
