@@ -95,6 +95,32 @@ class SimulationBatchFlowTests(TestCase):
                 "base_heuristic_guardrails",
             )
 
+
+    def test_simulation_batch_can_use_potential_points_agent(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            results = simulation_batch.run_simulation_batch(
+                workbook_path="missing-workbook.xlsx",
+                seeds=[1],
+                artifact_root=tmp_dir,
+                persist_postgres=False,
+                upload_artifacts=False,
+                batch_kind="smoke",
+                batch_label="potential_points_trial",
+                batch_id="potential_points_batch",
+                player_two_agent_kind="potential_points",
+            )
+
+            manifest_path = Path(results[0]["batch_manifest"]["path"])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(results[0]["player_two_agent_kind"], "potential_points")
+            self.assertEqual(results[0]["player_two_agent_id"], "potential_points_p2")
+            self.assertEqual(manifest["player_two_agent_kinds"], ["potential_points"])
+            self.assertEqual(
+                manifest["games"][0]["player_two_agent_id"],
+                "potential_points_p2",
+            )
+
     def test_replay_gate_rejects_invalid_replay_before_writing_artifacts(self) -> None:
         invalid_replay = ReplayValidationResult(
             is_valid=False,

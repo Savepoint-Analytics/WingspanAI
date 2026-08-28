@@ -199,6 +199,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/simulation/artifacts.py`: writes outcome, event, and public-state snapshot artifacts.
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
+- `src/wingspan_ai/agents/potential_points.py`: expected-value greedy variant that estimates final-score potential from resources, playable birds, powers, bonus-card progress, round-goal pressure, and endgame conversion.
 - `src/wingspan_ai/agents/guardrails.py`: YAML-configured policy guardrails that filter or rescore legal actions before agent selection.
 - `src/wingspan_ai/agents/human_cli.py`: terminal-backed human player policy for local human-vs-agent smoke games.
 - `src/wingspan_ai/agents/archetypes.py`: scripted strategy archetype bots for behavioural signatures.

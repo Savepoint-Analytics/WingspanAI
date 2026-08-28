@@ -701,3 +701,26 @@ Keep fail-open enabled by default so misconfigured guardrails do not dead-end a 
 - [ ] Add SQL/Python analysis for guardrail rule hits, excluded action counts, and score impact.
 - [ ] Promote only evidence-backed guardrails from exploratory configs into reusable defaults.
 
+
+## Update: 2026-08-28 - Potential-points greedy agent added
+
+### What changed
+Added `PotentialPointsAgent` in `src/wingspan_ai/agents/potential_points.py` as a new greedy-family baseline. It keeps the immediate-score greedy baseline intact, but evaluates legal actions by the estimated final-score potential of the resulting state. The first value breakdown includes realized score, playable bird potential, food/card/egg conversion potential, played engine power potential, bonus-card progress, round-goal pressure, endgame conversion value, and dead-resource penalties.
+
+The agent emits decision summaries with selected value delta, realized score delta, the selected state's potential breakdown, top alternatives, and whether endgame search was used. It also includes a shallow final-turn search mode for the last five turns so late-game choices favor concrete point conversion over dead food or dead cards.
+
+### Yellow, white, and timing-power plan
+- Brown powers: value expected repeated habitat activations based on remaining turns and visible conversion demand.
+- Pink powers: value passive opponent-turn triggers from estimated remaining opponent activity.
+- Teal powers: value end-of-round triggers by the number of remaining round ends.
+- Yellow powers: value end-of-game powers as one-shot final scoring conversions if the card can be played before game end; exact yellow handlers remain future work.
+- White powers: value one-shot when-played effects for cards in hand; already-resolved white powers are captured through `apply_action` deltas.
+
+### Why it matters
+This addresses the strategic gap where food, cards, egg capacity, passive powers, bonus-card progress, and round-goal positioning should matter before they become realized points. It gives the project an interpretable bridge between the current immediate greedy baseline and heavier rollout/Bayesian/search agents.
+
+### Next
+- [ ] Run fixed-seed comparison batches: random vs immediate greedy, random vs potential-points greedy, and random vs guardrailed potential-points greedy.
+- [ ] Replace text-based power valuation with registry-backed valuation handlers for common brown, pink, teal, yellow, and white patterns.
+- [ ] Upgrade final-five-turn search to simulate all remaining player turns and completed round-goal scoring, not only same-player continuations.
+- [ ] Calibrate potential weights from smoke-batch telemetry and card/action outcome summaries.

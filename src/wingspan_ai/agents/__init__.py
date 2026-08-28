@@ -11,6 +11,11 @@ from wingspan_ai.agents.guardrails import (
 )
 from wingspan_ai.agents.human_cli import HumanCliAgent
 from wingspan_ai.agents.monte_carlo import MonteCarloRolloutAgent
+from wingspan_ai.agents.potential_points import (
+    PotentialPointsAgent,
+    PotentialValueBreakdown,
+    evaluate_state_potential,
+)
 from wingspan_ai.agents.random_legal import RandomLegalAgent
 
 __all__ = [
@@ -21,8 +26,11 @@ __all__ = [
     "HumanCliAgent",
     "MonteCarloRolloutAgent",
     "PolicyGuardrail",
+    "PotentialPointsAgent",
+    "PotentialValueBreakdown",
     "RandomLegalAgent",
     "StrategyArchetype",
     "StrategyArchetypeAgent",
+    "evaluate_state_potential",
     "load_guardrail_config",
 ]

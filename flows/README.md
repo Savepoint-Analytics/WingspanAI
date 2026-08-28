@@ -6,13 +6,26 @@ Keep orchestration here and core simulator/rules logic in `src/wingspan_ai/`.
 
 Current flows:
 
-- `simulation_batch.py`: runs a labelled seeded random-vs-greedy batch. It uses Prefect decorators when Prefect is installed and falls back to plain Python functions for local smoke tests. If `data/raw/wingspan-card-list.xlsx` is absent, it uses the package sample catalog. By default it writes artifacts under `artifacts/smoke/core_random_vs_greedy/<batch_id>/`.
+- `simulation_batch.py`: runs a labelled seeded random-vs-agent batch. Player 2 can use `greedy_immediate` or `potential_points`. It uses Prefect decorators when Prefect is installed and falls back to plain Python functions for local smoke tests. If `data/raw/wingspan-card-list.xlsx` is absent, it uses the package sample catalog. By default it writes artifacts under `artifacts/smoke/core_random_vs_greedy/<batch_id>/`.
 - `human_vs_greedy.py`: runs an interactive terminal game with `HumanCliAgent` against the greedy baseline. It uses the same legal action generation as automated agents, so human play is feasible without a separate UI.
 
 
+## Agent Variants
+
+Pass `player_two_agent_kind="potential_points"` to compare random legal play against the expected-value greedy variant:
+
+```python
+run_simulation_batch(
+    batch_label="potential_points_trial",
+    player_two_agent_kind="potential_points",
+)
+```
+
+The manifest records `player_two_agent_kinds` and `player_two_agent_ids` so immediate-greedy and potential-points batches can be compared cleanly.
+
 ## Guardrailed Batches
 
-Pass a YAML guardrail config to wrap the greedy baseline with `GuardrailedAgent`:
+Pass a YAML guardrail config to wrap the selected player-two agent with `GuardrailedAgent`:
 
 ```python
 run_simulation_batch(

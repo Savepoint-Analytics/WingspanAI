@@ -13,6 +13,7 @@ from uuid import uuid4
 from wingspan_ai.agents import (
     GreedyBaselineAgent,
     GuardrailedAgent,
+    PotentialPointsAgent,
     RandomLegalAgent,
     load_guardrail_config,
 )
@@ -47,7 +48,9 @@ except ImportError:
 
 
 BatchKind = Literal["smoke", "experiment", "production"]
+PlayerTwoAgentKind = Literal["greedy_immediate", "potential_points"]
 VALID_BATCH_KINDS = frozenset({"smoke", "experiment", "production"})
+VALID_PLAYER_TWO_AGENT_KINDS = frozenset({"greedy_immediate", "potential_points"})
 DEFAULT_ARTIFACT_ROOT = "artifacts"
 DEFAULT_RUN_LABEL = "core_random_vs_greedy"
 MANIFEST_FILENAME = "batch_manifest.json"
@@ -67,6 +70,7 @@ def run_seeded_game(
     batch_id: str | None = None,
     require_valid_replay: bool = True,
     guardrail_config_path: str | None = None,
+    player_two_agent_kind: PlayerTwoAgentKind = "greedy_immediate",
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch."""
 
@@ -74,6 +78,7 @@ def run_seeded_game(
     resolved_batch_kind = _validate_batch_kind(batch_kind)
     resolved_batch_label = _validate_path_segment(batch_label, "batch_label")
     resolved_batch_id = _validate_path_segment(batch_id or _new_batch_id(), "batch_id")
+    resolved_player_two_agent_kind = _validate_player_two_agent_kind(player_two_agent_kind)
     resolved_workbook_path = Path(workbook_path)
     workbook_exists = resolved_workbook_path.exists()
     catalog = (
@@ -81,16 +86,20 @@ def run_seeded_game(
         if workbook_exists
         else make_sample_catalog()
     )
-    greedy_agent = GreedyBaselineAgent(agent_id="greedy_immediate_p2")
+    base_agent = _make_player_two_agent(resolved_player_two_agent_kind)
     guardrail_config = (
         load_guardrail_config(guardrail_config_path)
         if guardrail_config_path is not None
         else None
     )
     player_two_agent = (
-        GuardrailedAgent(greedy_agent, guardrail_config, agent_id="guardrailed_greedy_p2")
+        GuardrailedAgent(
+            base_agent,
+            guardrail_config,
+            agent_id=_guardrailed_agent_id(resolved_player_two_agent_kind),
+        )
         if guardrail_config is not None
-        else greedy_agent
+        else base_agent
     )
     result = run_single_game(
         catalog,
@@ -128,6 +137,8 @@ def run_seeded_game(
         "batch_kind": resolved_batch_kind,
         "batch_label": resolved_batch_label,
         "catalog_source": str(resolved_workbook_path) if workbook_exists else "sample_catalog",
+        "player_two_agent_kind": resolved_player_two_agent_kind,
+        "player_two_agent_id": player_two_agent.agent_id,
         "guardrail_config_path": guardrail_config_path,
         "guardrail_config_name": guardrail_config.name if guardrail_config is not None else None,
         "replay_validation": replay_validation_payload,
@@ -193,6 +204,8 @@ def run_seeded_game(
         "batch_kind": resolved_batch_kind,
         "batch_label": resolved_batch_label,
         "catalog_source": batch_metadata["catalog_source"],
+        "player_two_agent_kind": resolved_player_two_agent_kind,
+        "player_two_agent_id": player_two_agent.agent_id,
         "guardrail_config_path": guardrail_config_path,
         "guardrail_config_name": batch_metadata["guardrail_config_name"],
         "ruleset_id": result.state.ruleset.ruleset_id,
@@ -220,6 +233,25 @@ def _validate_batch_kind(batch_kind: str) -> BatchKind:
         allowed = ", ".join(sorted(VALID_BATCH_KINDS))
         raise ValueError(f"batch_kind must be one of: {allowed}")
     return batch_kind  # type: ignore[return-value]
+
+
+def _validate_player_two_agent_kind(agent_kind: str) -> PlayerTwoAgentKind:
+    if agent_kind not in VALID_PLAYER_TWO_AGENT_KINDS:
+        allowed = ", ".join(sorted(VALID_PLAYER_TWO_AGENT_KINDS))
+        raise ValueError(f"player_two_agent_kind must be one of: {allowed}")
+    return agent_kind  # type: ignore[return-value]
+
+
+def _make_player_two_agent(agent_kind: PlayerTwoAgentKind):
+    if agent_kind == "potential_points":
+        return PotentialPointsAgent(agent_id="potential_points_p2")
+    return GreedyBaselineAgent(agent_id="greedy_immediate_p2")
+
+
+def _guardrailed_agent_id(agent_kind: PlayerTwoAgentKind) -> str:
+    if agent_kind == "potential_points":
+        return "guardrailed_potential_points_p2"
+    return "guardrailed_greedy_p2"
 
 
 def _validate_path_segment(value: str, name: str) -> str:
@@ -276,6 +308,8 @@ def _write_batch_manifest(
         "workbook_path": workbook_path,
         "catalog_sources": sorted({result["catalog_source"] for result in results}),
         "guardrail_config_path": guardrail_config_path,
+        "player_two_agent_kinds": sorted({result["player_two_agent_kind"] for result in results}),
+        "player_two_agent_ids": sorted({result["player_two_agent_id"] for result in results}),
         "guardrail_config_names": sorted(
             {
                 result["guardrail_config_name"]
@@ -303,6 +337,8 @@ def _write_batch_manifest(
                 "outcome": result["outcome"],
                 "event_count": result["event_count"],
                 "ruleset_id": result["ruleset_id"],
+                "player_two_agent_kind": result["player_two_agent_kind"],
+                "player_two_agent_id": result["player_two_agent_id"],
                 "guardrail_config_name": result["guardrail_config_name"],
                 "replay_validation": result["replay_validation"],
                 "artifact_dir": result["artifact_dir"],
@@ -334,6 +370,7 @@ def run_simulation_batch(
     batch_id: str | None = None,
     require_valid_replay: bool = True,
     guardrail_config_path: str | None = None,
+    player_two_agent_kind: PlayerTwoAgentKind = "greedy_immediate",
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -341,6 +378,7 @@ def run_simulation_batch(
     resolved_batch_kind = _validate_batch_kind(batch_kind)
     resolved_batch_label = _validate_path_segment(batch_label, "batch_label")
     resolved_batch_id = _validate_path_segment(batch_id or _new_batch_id(), "batch_id")
+    resolved_player_two_agent_kind = _validate_player_two_agent_kind(player_two_agent_kind)
     resolved_seeds = seeds or [1, 2, 3]
     started_at = datetime.now(UTC).isoformat()
     results = [
@@ -355,6 +393,7 @@ def run_simulation_batch(
             batch_id=resolved_batch_id,
             require_valid_replay=require_valid_replay,
             guardrail_config_path=guardrail_config_path,
+            player_two_agent_kind=resolved_player_two_agent_kind,
         )
         for seed in resolved_seeds
     ]
