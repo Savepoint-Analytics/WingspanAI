@@ -724,3 +724,19 @@ This addresses the strategic gap where food, cards, egg capacity, passive powers
 - [ ] Replace text-based power valuation with registry-backed valuation handlers for common brown, pink, teal, yellow, and white patterns.
 - [ ] Upgrade final-five-turn search to simulate all remaining player turns and completed round-goal scoring, not only same-player continuations.
 - [ ] Calibrate potential weights from smoke-batch telemetry and card/action outcome summaries.
+
+## Update: 2026-08-28 - Potential-points smoke comparison helper added
+
+### What changed
+Ran fixed-seed smoke comparisons for random vs immediate greedy, random vs potential-points greedy, and random vs guardrailed potential-points greedy across seeds 1-5. Added `analysis/simulation_batch_comparison.py` to summarize batch manifests, player-two win rate, score margin, action mix, selected value deltas, endgame-search usage, and guardrail candidate counts from local artifact events.
+
+Started replacing potential-points text-token power valuation with registry-backed handler-key valuation. The evaluator now prefers explicit or classified `handler_key` values for common gain-food, draw-card, lay-egg, tuck, cache, predator, discard, all-player, and deck-search handlers before falling back to text-token valuation for unclassified powers.
+
+### Why it matters
+The project now has a repeatable way to compare baseline smoke batches without manually inspecting raw JSON artifacts. The first 5-seed comparison is encouraging for `PotentialPointsAgent`, but it is still smoke evidence only and should not be treated as a strategic finding until larger controlled batches and rule-fidelity filters are in place.
+
+### Follow-up tasks
+- [ ] Promote the comparison helper into a notebook or report artifact once batch sizes are large enough to interpret.
+- [ ] Add compute-time telemetry for agent decision summaries before scaling potential-points tournaments.
+- [ ] Extend registry-backed valuation into dedicated value-handler modules with tests per handler key.
+- [ ] Run larger fixed-seed tournaments against immediate greedy, archetypes, Monte Carlo, and guardrailed variants after power/scoring coverage improves.

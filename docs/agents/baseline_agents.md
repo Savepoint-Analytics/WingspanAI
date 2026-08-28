@@ -45,7 +45,7 @@ Power timing plan:
 
 Near-term improvements:
 
-- Replace text-token power valuation with registry-backed value handlers aligned to the power handler registry.
+- Continue replacing text-token power valuation with registry-backed value handlers aligned to the power handler registry. The first implementation now prefers explicit or classified power `handler_key` values for common gain-food, draw-card, lay-egg, tuck, cache, predator, discard, all-player, and deck-search patterns, then falls back to text-token valuation for unclassified powers.
 - Add better probability estimates for drawing playable cards, predator success, bonus-card thresholds, and opponent round-goal movement.
 - Expand endgame search from a shallow same-player search into a full remaining-turn planner that accounts for opponent actions and round-end scoring.
 - Compare `PotentialPointsAgent` against immediate greedy, guardrailed greedy, archetypes, and Monte Carlo over fixed-seed smoke batches.

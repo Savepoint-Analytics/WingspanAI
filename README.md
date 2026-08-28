@@ -217,6 +217,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/experiments/mlflow_tracking.py`: MLflow logging skeleton for simulation results.
 - `flows/simulation_batch.py`: Prefect-compatible seeded batch flow with replay validation, rule-fidelity audits, workload namespaces, batch-scoped game IDs, PostgreSQL/MinIO persistence, and a batch manifest.
 - `analysis/simulation_summary.py`: first reusable analysis helpers for outcomes and action frequency.
+- `analysis/simulation_batch_comparison.py`: compares batch manifests, action mixes, score margins, and potential/guardrail decision telemetry.
 - `notebooks/first_simulation_analysis.ipynb`: first Python notebook for tiny simulation-batch review.
 - `docs/architecture/project_package_structure.md`: recommended package and project folder structure.
 - `docs/architecture/simulator_architecture.md`: initial rules-engine and simulator architecture draft.

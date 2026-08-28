@@ -23,6 +23,14 @@ run_simulation_batch(
 
 The manifest records `player_two_agent_kinds` and `player_two_agent_ids` so immediate-greedy and potential-points batches can be compared cleanly.
 
+Compare local batch manifests with:
+
+```bash
+python analysis/simulation_batch_comparison.py \
+  artifacts/smoke/greedy_immediate_comparison/<batch_id>/batch_manifest.json \
+  artifacts/smoke/potential_points_comparison/<batch_id>/batch_manifest.json
+```
+
 ## Guardrailed Batches
 
 Pass a YAML guardrail config to wrap the selected player-two agent with `GuardrailedAgent`:

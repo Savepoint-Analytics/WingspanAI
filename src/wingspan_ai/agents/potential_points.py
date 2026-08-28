@@ -36,6 +36,7 @@ from wingspan_ai.rules.base_game import (
     legal_actions_for_current_player,
     score_player,
 )
+from wingspan_ai.rules.power_registry import classify_power_handler_key
 from wingspan_ai.state.models import BirdSlot, GameState, PlayerState
 
 
@@ -351,29 +352,45 @@ def _played_power_value(
     turns_remaining: int,
 ) -> float:
     power = slot.card.power
-    if power.color == PowerColor.NONE or not power.text:
+    if power.color == PowerColor.NONE or (not power.text and not power.handler_key):
         return 0.0
-    lowered = power.text.lower()
+    lowered = power.text.lower() if power.text else ""
+    handler_key = _power_handler_key(power.text, power.color, power.handler_key)
 
     if power.color == PowerColor.BROWN:
-        return expected_triggers * _per_trigger_power_value(lowered, demand, slot)
+        return expected_triggers * _per_trigger_power_value(handler_key, lowered, demand, slot)
     if power.color == PowerColor.PINK:
-        return (turns_remaining * 0.35) * _per_trigger_power_value(lowered, demand, slot)
+        return (turns_remaining * 0.35) * _per_trigger_power_value(
+            handler_key,
+            lowered,
+            demand,
+            slot,
+        )
     if power.color == PowerColor.TEAL:
         remaining_triggers = _remaining_teal_triggers(turns_remaining)
-        return remaining_triggers * _per_trigger_power_value(lowered, demand, slot)
+        return remaining_triggers * _per_trigger_power_value(handler_key, lowered, demand, slot)
     if power.color == PowerColor.YELLOW:
-        return _yellow_end_game_power_value(lowered, demand, slot, turns_remaining)
+        return _yellow_end_game_power_value(handler_key, lowered, demand, slot, turns_remaining)
     if power.color == PowerColor.WHITE:
         return 0.0
     return 0.0
 
 
 def _per_trigger_power_value(
+    handler_key: str | None,
     lowered_power_text: str,
     demand: Counter[FoodType],
     slot: BirdSlot,
 ) -> float:
+    handler_value = _registered_per_trigger_power_value(
+        handler_key,
+        lowered_power_text,
+        demand,
+        slot,
+    )
+    if handler_value is not None:
+        return handler_value
+
     value = 0.0
     if "tuck" in lowered_power_text:
         value += 1.0
@@ -391,6 +408,57 @@ def _per_trigger_power_value(
     if "[wild]" in lowered_power_text or "[die]" in lowered_power_text:
         value += 0.85 if sum(demand.values()) > 0 else 0.25
     return value
+
+
+def _registered_per_trigger_power_value(
+    handler_key: str | None,
+    lowered_power_text: str,
+    demand: Counter[FoodType],
+    slot: BirdSlot,
+) -> float | None:
+    """Value common power-handler registry entries before falling back to text tokens."""
+
+    if handler_key is None:
+        return None
+    if handler_key == "tuck_card":
+        return 1.15 if "draw" in lowered_power_text else 1.0
+    if handler_key == "cache_food":
+        return 1.0
+    if handler_key == "predator_hunt":
+        return 0.45
+    if handler_key == "draw_card":
+        return 0.55
+    if handler_key == "lay_egg":
+        return 0.9 if slot.available_egg_capacity > 0 else 0.0
+    if handler_key in {
+        "gain_food_from_birdfeeder",
+        "gain_food_from_supply",
+        "all_players_gain_food",
+        "discard_egg_gain_wild_food",
+    }:
+        return _registered_food_power_value(lowered_power_text, demand)
+    if handler_key == "all_players_lay_eggs":
+        return 0.75 if slot.available_egg_capacity > 0 else 0.0
+    if handler_key == "discard_to_tuck":
+        return 0.8
+    if handler_key == "deck_search_tuck_by_wingspan":
+        return 0.4
+    if handler_key == "pink_reaction":
+        return None
+    return None
+
+
+def _registered_food_power_value(
+    lowered_power_text: str,
+    demand: Counter[FoodType],
+) -> float:
+    if "wild" in lowered_power_text or "[die]" in lowered_power_text:
+        return 0.85 if sum(demand.values()) > 0 else 0.25
+    for food_type in BASE_FOOD_TYPES:
+        token = f"[{_food_power_token(food_type)}]"
+        if token in lowered_power_text:
+            return 0.85 if demand.get(food_type, 0) > 0 else 0.25
+    return 0.85 if sum(demand.values()) > 0 else 0.25
 
 
 def _bonus_card_potential(player: PlayerState, turns_remaining: int) -> float:
@@ -450,6 +518,7 @@ def _endgame_conversion_potential(player: PlayerState, turns_remaining: int) -> 
 
 
 def _yellow_end_game_power_value(
+    handler_key: str | None,
     lowered_power_text: str,
     demand: Counter[FoodType],
     slot: BirdSlot,
@@ -457,7 +526,7 @@ def _yellow_end_game_power_value(
 ) -> float:
     if turns_remaining <= 0:
         return 0.0
-    value = _per_trigger_power_value(lowered_power_text, demand, slot)
+    value = _per_trigger_power_value(handler_key, lowered_power_text, demand, slot)
     if "end of the game" in lowered_power_text or "game end" in lowered_power_text:
         value += 0.5
     return min(value, 3.0)
@@ -489,33 +558,51 @@ def _projected_bird_value(
 
 def _unplayed_power_value(card: BirdCard, player: PlayerState, turns_remaining: int) -> float:
     power = card.power
-    if power.color == PowerColor.NONE or not power.text:
+    if power.color == PowerColor.NONE or (not power.text and not power.handler_key):
         return 0.0
-    lowered = power.text.lower()
+    lowered = power.text.lower() if power.text else ""
+    handler_key = _power_handler_key(power.text, power.color, power.handler_key)
     demand = _food_demand(player)
     if power.color == PowerColor.WHITE:
-        return _per_trigger_power_value(lowered, demand, BirdSlot(card=card))
+        return _per_trigger_power_value(handler_key, lowered, demand, BirdSlot(card=card))
     if power.color == PowerColor.YELLOW:
-        return _yellow_end_game_power_value(lowered, demand, BirdSlot(card=card), turns_remaining)
+        return _yellow_end_game_power_value(
+            handler_key,
+            lowered,
+            demand,
+            BirdSlot(card=card),
+            turns_remaining,
+        )
     if power.color == PowerColor.TEAL:
         return _remaining_teal_triggers(turns_remaining) * _per_trigger_power_value(
+            handler_key,
             lowered,
             demand,
             BirdSlot(card=card),
         )
     if power.color == PowerColor.BROWN:
         return min(turns_remaining, 4) * 0.35 * _per_trigger_power_value(
+            handler_key,
             lowered,
             demand,
             BirdSlot(card=card),
         )
     if power.color == PowerColor.PINK:
         return turns_remaining * 0.15 * _per_trigger_power_value(
+            handler_key,
             lowered,
             demand,
             BirdSlot(card=card),
         )
     return 0.0
+
+
+def _power_handler_key(
+    power_text: str | None,
+    power_color: PowerColor,
+    explicit_handler_key: str | None,
+) -> str | None:
+    return explicit_handler_key or classify_power_handler_key(power_text, power_color)
 
 
 def _estimated_actions_to_play(state: GameState, player: PlayerState, card: BirdCard) -> int:

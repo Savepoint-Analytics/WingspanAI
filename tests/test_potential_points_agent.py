@@ -148,6 +148,29 @@ class PotentialPointsAgentTests(TestCase):
             plain_breakdown.playable_bird_potential,
         )
 
+    def test_handler_key_can_value_power_without_text_token_match(self) -> None:
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=35)
+        player = state.active_player
+        player.habitats[Habitat.WETLAND].append(
+            BirdSlot(
+                card=_bird(
+                    "Registered Tuck Bird",
+                    points=1,
+                    food_cost={},
+                    power=Power(
+                        color=PowerColor.BROWN,
+                        text="Custom registry-backed wording.",
+                        implementation_status=PowerImplementationStatus.HEURISTIC_RESOLUTION,
+                        handler_key="tuck_card",
+                    ),
+                )
+            )
+        )
+
+        breakdown = evaluate_state_potential(state, player.player_id)
+
+        self.assertGreater(breakdown.engine_power_potential, 0)
+
     def test_immediate_greedy_baseline_still_available(self) -> None:
         self.assertEqual(GreedyBaselineAgent().agent_id, "greedy_immediate_score")
 
