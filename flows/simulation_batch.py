@@ -14,6 +14,7 @@ from wingspan_ai.agents import (
     GreedyBaselineAgent,
     GuardrailedAgent,
     MonteCarloRolloutAgent,
+    NetValueOpponentResponseAgent,
     PotentialPointsAgent,
     RandomLegalAgent,
     StrategyArchetype,
@@ -55,6 +56,7 @@ PlayerTwoAgentKind = Literal[
     "random_legal",
     "greedy_immediate",
     "potential_points",
+    "net_value_response",
     "archetype_egg_focus",
     "archetype_engine_builder",
     "archetype_food_acceleration",
@@ -69,6 +71,7 @@ VALID_PLAYER_TWO_AGENT_KINDS = frozenset(
         "greedy_immediate",
         "random_legal",
         "potential_points",
+        "net_value_response",
         "archetype_egg_focus",
         "archetype_engine_builder",
         "archetype_food_acceleration",
@@ -98,6 +101,11 @@ def run_seeded_game(
     require_valid_replay: bool = True,
     guardrail_config_path: str | None = None,
     player_two_agent_kind: PlayerTwoAgentKind = "greedy_immediate",
+    monte_carlo_rollout_count: int = 8,
+    monte_carlo_rollout_depth: int = 12,
+    monte_carlo_max_decision_time_ms: float | None = None,
+    net_value_max_candidate_actions: int | None = 12,
+    net_value_max_opponent_response_actions: int | None = 8,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch."""
 
@@ -116,6 +124,11 @@ def run_seeded_game(
     base_agent = _make_player_two_agent(
         resolved_player_two_agent_kind,
         random_seed=random_seed,
+        monte_carlo_rollout_count=monte_carlo_rollout_count,
+        monte_carlo_rollout_depth=monte_carlo_rollout_depth,
+        monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
+        net_value_max_candidate_actions=net_value_max_candidate_actions,
+        net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
     )
     guardrail_config = (
         load_guardrail_config(guardrail_config_path)
@@ -171,6 +184,11 @@ def run_seeded_game(
         "player_two_agent_id": player_two_agent.agent_id,
         "guardrail_config_path": guardrail_config_path,
         "guardrail_config_name": guardrail_config.name if guardrail_config is not None else None,
+        "monte_carlo_rollout_count": monte_carlo_rollout_count,
+        "monte_carlo_rollout_depth": monte_carlo_rollout_depth,
+        "monte_carlo_max_decision_time_ms": monte_carlo_max_decision_time_ms,
+        "net_value_max_candidate_actions": net_value_max_candidate_actions,
+        "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "replay_validation": replay_validation_payload,
         "rule_audits": rule_audits,
     }
@@ -238,6 +256,11 @@ def run_seeded_game(
         "player_two_agent_id": player_two_agent.agent_id,
         "guardrail_config_path": guardrail_config_path,
         "guardrail_config_name": batch_metadata["guardrail_config_name"],
+        "monte_carlo_rollout_count": monte_carlo_rollout_count,
+        "monte_carlo_rollout_depth": monte_carlo_rollout_depth,
+        "monte_carlo_max_decision_time_ms": monte_carlo_max_decision_time_ms,
+        "net_value_max_candidate_actions": net_value_max_candidate_actions,
+        "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "ruleset_id": result.state.ruleset.ruleset_id,
         "outcome": asdict(result.outcome),
         "event_count": len(result.events),
@@ -272,11 +295,26 @@ def _validate_player_two_agent_kind(agent_kind: str) -> PlayerTwoAgentKind:
     return agent_kind  # type: ignore[return-value]
 
 
-def _make_player_two_agent(agent_kind: PlayerTwoAgentKind, *, random_seed: int = 0):
+def _make_player_two_agent(
+    agent_kind: PlayerTwoAgentKind,
+    *,
+    random_seed: int = 0,
+    monte_carlo_rollout_count: int = 8,
+    monte_carlo_rollout_depth: int = 12,
+    monte_carlo_max_decision_time_ms: float | None = None,
+    net_value_max_candidate_actions: int | None = 12,
+    net_value_max_opponent_response_actions: int | None = 8,
+):
     if agent_kind == "random_legal":
         return RandomLegalAgent(agent_id="random_legal_p2", random_seed=random_seed)
     if agent_kind == "potential_points":
         return PotentialPointsAgent(agent_id="potential_points_p2")
+    if agent_kind == "net_value_response":
+        return NetValueOpponentResponseAgent(
+            agent_id="net_value_response_p2",
+            max_candidate_actions=net_value_max_candidate_actions,
+            max_opponent_response_actions=net_value_max_opponent_response_actions,
+        )
     if agent_kind == "archetype_egg_focus":
         return StrategyArchetypeAgent(StrategyArchetype.EGG_FOCUS, agent_id="egg_focus_p2")
     if agent_kind == "archetype_engine_builder":
@@ -302,7 +340,13 @@ def _make_player_two_agent(agent_kind: PlayerTwoAgentKind, *, random_seed: int =
             agent_id="round_goal_chase_p2",
         )
     if agent_kind == "monte_carlo_rollout":
-        return MonteCarloRolloutAgent(agent_id="monte_carlo_rollout_p2", random_seed=random_seed)
+        return MonteCarloRolloutAgent(
+            agent_id="monte_carlo_rollout_p2",
+            rollout_count=monte_carlo_rollout_count,
+            rollout_depth=monte_carlo_rollout_depth,
+            max_decision_time_ms=monte_carlo_max_decision_time_ms,
+            random_seed=random_seed,
+        )
     return GreedyBaselineAgent(agent_id="greedy_immediate_p2")
 
 
@@ -352,6 +396,11 @@ def _write_batch_manifest(
     seeds: list[int],
     results: list[dict[str, Any]],
     guardrail_config_path: str | None,
+    monte_carlo_rollout_count: int,
+    monte_carlo_rollout_depth: int,
+    monte_carlo_max_decision_time_ms: float | None,
+    net_value_max_candidate_actions: int | None,
+    net_value_max_opponent_response_actions: int | None,
 ) -> Path:
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -366,6 +415,11 @@ def _write_batch_manifest(
         "guardrail_config_path": guardrail_config_path,
         "player_two_agent_kinds": sorted({result["player_two_agent_kind"] for result in results}),
         "player_two_agent_ids": sorted({result["player_two_agent_id"] for result in results}),
+        "monte_carlo_rollout_count": monte_carlo_rollout_count,
+        "monte_carlo_rollout_depth": monte_carlo_rollout_depth,
+        "monte_carlo_max_decision_time_ms": monte_carlo_max_decision_time_ms,
+        "net_value_max_candidate_actions": net_value_max_candidate_actions,
+        "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "guardrail_config_names": sorted(
             {
                 result["guardrail_config_name"]
@@ -396,6 +450,15 @@ def _write_batch_manifest(
                 "player_two_agent_kind": result["player_two_agent_kind"],
                 "player_two_agent_id": result["player_two_agent_id"],
                 "guardrail_config_name": result["guardrail_config_name"],
+                "monte_carlo_rollout_count": result["monte_carlo_rollout_count"],
+                "monte_carlo_rollout_depth": result["monte_carlo_rollout_depth"],
+                "monte_carlo_max_decision_time_ms": result[
+                    "monte_carlo_max_decision_time_ms"
+                ],
+                "net_value_max_candidate_actions": result["net_value_max_candidate_actions"],
+                "net_value_max_opponent_response_actions": result[
+                    "net_value_max_opponent_response_actions"
+                ],
                 "replay_validation": result["replay_validation"],
                 "artifact_dir": result["artifact_dir"],
                 "postgres": result["postgres"],
@@ -427,6 +490,11 @@ def run_simulation_batch(
     require_valid_replay: bool = True,
     guardrail_config_path: str | None = None,
     player_two_agent_kind: PlayerTwoAgentKind = "greedy_immediate",
+    monte_carlo_rollout_count: int = 8,
+    monte_carlo_rollout_depth: int = 12,
+    monte_carlo_max_decision_time_ms: float | None = None,
+    net_value_max_candidate_actions: int | None = 12,
+    net_value_max_opponent_response_actions: int | None = 8,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -450,6 +518,11 @@ def run_simulation_batch(
             require_valid_replay=require_valid_replay,
             guardrail_config_path=guardrail_config_path,
             player_two_agent_kind=resolved_player_two_agent_kind,
+            monte_carlo_rollout_count=monte_carlo_rollout_count,
+            monte_carlo_rollout_depth=monte_carlo_rollout_depth,
+            monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
+            net_value_max_candidate_actions=net_value_max_candidate_actions,
+            net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
         )
         for seed in resolved_seeds
     ]
@@ -474,6 +547,11 @@ def run_simulation_batch(
             seeds=resolved_seeds,
             results=results,
             guardrail_config_path=guardrail_config_path,
+            monte_carlo_rollout_count=monte_carlo_rollout_count,
+            monte_carlo_rollout_depth=monte_carlo_rollout_depth,
+            monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
+            net_value_max_candidate_actions=net_value_max_candidate_actions,
+            net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
         )
         storage_config = object_storage_config_from_env()
         should_upload_manifest = (

@@ -126,6 +126,7 @@ class SimulationBatchFlowTests(TestCase):
             "random_legal": "random_legal_p2",
             "greedy_immediate": "greedy_immediate_p2",
             "potential_points": "potential_points_p2",
+            "net_value_response": "net_value_response_p2",
             "archetype_egg_focus": "egg_focus_p2",
             "archetype_engine_builder": "engine_builder_p2",
             "archetype_food_acceleration": "food_acceleration_p2",
@@ -143,6 +144,59 @@ class SimulationBatchFlowTests(TestCase):
                 )
 
                 self.assertEqual(agent.agent_id, expected_agent_id)
+
+    def test_simulation_batch_records_monte_carlo_budget_controls(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            results = simulation_batch.run_simulation_batch(
+                workbook_path="missing-workbook.xlsx",
+                seeds=[1],
+                artifact_root=tmp_dir,
+                persist_postgres=False,
+                upload_artifacts=False,
+                batch_kind="smoke",
+                batch_label="monte_budget_trial",
+                batch_id="monte_budget_batch",
+                player_two_agent_kind="monte_carlo_rollout",
+                monte_carlo_rollout_count=2,
+                monte_carlo_rollout_depth=2,
+                monte_carlo_max_decision_time_ms=5.0,
+            )
+
+            manifest_path = Path(results[0]["batch_manifest"]["path"])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(results[0]["monte_carlo_rollout_count"], 2)
+            self.assertEqual(results[0]["monte_carlo_rollout_depth"], 2)
+            self.assertEqual(results[0]["monte_carlo_max_decision_time_ms"], 5.0)
+            self.assertEqual(manifest["monte_carlo_rollout_count"], 2)
+            self.assertEqual(manifest["games"][0]["monte_carlo_rollout_depth"], 2)
+
+    def test_simulation_batch_records_net_value_budget_controls(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            results = simulation_batch.run_simulation_batch(
+                workbook_path="missing-workbook.xlsx",
+                seeds=[1],
+                artifact_root=tmp_dir,
+                persist_postgres=False,
+                upload_artifacts=False,
+                batch_kind="smoke",
+                batch_label="net_value_budget_trial",
+                batch_id="net_value_budget_batch",
+                player_two_agent_kind="net_value_response",
+                net_value_max_candidate_actions=4,
+                net_value_max_opponent_response_actions=3,
+            )
+
+            manifest_path = Path(results[0]["batch_manifest"]["path"])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+            self.assertEqual(results[0]["net_value_max_candidate_actions"], 4)
+            self.assertEqual(results[0]["net_value_max_opponent_response_actions"], 3)
+            self.assertEqual(manifest["net_value_max_candidate_actions"], 4)
+            self.assertEqual(
+                manifest["games"][0]["net_value_max_opponent_response_actions"],
+                3,
+            )
 
     def test_replay_gate_rejects_invalid_replay_before_writing_artifacts(self) -> None:
         invalid_replay = ReplayValidationResult(

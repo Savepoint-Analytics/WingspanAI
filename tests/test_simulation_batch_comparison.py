@@ -46,6 +46,8 @@ class SimulationBatchComparisonTests(TestCase):
             self.assertAlmostEqual(decision["endgame_search_share"], 0.5)
             self.assertAlmostEqual(decision["average_action_selection_elapsed_ms"], 10.0)
             self.assertAlmostEqual(decision["average_decision_total_elapsed_ms"], 13.0)
+            self.assertAlmostEqual(decision["average_total_completed_rollouts"], 4.0)
+            self.assertAlmostEqual(decision["budget_exhausted_share"], 0.5)
             self.assertAlmostEqual(score_mix["bird_points"], 16.0)
             self.assertAlmostEqual(score_mix["egg_points"], 7.5)
             self.assertAlmostEqual(score_mix["total"], 32.0)
@@ -83,6 +85,8 @@ def _write_manifest(root: Path) -> Path:
                     "action_selection_elapsed_ms": 12.0,
                     "decision_summary_elapsed_ms": 4.0,
                     "decision_total_elapsed_ms": 16.0,
+                    "total_completed_rollouts": 6,
+                    "budget_exhausted": False,
                 },
             ),
             _game_ended_event(
@@ -109,6 +113,8 @@ def _write_manifest(root: Path) -> Path:
                     "action_selection_elapsed_ms": 8.0,
                     "decision_summary_elapsed_ms": 2.0,
                     "decision_total_elapsed_ms": 10.0,
+                    "total_completed_rollouts": 2,
+                    "budget_exhausted": True,
                     "base_decision_summary": {
                         "selected_value_delta": 0.0,
                         "selected_realized_delta": -0.5,

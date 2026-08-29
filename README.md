@@ -200,6 +200,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
 - `src/wingspan_ai/agents/potential_points.py`: expected-value greedy variant that estimates final-score potential from resources, playable birds, powers, bonus-card progress, round-goal pressure, and endgame conversion.
+- `src/wingspan_ai/agents/net_value.py`: score-margin agent scaffold that estimates next opponent response and shared-resource denial value.
 - `src/wingspan_ai/agents/guardrails.py`: YAML-configured policy guardrails that filter or rescore legal actions before agent selection.
 - `src/wingspan_ai/agents/human_cli.py`: terminal-backed human player policy for local human-vs-agent smoke games.
 - `src/wingspan_ai/agents/archetypes.py`: scripted strategy archetype bots for behavioural signatures.
@@ -218,10 +219,12 @@ This structure should make it easier to adapt the approach to other board games 
 - `flows/simulation_batch.py`: Prefect-compatible seeded batch flow with replay validation, rule-fidelity audits, workload namespaces, batch-scoped game IDs, PostgreSQL/MinIO persistence, and a batch manifest.
 - `analysis/simulation_summary.py`: first reusable analysis helpers for outcomes and action frequency.
 - `analysis/simulation_batch_comparison.py`: compares batch manifests, action mixes, score margins, and potential/guardrail decision telemetry.
+- `analysis/apply_action_profile.py`: profiles legal action generation, deep-copy cost, and full transition cost for lookahead-heavy agents.
 - `notebooks/first_simulation_analysis.ipynb`: first Python notebook for tiny simulation-batch review.
 - `docs/architecture/project_package_structure.md`: recommended package and project folder structure.
 - `docs/architecture/simulator_architecture.md`: initial rules-engine and simulator architecture draft.
 - `docs/agents/baseline_agents.md`: current baseline and strategy archetype definitions.
+- `docs/agents/net_value_opponent_response_agent.md`: score-margin and opponent-response agent template.
 - `docs/agents/guardrail_policies.md`: YAML guardrail policy schema, telemetry, and usage notes.
 - `docs/agents/bayesian_belief_model_plan.md`: first Bayesian belief model plan.
 - `docs/events/simulation_event_taxonomy.md`: event envelope, current event names, and replay direction.

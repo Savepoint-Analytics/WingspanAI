@@ -9,8 +9,9 @@ Status: initial draft, 2026-05-04
 | `RandomLegalAgent` | `src/wingspan_ai/agents/random_legal.py` | Uniformly samples legal actions with seeded randomness. |
 | `GreedyBaselineAgent` | `src/wingspan_ai/agents/greedy.py` | Picks the action with the largest immediate implemented score gain, with food-choice tiebreaks based on visible hand deficits. |
 | `PotentialPointsAgent` | `src/wingspan_ai/agents/potential_points.py` | Picks the action that creates the best estimated final-score potential, including resource conversion, playable hand value, power timing, bonus-card progress, round-goal pressure, and endgame conversion. |
+| `NetValueOpponentResponseAgent` | `src/wingspan_ai/agents/net_value.py` | Estimates score-margin impact after the next opponent response, including simple shared-resource denial. |
 | `StrategyArchetypeAgent` | `src/wingspan_ai/agents/archetypes.py` | Produces interpretable behavioural signatures for early strategy analysis, including resource-biased food choices. |
-| `MonteCarloRolloutAgent` | `src/wingspan_ai/agents/monte_carlo.py` | Estimates action value through sampled random legal continuations. |
+| `MonteCarloRolloutAgent` | `src/wingspan_ai/agents/monte_carlo.py` | Estimates action value through sampled random legal continuations, with optional decision-time and rollout-count budget controls. |
 
 ## Strategy Archetypes
 
@@ -28,6 +29,8 @@ These are not intended to be strong yet. Their near-term job is to create distin
 ## Rollout Agent Caveats
 
 The first Monte Carlo agent uses random legal continuations and the current implemented scoring surface. It does not yet model hidden information, most unimplemented bird powers, or opponent strategy adaptation. Treat it as a plumbing test for action-value estimation, not as a claim of strong play.
+
+Monte Carlo now supports `max_decision_time_ms`, `rollout_count`, `rollout_depth`, and `min_rollouts_per_action`. Decision summaries report whether the budget was exhausted and how many rollouts completed, which should be monitored before scaling beyond smoke matrices.
 
 ## Potential-Points Agent
 

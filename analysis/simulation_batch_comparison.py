@@ -79,8 +79,9 @@ def render_markdown_report(comparison: dict[str, Any]) -> str:
                 "",
                 "| Batch | Agent | Decisions | Avg score delta | Avg value delta | "
                 "Avg realized delta | Endgame search share | Avg guardrail candidates | "
-                "Avg select ms | Avg summary ms | Avg total ms |",
-                "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+                "Avg select ms | Avg summary ms | Avg total ms | Avg rollouts | "
+                "Budget exhausted |",
+                "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
             ]
         )
         for row in comparison["decision_summaries"]:
@@ -93,7 +94,9 @@ def render_markdown_report(comparison: dict[str, Any]) -> str:
                 "{average_guardrail_candidate_count} | "
                 "{average_action_selection_elapsed_ms} | "
                 "{average_decision_summary_elapsed_ms} | "
-                "{average_decision_total_elapsed_ms} |".format(
+                "{average_decision_total_elapsed_ms} | "
+                "{average_total_completed_rollouts} | "
+                "{budget_exhausted_share} |".format(
                     batch_label=row["batch_label"],
                     agent_id=row["agent_id"],
                     decision_count=row["decision_count"],
@@ -124,6 +127,14 @@ def render_markdown_report(comparison: dict[str, Any]) -> str:
                     ),
                     average_decision_total_elapsed_ms=_format_optional(
                         row["average_decision_total_elapsed_ms"],
+                        3,
+                    ),
+                    average_total_completed_rollouts=_format_optional(
+                        row["average_total_completed_rollouts"],
+                        2,
+                    ),
+                    budget_exhausted_share=_format_optional(
+                        row["budget_exhausted_share"],
                         3,
                     ),
                 )
@@ -322,6 +333,16 @@ def _decision_summary_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             for payload in payloads
             if (timing := _nested_number(payload, "decision_total_elapsed_ms")) is not None
         ]
+        total_completed_rollouts = [
+            count
+            for payload in payloads
+            if (count := _nested_number(payload, "total_completed_rollouts")) is not None
+        ]
+        budget_exhausted_flags = [
+            bool(flag)
+            for payload in payloads
+            if (flag := _nested_value(payload, "budget_exhausted")) is not None
+        ]
         rows.append(
             {
                 "batch_label": manifest["batch_label"],
@@ -344,6 +365,12 @@ def _decision_summary_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                 else None,
                 "average_decision_total_elapsed_ms": mean(decision_total_times)
                 if decision_total_times
+                else None,
+                "average_total_completed_rollouts": mean(total_completed_rollouts)
+                if total_completed_rollouts
+                else None,
+                "budget_exhausted_share": mean(budget_exhausted_flags)
+                if budget_exhausted_flags
                 else None,
             }
         )

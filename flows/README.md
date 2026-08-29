@@ -6,7 +6,7 @@ Keep orchestration here and core simulator/rules logic in `src/wingspan_ai/`.
 
 Current flows:
 
-- `simulation_batch.py`: runs a labelled seeded random-vs-agent batch. Player 2 can use `random_legal`, `greedy_immediate`, `potential_points`, any `archetype_*` strategy, or `monte_carlo_rollout`. It uses Prefect decorators when Prefect is installed and falls back to plain Python functions for local smoke tests. If `data/raw/wingspan-card-list.xlsx` is absent, it uses the package sample catalog. By default it writes artifacts under `artifacts/smoke/core_random_vs_greedy/<batch_id>/`.
+- `simulation_batch.py`: runs a labelled seeded random-vs-agent batch. Player 2 can use `random_legal`, `greedy_immediate`, `potential_points`, `net_value_response`, any `archetype_*` strategy, or `monte_carlo_rollout`. It uses Prefect decorators when Prefect is installed and falls back to plain Python functions for local smoke tests. If `data/raw/wingspan-card-list.xlsx` is absent, it uses the package sample catalog. By default it writes artifacts under `artifacts/smoke/core_random_vs_greedy/<batch_id>/`.
 - `human_vs_greedy.py`: runs an interactive terminal game with `HumanCliAgent` against the greedy baseline. It uses the same legal action generation as automated agents, so human play is feasible without a separate UI.
 
 
@@ -22,6 +22,27 @@ run_simulation_batch(
 ```
 
 The manifest records `player_two_agent_kinds` and `player_two_agent_ids` so baseline, archetype, Monte Carlo, and guardrailed batches can be compared cleanly.
+
+Monte Carlo batches can be cost-capped with:
+
+```python
+run_simulation_batch(
+    player_two_agent_kind="monte_carlo_rollout",
+    monte_carlo_rollout_count=4,
+    monte_carlo_rollout_depth=6,
+    monte_carlo_max_decision_time_ms=250.0,
+)
+```
+
+Net-value opponent-response batches can cap both own-action and opponent-response breadth:
+
+```python
+run_simulation_batch(
+    player_two_agent_kind="net_value_response",
+    net_value_max_candidate_actions=8,
+    net_value_max_opponent_response_actions=5,
+)
+```
 
 Compare local batch manifests with:
 

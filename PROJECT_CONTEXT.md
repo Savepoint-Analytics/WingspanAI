@@ -756,7 +756,27 @@ The potential-points win pattern looks behaviourally plausible at smoke scale: i
 Decision-time telemetry exposed the scaling bottleneck. Potential-points averaged about 407 ms per player-two decision, guardrailed potential-points about 153 ms, and Monte Carlo about 11 seconds. A 50-100 seed matrix should wait for compute-budget controls, smaller rollout settings, or faster action evaluation.
 
 ### Follow-up tasks
-- [ ] Add compute-budget controls for `MonteCarloRolloutAgent` in batch configuration.
-- [ ] Profile and reduce `apply_action` deep-copy cost for lookahead-heavy agents.
+- [x] Add compute-budget controls for `MonteCarloRolloutAgent` in batch configuration.
+- [ ] Reduce `apply_action` deep-copy cost for lookahead-heavy agents.
 - [ ] Compare potential-points against non-random opponents in smaller matchup matrices.
 - [ ] Tune guardrails separately for potential-points instead of reusing the immediate-greedy guardrail config unchanged.
+
+## Update: 2026-08-28 - Lookahead budgets, profiling, and net-value response scaffold
+
+### What changed
+Added Monte Carlo budget controls: `max_decision_time_ms`, `rollout_count`, `rollout_depth`, and `min_rollouts_per_action`, with telemetry for completed rollouts and budget exhaustion.
+
+Added `analysis/apply_action_profile.py` and profiled a workbook-backed initial state. `GameState.model_copy(deep=True)` averaged 7.887 ms, full `apply_action` averaged 8.468 ms, and deep copy accounted for about 93.1% of transition time.
+
+Added `NetValueOpponentResponseAgent` in `src/wingspan_ai/agents/net_value.py` and documented the template in `docs/agents/net_value_opponent_response_agent.md`. The first scaffold estimates score-margin impact after the next opponent response and includes simple tray-card and birdfeeder-food denial value across forest/woodland, grassland/plains, and wetland/coastal dimensions.
+
+### Why it matters
+The project now has explicit compute controls before any 50-100 seed lookahead matrix. The profile shows that faster speculative search requires reducing full-state deep-copy cost or pruning candidate actions before expensive evaluation.
+
+The net-value response template captures the competitive idea Alex raised: choose moves based on expected margin and opponent reaction, not only self-score maximization. The first implementation is intentionally marked `full_state_oracle_v0`; it is useful for plumbing and controlled ablations, but should move to public observations plus belief state before claim-grade experiments.
+
+### Follow-up tasks
+- [ ] Add strict candidate sampling for Monte Carlo when a hard wall-clock cap matters more than one rollout per legal action.
+- [ ] Replace full-state opponent scoring in `NetValueOpponentResponseAgent` with public observation plus Bayesian belief estimates.
+- [ ] Add controlled fixtures for pink/passive trigger liability and round-goal blocking.
+- [ ] Prototype a lower-copy transition path for speculative evaluation.
