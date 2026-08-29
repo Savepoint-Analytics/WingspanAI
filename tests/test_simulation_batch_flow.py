@@ -121,6 +121,29 @@ class SimulationBatchFlowTests(TestCase):
                 "potential_points_p2",
             )
 
+    def test_player_two_agent_factory_supports_matrix_variants(self) -> None:
+        expected_agent_ids = {
+            "random_legal": "random_legal_p2",
+            "greedy_immediate": "greedy_immediate_p2",
+            "potential_points": "potential_points_p2",
+            "archetype_egg_focus": "egg_focus_p2",
+            "archetype_engine_builder": "engine_builder_p2",
+            "archetype_food_acceleration": "food_acceleration_p2",
+            "archetype_card_draw": "card_draw_p2",
+            "archetype_bonus_card_focus": "bonus_card_focus_p2",
+            "archetype_round_goal_chase": "round_goal_chase_p2",
+            "monte_carlo_rollout": "monte_carlo_rollout_p2",
+        }
+
+        for agent_kind, expected_agent_id in expected_agent_ids.items():
+            with self.subTest(agent_kind=agent_kind):
+                agent = simulation_batch._make_player_two_agent(
+                    agent_kind,
+                    random_seed=11,
+                )
+
+                self.assertEqual(agent.agent_id, expected_agent_id)
+
     def test_replay_gate_rejects_invalid_replay_before_writing_artifacts(self) -> None:
         invalid_replay = ReplayValidationResult(
             is_valid=False,

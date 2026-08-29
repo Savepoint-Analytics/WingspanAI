@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from time import perf_counter
 from typing import Protocol
 from uuid import uuid4
 
@@ -142,7 +143,9 @@ def run_single_game(
             terminal_reason = "no_legal_actions"
             break
 
+        action_selection_started_at = perf_counter()
         action = agent.choose_action(state)
+        action_selection_elapsed_ms = (perf_counter() - action_selection_started_at) * 1000
         if action not in legal_actions:
             raise ValueError(f"agent {agent.agent_id} selected an illegal action: {action}")
 
@@ -163,6 +166,7 @@ def run_single_game(
             agent,
             legal_actions,
             action,
+            action_selection_elapsed_ms=action_selection_elapsed_ms,
         )
         action_state = state
         previous_round = state.round_state.round_number
@@ -377,8 +381,11 @@ def _emit_agent_decision_summary(
     agent: AgentPolicy,
     legal_actions: list[LegalAction],
     action: LegalAction,
+    *,
+    action_selection_elapsed_ms: float,
 ) -> None:
     summarizer = getattr(agent, "summarize_decision", None)
+    summary_started_at = perf_counter()
     if callable(summarizer):
         payload = summarizer(state, legal_actions, action)
     else:
@@ -387,6 +394,16 @@ def _emit_agent_decision_summary(
             "legal_action_count": len(legal_actions),
             "selected_action_type": action.action_type.value,
         }
+    summary_elapsed_ms = (perf_counter() - summary_started_at) * 1000
+    payload = {
+        **payload,
+        "action_selection_elapsed_ms": round(action_selection_elapsed_ms, 3),
+        "decision_summary_elapsed_ms": round(summary_elapsed_ms, 3),
+        "decision_total_elapsed_ms": round(
+            action_selection_elapsed_ms + summary_elapsed_ms,
+            3,
+        ),
+    }
     sink.emit(
         _base_event(
             EventName.AGENT_DECISION_SUMMARY,

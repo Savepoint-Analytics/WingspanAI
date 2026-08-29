@@ -740,3 +740,23 @@ The project now has a repeatable way to compare baseline smoke batches without m
 - [ ] Add compute-time telemetry for agent decision summaries before scaling potential-points tournaments.
 - [ ] Extend registry-backed valuation into dedicated value-handler modules with tests per handler key.
 - [ ] Run larger fixed-seed tournaments against immediate greedy, archetypes, Monte Carlo, and guardrailed variants after power/scoring coverage improves.
+
+## Update: 2026-08-28 - Decision timing and 10-seed baseline matrix completed
+
+### What changed
+Added runner-level decision-time telemetry to every `agent_decision_summary`: `action_selection_elapsed_ms`, `decision_summary_elapsed_ms`, and `decision_total_elapsed_ms`.
+
+Expanded `flows/simulation_batch.py` so player two can use `random_legal`, `greedy_immediate`, `potential_points`, six `archetype_*` agents, or `monte_carlo_rollout`, with guardrails able to wrap any selected variant.
+
+Ran a 10-seed smoke matrix against random player one for random, immediate greedy, potential-points, guardrailed greedy, guardrailed potential-points, six archetypes, and Monte Carlo. Documented findings in `docs/experiments/potential_points_matrix10_smoke.md`.
+
+### Why it matters
+The potential-points win pattern looks behaviourally plausible at smoke scale: it plays far more birds than immediate greedy while maintaining eggs, round goals, cached food, and tucked cards. It does not appear to be driven by one obvious scoring category. The main caution is still simulator fidelity: the current power audit reports 49 unsupported powered cards and about 71.8% implemented power coverage.
+
+Decision-time telemetry exposed the scaling bottleneck. Potential-points averaged about 407 ms per player-two decision, guardrailed potential-points about 153 ms, and Monte Carlo about 11 seconds. A 50-100 seed matrix should wait for compute-budget controls, smaller rollout settings, or faster action evaluation.
+
+### Follow-up tasks
+- [ ] Add compute-budget controls for `MonteCarloRolloutAgent` in batch configuration.
+- [ ] Profile and reduce `apply_action` deep-copy cost for lookahead-heavy agents.
+- [ ] Compare potential-points against non-random opponents in smaller matchup matrices.
+- [ ] Tune guardrails separately for potential-points instead of reusing the immediate-greedy guardrail config unchanged.

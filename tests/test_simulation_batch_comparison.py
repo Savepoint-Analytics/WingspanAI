@@ -24,6 +24,11 @@ class SimulationBatchComparisonTests(TestCase):
             comparison = simulation_batch_comparison.compare_batch_manifests([manifest_path])
             summary = comparison["batch_summaries"][0]
             decision = comparison["decision_summaries"][0]
+            score_mix = comparison["score_breakdowns"][0]
+            action_rounds = {
+                row["round_number"]: row
+                for row in comparison["action_frequency_by_round"]
+            }
             actions = {
                 row["action_type"]: row
                 for row in comparison["action_frequency"]
@@ -39,6 +44,13 @@ class SimulationBatchComparisonTests(TestCase):
             self.assertAlmostEqual(decision["average_selected_value_delta"], 1.0)
             self.assertAlmostEqual(decision["average_selected_realized_delta"], 0.25)
             self.assertAlmostEqual(decision["endgame_search_share"], 0.5)
+            self.assertAlmostEqual(decision["average_action_selection_elapsed_ms"], 10.0)
+            self.assertAlmostEqual(decision["average_decision_total_elapsed_ms"], 13.0)
+            self.assertAlmostEqual(score_mix["bird_points"], 16.0)
+            self.assertAlmostEqual(score_mix["egg_points"], 7.5)
+            self.assertAlmostEqual(score_mix["total"], 32.0)
+            self.assertAlmostEqual(action_rounds[1]["play_bird"], 1.0)
+            self.assertAlmostEqual(action_rounds[2]["gain_food"], 1.0)
 
     def test_render_markdown_report_includes_batch_table(self) -> None:
         with TemporaryDirectory() as tmp_dir:
@@ -49,6 +61,8 @@ class SimulationBatchComparisonTests(TestCase):
 
             self.assertIn("| comparison | potential_points_p2 |", report)
             self.assertIn("## Player 2 Action Mix", report)
+            self.assertIn("## Player 2 Action Mix By Round", report)
+            self.assertIn("## Player 2 Score Mix", report)
 
 
 def _write_manifest(root: Path) -> Path:
@@ -66,7 +80,20 @@ def _write_manifest(root: Path) -> Path:
                     "selected_value_delta": 2.0,
                     "selected_realized_delta": 1.0,
                     "endgame_search_used": False,
+                    "action_selection_elapsed_ms": 12.0,
+                    "decision_summary_elapsed_ms": 4.0,
+                    "decision_total_elapsed_ms": 16.0,
                 },
+            ),
+            _game_ended_event(
+                {
+                    "bird_points": 15,
+                    "bonus_points": 2,
+                    "round_goal_points": 3,
+                    "egg_points": 8,
+                    "cached_food_points": 1,
+                    "tucked_card_points": 1,
+                }
             ),
         ],
     )
@@ -79,12 +106,25 @@ def _write_manifest(root: Path) -> Path:
                 {
                     "policy": "guardrailed_policy",
                     "guardrail_candidate_action_count": 2,
+                    "action_selection_elapsed_ms": 8.0,
+                    "decision_summary_elapsed_ms": 2.0,
+                    "decision_total_elapsed_ms": 10.0,
                     "base_decision_summary": {
                         "selected_value_delta": 0.0,
                         "selected_realized_delta": -0.5,
                         "endgame_search_used": True,
                     },
                 },
+            ),
+            _game_ended_event(
+                {
+                    "bird_points": 17,
+                    "bonus_points": 3,
+                    "round_goal_points": 4,
+                    "egg_points": 7,
+                    "cached_food_points": 2,
+                    "tucked_card_points": 1,
+                }
             ),
         ],
     )
@@ -130,6 +170,7 @@ def _action_event(agent_id: str, action_type: str) -> dict:
     return {
         "event_name": "action_selected",
         "agent_id": agent_id,
+        "round_number": 1 if action_type == "play_bird" else 2,
         "payload": {"action": {"action_type": action_type}},
     }
 
@@ -139,4 +180,17 @@ def _decision_event(agent_id: str, payload: dict) -> dict:
         "event_name": "agent_decision_summary",
         "agent_id": agent_id,
         "payload": payload,
+    }
+
+
+def _game_ended_event(player_two_breakdown: dict) -> dict:
+    return {
+        "event_name": "game_ended",
+        "agent_id": "potential_points_p2",
+        "payload": {
+            "score_breakdowns": {
+                "player_1": {},
+                "player_2": player_two_breakdown,
+            }
+        },
     }

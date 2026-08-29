@@ -27,16 +27,28 @@ def compare_batch_manifests(paths: list[str | Path]) -> dict[str, Any]:
         for manifest in manifests
         for row in _action_frequency_rows(manifest)
     ]
+    action_by_round_rows = [
+        row
+        for manifest in manifests
+        for row in _action_frequency_by_round_rows(manifest)
+    ]
     decision_rows = [
         row
         for manifest in manifests
         for row in _decision_summary_rows(manifest)
     ]
+    score_breakdown_rows = [
+        row
+        for manifest in manifests
+        for row in _score_breakdown_rows(manifest)
+    ]
     return {
         "batch_count": len(manifests),
         "batch_summaries": batch_summaries,
         "action_frequency": action_rows,
+        "action_frequency_by_round": action_by_round_rows,
         "decision_summaries": decision_rows,
+        "score_breakdowns": score_breakdown_rows,
     }
 
 
@@ -66,8 +78,9 @@ def render_markdown_report(comparison: dict[str, Any]) -> str:
                 "## Decision Telemetry",
                 "",
                 "| Batch | Agent | Decisions | Avg score delta | Avg value delta | "
-                "Avg realized delta | Endgame search share | Avg guardrail candidates |",
-                "|---|---|---:|---:|---:|---:|---:|---:|",
+                "Avg realized delta | Endgame search share | Avg guardrail candidates | "
+                "Avg select ms | Avg summary ms | Avg total ms |",
+                "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
             ]
         )
         for row in comparison["decision_summaries"]:
@@ -77,7 +90,10 @@ def render_markdown_report(comparison: dict[str, Any]) -> str:
                 "{average_selected_value_delta} | "
                 "{average_selected_realized_delta} | "
                 "{endgame_search_share} | "
-                "{average_guardrail_candidate_count} |".format(
+                "{average_guardrail_candidate_count} | "
+                "{average_action_selection_elapsed_ms} | "
+                "{average_decision_summary_elapsed_ms} | "
+                "{average_decision_total_elapsed_ms} |".format(
                     batch_label=row["batch_label"],
                     agent_id=row["agent_id"],
                     decision_count=row["decision_count"],
@@ -98,6 +114,18 @@ def render_markdown_report(comparison: dict[str, Any]) -> str:
                         row["average_guardrail_candidate_count"],
                         2,
                     ),
+                    average_action_selection_elapsed_ms=_format_optional(
+                        row["average_action_selection_elapsed_ms"],
+                        3,
+                    ),
+                    average_decision_summary_elapsed_ms=_format_optional(
+                        row["average_decision_summary_elapsed_ms"],
+                        3,
+                    ),
+                    average_decision_total_elapsed_ms=_format_optional(
+                        row["average_decision_total_elapsed_ms"],
+                        3,
+                    ),
                 )
             )
 
@@ -116,6 +144,41 @@ def render_markdown_report(comparison: dict[str, Any]) -> str:
                 "| {batch_label} | {agent_id} | {action_type} | {count} | {share:.3f} |".format(
                     **row
                 )
+            )
+
+    if comparison["score_breakdowns"]:
+        lines.extend(
+            [
+                "",
+                "## Player 2 Score Mix",
+                "",
+                "| Batch | Agent | Birds | Bonus | Round goals | Eggs | Cached | Tucked | Total |",
+                "|---|---|---:|---:|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for row in comparison["score_breakdowns"]:
+            lines.append(
+                "| {batch_label} | {agent_id} | {bird_points:.2f} | "
+                "{bonus_points:.2f} | {round_goal_points:.2f} | {egg_points:.2f} | "
+                "{cached_food_points:.2f} | {tucked_card_points:.2f} | "
+                "{total:.2f} |".format(**row)
+            )
+
+    if comparison["action_frequency_by_round"]:
+        lines.extend(
+            [
+                "",
+                "## Player 2 Action Mix By Round",
+                "",
+                "| Batch | Agent | Round | Draw | Food | Eggs | Play |",
+                "|---|---|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for row in comparison["action_frequency_by_round"]:
+            lines.append(
+                "| {batch_label} | {agent_id} | {round_number} | "
+                "{draw_cards:.3f} | {gain_food:.3f} | {lay_eggs:.3f} | "
+                "{play_bird:.3f} |".format(**row)
             )
 
     return "\n".join(lines) + "\n"
@@ -175,6 +238,37 @@ def _action_frequency_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _action_frequency_by_round_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    player_two_agent_ids = set(manifest.get("player_two_agent_ids", []))
+    counts: Counter[tuple[str, int, str]] = Counter()
+    totals: Counter[tuple[str, int]] = Counter()
+    for event in _iter_events(manifest):
+        if event.get("event_name") != "action_selected":
+            continue
+        agent_id = str(event.get("agent_id"))
+        if agent_id not in player_two_agent_ids:
+            continue
+        round_number = int(event.get("round_number", 0))
+        action_type = str(event.get("payload", {}).get("action", {}).get("action_type"))
+        counts[(agent_id, round_number, action_type)] += 1
+        totals[(agent_id, round_number)] += 1
+
+    rows = []
+    for agent_id, round_number in sorted(totals):
+        total = totals[(agent_id, round_number)]
+        row = {
+            "batch_label": manifest["batch_label"],
+            "agent_id": agent_id,
+            "round_number": round_number,
+        }
+        for action_type in ("draw_cards", "gain_food", "lay_eggs", "play_bird"):
+            row[action_type] = (
+                counts[(agent_id, round_number, action_type)] / total if total else 0.0
+            )
+        rows.append(row)
+    return rows
+
+
 def _decision_summary_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     player_two_agent_ids = set(manifest.get("player_two_agent_ids", []))
     summaries: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -213,6 +307,21 @@ def _decision_summary_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
             for payload in payloads
             if (count := _nested_number(payload, "guardrail_candidate_action_count")) is not None
         ]
+        action_selection_times = [
+            timing
+            for payload in payloads
+            if (timing := _nested_number(payload, "action_selection_elapsed_ms")) is not None
+        ]
+        decision_summary_times = [
+            timing
+            for payload in payloads
+            if (timing := _nested_number(payload, "decision_summary_elapsed_ms")) is not None
+        ]
+        decision_total_times = [
+            timing
+            for payload in payloads
+            if (timing := _nested_number(payload, "decision_total_elapsed_ms")) is not None
+        ]
         rows.append(
             {
                 "batch_label": manifest["batch_label"],
@@ -227,9 +336,54 @@ def _decision_summary_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                 "average_guardrail_candidate_count": mean(guardrail_candidates)
                 if guardrail_candidates
                 else None,
+                "average_action_selection_elapsed_ms": mean(action_selection_times)
+                if action_selection_times
+                else None,
+                "average_decision_summary_elapsed_ms": mean(decision_summary_times)
+                if decision_summary_times
+                else None,
+                "average_decision_total_elapsed_ms": mean(decision_total_times)
+                if decision_total_times
+                else None,
             }
         )
     return rows
+
+
+def _score_breakdown_rows(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    player_two_agent_ids = set(manifest.get("player_two_agent_ids", []))
+    player_two_agent_id = _single_or_joined(manifest.get("player_two_agent_ids", []))
+    if not player_two_agent_ids:
+        return []
+
+    breakdowns: list[dict[str, int]] = []
+    for event in _iter_events(manifest):
+        if event.get("event_name") != "game_ended":
+            continue
+        score_breakdown = event.get("payload", {}).get("score_breakdowns", {})
+        player_two_breakdown = score_breakdown.get("player_2")
+        if player_two_breakdown:
+            breakdowns.append(player_two_breakdown)
+
+    if not breakdowns:
+        return []
+
+    categories = [
+        "bird_points",
+        "bonus_points",
+        "round_goal_points",
+        "egg_points",
+        "cached_food_points",
+        "tucked_card_points",
+    ]
+    row = {
+        "batch_label": manifest["batch_label"],
+        "agent_id": player_two_agent_id,
+    }
+    for category in categories:
+        row[category] = mean(breakdown.get(category, 0) for breakdown in breakdowns)
+    row["total"] = sum(row[category] for category in categories)
+    return [row]
 
 
 def _iter_events(manifest: dict[str, Any]):

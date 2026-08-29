@@ -43,7 +43,7 @@ Every event uses a stable envelope:
 | `action_selected` | Agent selects an action. | `agent_id`, `action`, `action_label`, `state_hash_before` |
 | `action_resolved` | Transition has been applied. Its envelope uses the same action-start round/turn as `action_selected`; next-state counters live in the payload. | `acting_player_id`, `action`, `action_label`, `state_hash_before`, `state_hash_after`, `next_round_number`, `next_turn_number`, `next_round_action_number`, `next_global_turn_number`, `rng_draws` |
 | `game_ended` | Runner builds final outcome. | `outcome`, `score_breakdowns` |
-| `agent_decision_summary` | Agent provides policy diagnostics for the selected action. | `policy`, `legal_action_count`, `selected_action_type`, policy-specific fields |
+| `agent_decision_summary` | Agent provides policy diagnostics for the selected action. | `policy`, `legal_action_count`, `selected_action_type`, `action_selection_elapsed_ms`, `decision_summary_elapsed_ms`, `decision_total_elapsed_ms`, policy-specific fields |
 
 ## Private Information Rule
 

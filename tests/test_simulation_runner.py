@@ -93,6 +93,15 @@ class SimulationRunnerTests(TestCase):
 
         self.assertIn(EventName.SETUP_SELECTION_APPLIED, event_names)
         self.assertIn(EventName.AGENT_DECISION_SUMMARY, event_names)
+        decision_event = next(
+            event
+            for event in result.events
+            if event.event_name == EventName.AGENT_DECISION_SUMMARY
+        )
+        self.assertIn("action_selection_elapsed_ms", decision_event.payload)
+        self.assertIn("decision_summary_elapsed_ms", decision_event.payload)
+        self.assertIn("decision_total_elapsed_ms", decision_event.payload)
+        self.assertGreaterEqual(decision_event.payload["decision_total_elapsed_ms"], 0)
         resolved_event = next(
             event for event in result.events if event.event_name == EventName.ACTION_RESOLVED
         )

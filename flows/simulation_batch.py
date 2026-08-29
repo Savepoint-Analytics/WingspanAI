@@ -13,8 +13,11 @@ from uuid import uuid4
 from wingspan_ai.agents import (
     GreedyBaselineAgent,
     GuardrailedAgent,
+    MonteCarloRolloutAgent,
     PotentialPointsAgent,
     RandomLegalAgent,
+    StrategyArchetype,
+    StrategyArchetypeAgent,
     load_guardrail_config,
 )
 from wingspan_ai.config import database_url_from_env, load_dotenv, object_storage_config_from_env
@@ -48,9 +51,33 @@ except ImportError:
 
 
 BatchKind = Literal["smoke", "experiment", "production"]
-PlayerTwoAgentKind = Literal["greedy_immediate", "potential_points"]
+PlayerTwoAgentKind = Literal[
+    "random_legal",
+    "greedy_immediate",
+    "potential_points",
+    "archetype_egg_focus",
+    "archetype_engine_builder",
+    "archetype_food_acceleration",
+    "archetype_card_draw",
+    "archetype_bonus_card_focus",
+    "archetype_round_goal_chase",
+    "monte_carlo_rollout",
+]
 VALID_BATCH_KINDS = frozenset({"smoke", "experiment", "production"})
-VALID_PLAYER_TWO_AGENT_KINDS = frozenset({"greedy_immediate", "potential_points"})
+VALID_PLAYER_TWO_AGENT_KINDS = frozenset(
+    {
+        "greedy_immediate",
+        "random_legal",
+        "potential_points",
+        "archetype_egg_focus",
+        "archetype_engine_builder",
+        "archetype_food_acceleration",
+        "archetype_card_draw",
+        "archetype_bonus_card_focus",
+        "archetype_round_goal_chase",
+        "monte_carlo_rollout",
+    }
+)
 DEFAULT_ARTIFACT_ROOT = "artifacts"
 DEFAULT_RUN_LABEL = "core_random_vs_greedy"
 MANIFEST_FILENAME = "batch_manifest.json"
@@ -86,7 +113,10 @@ def run_seeded_game(
         if workbook_exists
         else make_sample_catalog()
     )
-    base_agent = _make_player_two_agent(resolved_player_two_agent_kind)
+    base_agent = _make_player_two_agent(
+        resolved_player_two_agent_kind,
+        random_seed=random_seed,
+    )
     guardrail_config = (
         load_guardrail_config(guardrail_config_path)
         if guardrail_config_path is not None
@@ -242,16 +272,42 @@ def _validate_player_two_agent_kind(agent_kind: str) -> PlayerTwoAgentKind:
     return agent_kind  # type: ignore[return-value]
 
 
-def _make_player_two_agent(agent_kind: PlayerTwoAgentKind):
+def _make_player_two_agent(agent_kind: PlayerTwoAgentKind, *, random_seed: int = 0):
+    if agent_kind == "random_legal":
+        return RandomLegalAgent(agent_id="random_legal_p2", random_seed=random_seed)
     if agent_kind == "potential_points":
         return PotentialPointsAgent(agent_id="potential_points_p2")
+    if agent_kind == "archetype_egg_focus":
+        return StrategyArchetypeAgent(StrategyArchetype.EGG_FOCUS, agent_id="egg_focus_p2")
+    if agent_kind == "archetype_engine_builder":
+        return StrategyArchetypeAgent(
+            StrategyArchetype.ENGINE_BUILDER,
+            agent_id="engine_builder_p2",
+        )
+    if agent_kind == "archetype_food_acceleration":
+        return StrategyArchetypeAgent(
+            StrategyArchetype.FOOD_ACCELERATION,
+            agent_id="food_acceleration_p2",
+        )
+    if agent_kind == "archetype_card_draw":
+        return StrategyArchetypeAgent(StrategyArchetype.CARD_DRAW, agent_id="card_draw_p2")
+    if agent_kind == "archetype_bonus_card_focus":
+        return StrategyArchetypeAgent(
+            StrategyArchetype.BONUS_CARD_FOCUS,
+            agent_id="bonus_card_focus_p2",
+        )
+    if agent_kind == "archetype_round_goal_chase":
+        return StrategyArchetypeAgent(
+            StrategyArchetype.ROUND_GOAL_CHASE,
+            agent_id="round_goal_chase_p2",
+        )
+    if agent_kind == "monte_carlo_rollout":
+        return MonteCarloRolloutAgent(agent_id="monte_carlo_rollout_p2", random_seed=random_seed)
     return GreedyBaselineAgent(agent_id="greedy_immediate_p2")
 
 
 def _guardrailed_agent_id(agent_kind: PlayerTwoAgentKind) -> str:
-    if agent_kind == "potential_points":
-        return "guardrailed_potential_points_p2"
-    return "guardrailed_greedy_p2"
+    return f"guardrailed_{agent_kind}_p2"
 
 
 def _validate_path_segment(value: str, name: str) -> str:

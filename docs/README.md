@@ -17,6 +17,7 @@ Key rules docs:
 - `events/simulation_event_taxonomy.md`: current simulation telemetry envelope and emitted event names.
 - `events/postgresql_event_table_design.md`: draft event-log database tables and indexes.
 - `experiments/case_study_outline.md`: public case-study narrative outline.
+- `experiments/potential_points_matrix10_smoke.md`: 10-seed baseline matrix findings, decision timing, and current interpretation caveats.
 - `rules/game_content_schema.md`: current content schema and enum design.
 - `rules/power_handler_registry.md`: registry metadata approach for bird power handlers.
 - `rules/scoring_handler_audit.md`: current scoring coverage audit utility and remaining validation work.
