@@ -16,6 +16,8 @@ from wingspan_ai.agents.net_value import (
     NetValueBreakdown,
     NetValueOpponentResponseAgent,
     OpponentResponseEstimate,
+    PublicOpponentBelief,
+    PublicOpponentBeliefModel,
 )
 from wingspan_ai.agents.potential_points import (
     PotentialPointsAgent,
@@ -35,6 +37,8 @@ __all__ = [
     "NetValueBreakdown",
     "NetValueOpponentResponseAgent",
     "OpponentResponseEstimate",
+    "PublicOpponentBelief",
+    "PublicOpponentBeliefModel",
     "PolicyGuardrail",
     "PotentialPointsAgent",
     "PotentialValueBreakdown",

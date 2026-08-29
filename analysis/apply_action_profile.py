@@ -16,6 +16,7 @@ from wingspan_ai.content.schemas import ContentCatalog
 from wingspan_ai.rules.actions import render_action
 from wingspan_ai.rules.base_game import (
     apply_action,
+    apply_action_in_place,
     legal_actions_for_current_player,
     setup_base_game,
 )
@@ -41,8 +42,23 @@ def profile_apply_action_cost(
     legal_action_ms = _time_average_ms(lambda: legal_actions_for_current_player(state), iterations)
     deep_copy_ms = _time_average_ms(lambda: state.model_copy(deep=True), iterations)
     apply_action_ms = _time_average_ms(lambda: apply_action(state, action), iterations)
+    branch_copy_in_place_ms = _time_average_ms(
+        lambda: apply_action_in_place(state.model_copy(deep=True), action),
+        iterations,
+    )
+    branch_state = apply_action(state, action)
+    branch_actions = legal_actions_for_current_player(branch_state)
+    branch_action = branch_actions[0] if branch_actions else None
+    isolated_in_place_ms = (
+        _time_average_ms_over_items(
+            [branch_state.model_copy(deep=True) for _index in range(iterations)],
+            lambda isolated_state: apply_action_in_place(isolated_state, branch_action),
+        )
+        if branch_action is not None
+        else 0.0
+    )
     transition_without_copy_ms = max(apply_action_ms - deep_copy_ms, 0.0)
-    copy_share = deep_copy_ms / apply_action_ms if apply_action_ms else 0.0
+    copy_share = min(deep_copy_ms / apply_action_ms, 1.0) if apply_action_ms else 0.0
 
     return {
         "random_seed": random_seed,
@@ -53,6 +69,8 @@ def profile_apply_action_cost(
         "legal_actions_avg_ms": legal_action_ms,
         "deep_copy_avg_ms": deep_copy_ms,
         "apply_action_avg_ms": apply_action_ms,
+        "branch_copy_in_place_avg_ms": branch_copy_in_place_ms,
+        "isolated_in_place_transition_avg_ms": isolated_in_place_ms,
         "estimated_transition_without_copy_ms": transition_without_copy_ms,
         "deep_copy_share_of_apply_action": copy_share,
     }
@@ -75,6 +93,10 @@ def render_profile_markdown(profile: dict[str, Any]) -> str:
             f"| Legal action generation | {profile['legal_actions_avg_ms']:.3f} |",
             f"| `GameState.model_copy(deep=True)` | {profile['deep_copy_avg_ms']:.3f} |",
             f"| Full `apply_action` | {profile['apply_action_avg_ms']:.3f} |",
+            f"| Branch copy + `apply_action_in_place` | "
+            f"{profile['branch_copy_in_place_avg_ms']:.3f} |",
+            f"| Isolated in-place transition | "
+            f"{profile['isolated_in_place_transition_avg_ms']:.3f} |",
             "| Estimated transition after copy | "
             f"{profile['estimated_transition_without_copy_ms']:.3f} |",
             "",
@@ -102,6 +124,18 @@ def _time_average_ms(callback: Callable[[], object], iterations: int) -> float:
     for _index in range(iterations):
         started_at = perf_counter()
         callback()
+        timings.append((perf_counter() - started_at) * 1000)
+    return mean(timings)
+
+
+def _time_average_ms_over_items(
+    items: list[Any],
+    callback: Callable[[Any], object],
+) -> float:
+    timings = []
+    for item in items:
+        started_at = perf_counter()
+        callback(item)
         timings.append((perf_counter() - started_at) * 1000)
     return mean(timings)
 

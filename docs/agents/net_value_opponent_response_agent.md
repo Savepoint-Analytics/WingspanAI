@@ -1,6 +1,6 @@
 # Net-Value Opponent-Response Agent
 
-Status: first design template and implementation scaffold, 2026-08-28
+Status: public-observation implementation scaffold, 2026-08-29
 
 ## Purpose
 
@@ -16,20 +16,31 @@ net value =
   + shared-resource denial or blocking value
 ```
 
-This is the bridge between `PotentialPointsAgent` and a later Bayesian/game-theoretic policy. It makes blocking, resource denial, and opponent response first-class without requiring a full belief model yet.
+This is the bridge between `PotentialPointsAgent` and a later Bayesian/game-theoretic policy. It makes blocking, resource denial, and opponent response first-class while enforcing that opponent estimates come from public observations plus an explicit belief heuristic.
 
 ## Current Implementation
 
 The first scaffold:
 
 - Scores each legal action with `evaluate_state_potential`.
-- Applies the action, then estimates the next active opponent's best potential-value response.
+- Applies the action, then estimates the next active opponent's best response from public board state, public tray cards, birdfeeder dice, hand counts, bonus-card counts, round goals, and visible resources.
 - Caps own candidate breadth with `max_candidate_actions` and opponent-response breadth with `max_opponent_response_actions`.
 - Adds denial value when drawing a public tray card or taking birdfeeder food.
 - Emits telemetry with the selected net-margin breakdown and opponent response estimate.
-- Uses `full_state_oracle_v0`, meaning it can inspect simulator full state for opponent potential. This is acceptable for plumbing and ablation tests, but should be replaced with public observations plus beliefs before claim-grade experiments.
+- Uses `public_observation_belief_v0` for opponent potential, denial, and response estimates. The acting player's own value still uses their private hand and bonus cards, matching the information available to that player.
 
-Telemetry avoids emitting opponent hand details. The current response estimate records only opponent ID, response action type, response value delta, and response legal-action count.
+Telemetry avoids emitting opponent hand details. The current response estimate records only opponent ID, response action type, response value delta, and response candidate count.
+
+## Public Belief Template
+
+`PublicOpponentBeliefModel` is a first non-oracle belief boundary, not a calibrated Bayesian model. It estimates:
+
+- Food demand from face-up tray card costs, visible food tokens, hand count, open board slots, and early forest-development pressure.
+- Hidden card quality from the visible tray's threat profile.
+- Bonus-card pressure from visible bonus-card count and played-bird count.
+- Opponent response value from public action-family candidates: gain food, lay eggs, draw cards, or play bird.
+
+The model deliberately ignores hidden opponent hand contents, hidden bonus cards, and deck order. A regression test mutates the opponent's hidden hand and verifies the public belief score is unchanged.
 
 ## Habitat Dimensions
 
@@ -98,7 +109,7 @@ The agent should score blocking and opponent impact across:
 - Bonus-card-compatible visible birds.
 - Endgame scoring capacity.
 
-Future versions should estimate:
+Future calibrated versions should estimate:
 
 - Opponent archetype posterior.
 - Opponent hidden hand usefulness.
@@ -111,17 +122,16 @@ Future versions should estimate:
 Short-term tests:
 
 - Compare `net_value_response` against `potential_points` in 10-seed random-vs-agent smoke batches.
-- Add controlled fixtures where a public tray card is valuable to the opponent and verify the agent assigns denial value.
-- Add controlled fixtures where an action triggers opponent pink/passive benefit and verify the agent penalizes it.
 - Measure decision time against potential-points and Monte Carlo.
+- Design the controlled blocking-fixture suite before implementing it. Each fixture should have a stated hypothesis, expected public signal, required simulator support, and data needed to justify the expected direction.
 
 Medium-term experiments:
 
-- Replace full-state opponent scoring with public observation plus belief-state estimates.
+- Calibrate the public belief model against observed action choices and batch outcomes.
 - Evaluate against archetype opponents, not only random.
 - Track whether blocking actions improve win probability even when they lower the active player's immediate score.
 - Add by-habitat threat metrics: forest food denial, grassland conversion threat, wetland tuck/draw engine threat.
 
 ## Caveats
 
-The first implementation is a template, not a finished strategic agent. It is intentionally useful for research plumbing, telemetry shape, and controlled ablations. It should not be used for public strategy claims until hidden information is handled through observations and beliefs rather than simulator full state.
+The current implementation is a template, not a finished strategic agent. It is intentionally useful for research plumbing, telemetry shape, and early ablations. It should not be used for public strategy claims until the public belief model is calibrated and the blocking/response assumptions are backed by controlled data.

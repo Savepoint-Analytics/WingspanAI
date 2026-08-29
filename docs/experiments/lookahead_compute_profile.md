@@ -1,6 +1,6 @@
 # Lookahead Compute Profile
 
-Status: first profiling pass, 2026-08-28
+Status: second profiling pass, 2026-08-29
 
 ## Purpose
 
@@ -18,31 +18,34 @@ Workbook-backed initial state, seed 1:
 
 | Segment | Avg ms |
 |---|---:|
-| Legal action generation | 0.045 |
-| `GameState.model_copy(deep=True)` | 7.887 |
-| Full `apply_action` | 8.468 |
-| Estimated transition after copy | 0.581 |
+| Legal action generation | 0.044 |
+| `GameState.model_copy(deep=True)` | 8.092 |
+| Full `apply_action` | 9.960 |
+| Branch copy + `apply_action_in_place` | 8.101 |
+| Isolated in-place transition | 0.062 |
+| Estimated transition after copy | 1.867 |
 
-Deep copy accounted for about 93.1% of `apply_action` time in this profile. This explains why greedy, archetype, potential-points, Monte Carlo, and net-value opponent-response agents become expensive: their action evaluation loops mostly pay repeated full-state copy cost.
+Deep copy accounted for about 81.3% of `apply_action` time in this profile. Because the copy and transition timings are close, the exact share is noisy across short runs. The stable finding is that branch creation dominates speculative search cost, while mutating an already-isolated branch with `apply_action_in_place` is cheap.
 
-## Budgeted Monte Carlo Probe
+`apply_action` still deep-copies before mutating and remains the safe default for normal simulator execution. `apply_action_in_place` is explicit and should only be used by callers that already own a throwaway branch state.
+
+## Strict Monte Carlo Probe
 
 Settings:
 
-- Seeds: 1-3.
+- Seeds: 1.
 - `rollout_count=4`.
-- `rollout_depth=4`.
-- `max_decision_time_ms=100.0`.
+- `rollout_depth=6`.
+- `max_decision_time_ms=75.0`.
+- `max_candidate_actions=4`.
 
 Result:
 
-- Player 2 wins: 3.0 / 3.
-- Player 2 average score: 61.33.
-- Average decision total: 625.921 ms.
-- Average completed rollouts per decision: 14.73.
-- Budget exhausted on all player-two decisions.
+- Player 2 score: 66.
+- Player 1 score: 35.
+- Replay validation: valid.
 
-The nominal 100 ms budget is not a strict wall-clock cap because the current implementation guarantees at least one rollout per legal action before checking the deadline. That is strategically fairer than starving late-listed actions, but it means early turns with many legal actions can exceed the nominal budget.
+The Monte Carlo agent now supports strict breadth control with `max_candidate_actions`. Its default `min_rollouts_per_action=0` lets the time budget stop before any rollout is launched; actions without rollouts receive a static fallback score and are marked with `used_static_fallback=true` in telemetry. Set `min_rollouts_per_action` above zero only when fairness across candidate actions matters more than a hard wall-clock cap.
 
 ## Net-Value Response Probe
 
@@ -51,24 +54,23 @@ Initial uncapped summary recomputation made the net-value scaffold too slow even
 - own candidate actions with `max_candidate_actions`
 - opponent response actions with `max_opponent_response_actions`
 
-Balanced probe settings:
+Public-belief probe settings:
 
-- Seeds: 1-3.
+- Seeds: 1.
 - `max_candidate_actions=5`.
 - `max_opponent_response_actions=3`.
 
 Result:
 
-- Player 2 wins: 2.0 / 3.
-- Player 2 average score: 35.00.
-- Average decision total: 175.410 ms.
-- Action mix: 52.6% draw, 17.9% food, 14.1% eggs, 15.4% play.
+- Player 2 score: 66.
+- Player 1 score: 38.
+- Replay validation: valid.
 
-The candidate-diversity fix improved behaviour over the first fast probe, which selected draw cards 78.2% of the time and never selected gain food. The agent still appears over-attracted to tray denial and needs calibration before tournament-scale tests.
+The net-value response agent now uses `public_observation_belief_v0` for opponent scoring instead of full-state opponent hand and bonus-card access. This is still an uncalibrated heuristic, but it enforces the correct information boundary for opponent estimates.
 
 ## Next Optimization Targets
 
-- Reduce or avoid `GameState.model_copy(deep=True)` inside speculative action evaluation.
+- Reuse isolated branch states inside deeper search wherever a branch is already owned by the caller.
 - Add candidate pruning before expensive lookahead for all greedy-family agents.
-- Add strict wall-clock options that can skip the minimum rollout guarantee when batch throughput matters.
-- Add lower-cost public-observation opponent scoring before expanding net-value response beyond controlled probes.
+- Calibrate `public_observation_belief_v0` against observed action choices and batch outcomes.
+- Design the controlled blocking-fixture suite before implementing it; each fixture should be backed by a stated hypothesis and data requirement.

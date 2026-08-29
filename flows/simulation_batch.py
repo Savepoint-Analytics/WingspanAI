@@ -104,6 +104,7 @@ def run_seeded_game(
     monte_carlo_rollout_count: int = 8,
     monte_carlo_rollout_depth: int = 12,
     monte_carlo_max_decision_time_ms: float | None = None,
+    monte_carlo_max_candidate_actions: int | None = 12,
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
 ) -> dict[str, Any]:
@@ -127,6 +128,7 @@ def run_seeded_game(
         monte_carlo_rollout_count=monte_carlo_rollout_count,
         monte_carlo_rollout_depth=monte_carlo_rollout_depth,
         monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
+        monte_carlo_max_candidate_actions=monte_carlo_max_candidate_actions,
         net_value_max_candidate_actions=net_value_max_candidate_actions,
         net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
     )
@@ -187,6 +189,7 @@ def run_seeded_game(
         "monte_carlo_rollout_count": monte_carlo_rollout_count,
         "monte_carlo_rollout_depth": monte_carlo_rollout_depth,
         "monte_carlo_max_decision_time_ms": monte_carlo_max_decision_time_ms,
+        "monte_carlo_max_candidate_actions": monte_carlo_max_candidate_actions,
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "replay_validation": replay_validation_payload,
@@ -259,6 +262,7 @@ def run_seeded_game(
         "monte_carlo_rollout_count": monte_carlo_rollout_count,
         "monte_carlo_rollout_depth": monte_carlo_rollout_depth,
         "monte_carlo_max_decision_time_ms": monte_carlo_max_decision_time_ms,
+        "monte_carlo_max_candidate_actions": monte_carlo_max_candidate_actions,
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "ruleset_id": result.state.ruleset.ruleset_id,
@@ -302,6 +306,7 @@ def _make_player_two_agent(
     monte_carlo_rollout_count: int = 8,
     monte_carlo_rollout_depth: int = 12,
     monte_carlo_max_decision_time_ms: float | None = None,
+    monte_carlo_max_candidate_actions: int | None = 12,
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
 ):
@@ -345,6 +350,7 @@ def _make_player_two_agent(
             rollout_count=monte_carlo_rollout_count,
             rollout_depth=monte_carlo_rollout_depth,
             max_decision_time_ms=monte_carlo_max_decision_time_ms,
+            max_candidate_actions=monte_carlo_max_candidate_actions,
             random_seed=random_seed,
         )
     return GreedyBaselineAgent(agent_id="greedy_immediate_p2")
@@ -399,6 +405,7 @@ def _write_batch_manifest(
     monte_carlo_rollout_count: int,
     monte_carlo_rollout_depth: int,
     monte_carlo_max_decision_time_ms: float | None,
+    monte_carlo_max_candidate_actions: int | None,
     net_value_max_candidate_actions: int | None,
     net_value_max_opponent_response_actions: int | None,
 ) -> Path:
@@ -418,6 +425,7 @@ def _write_batch_manifest(
         "monte_carlo_rollout_count": monte_carlo_rollout_count,
         "monte_carlo_rollout_depth": monte_carlo_rollout_depth,
         "monte_carlo_max_decision_time_ms": monte_carlo_max_decision_time_ms,
+        "monte_carlo_max_candidate_actions": monte_carlo_max_candidate_actions,
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "guardrail_config_names": sorted(
@@ -454,6 +462,9 @@ def _write_batch_manifest(
                 "monte_carlo_rollout_depth": result["monte_carlo_rollout_depth"],
                 "monte_carlo_max_decision_time_ms": result[
                     "monte_carlo_max_decision_time_ms"
+                ],
+                "monte_carlo_max_candidate_actions": result[
+                    "monte_carlo_max_candidate_actions"
                 ],
                 "net_value_max_candidate_actions": result["net_value_max_candidate_actions"],
                 "net_value_max_opponent_response_actions": result[
@@ -493,6 +504,7 @@ def run_simulation_batch(
     monte_carlo_rollout_count: int = 8,
     monte_carlo_rollout_depth: int = 12,
     monte_carlo_max_decision_time_ms: float | None = None,
+    monte_carlo_max_candidate_actions: int | None = 12,
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
 ) -> list[dict[str, Any]]:
@@ -521,6 +533,7 @@ def run_simulation_batch(
             monte_carlo_rollout_count=monte_carlo_rollout_count,
             monte_carlo_rollout_depth=monte_carlo_rollout_depth,
             monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
+            monte_carlo_max_candidate_actions=monte_carlo_max_candidate_actions,
             net_value_max_candidate_actions=net_value_max_candidate_actions,
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
         )
@@ -550,6 +563,7 @@ def run_simulation_batch(
             monte_carlo_rollout_count=monte_carlo_rollout_count,
             monte_carlo_rollout_depth=monte_carlo_rollout_depth,
             monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
+            monte_carlo_max_candidate_actions=monte_carlo_max_candidate_actions,
             net_value_max_candidate_actions=net_value_max_candidate_actions,
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
         )

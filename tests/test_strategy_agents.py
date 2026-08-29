@@ -50,8 +50,27 @@ class StrategyAgentTests(TestCase):
         self.assertIn(action, legal_actions)
         self.assertEqual(summary["policy"], "monte_carlo_rollout")
         self.assertTrue(summary["budget_exhausted"])
-        self.assertGreaterEqual(summary["total_completed_rollouts"], len(legal_actions))
+        self.assertLessEqual(summary["evaluated_action_count"], 12)
+        self.assertEqual(summary["total_completed_rollouts"], 0)
+        self.assertTrue(summary["selected_used_static_fallback"])
         self.assertEqual(summary["configured_max_decision_time_ms"], 0.001)
+
+    def test_monte_carlo_agent_respects_candidate_cap(self) -> None:
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=9)
+        legal_actions = legal_actions_for_current_player(state)
+        agent = MonteCarloRolloutAgent(
+            rollout_count=1,
+            rollout_depth=1,
+            max_candidate_actions=3,
+            random_seed=9,
+        )
+
+        action = agent.select_action(state, legal_actions)
+        summary = agent.summarize_decision(state, legal_actions, action)
+
+        self.assertIn(action, legal_actions)
+        self.assertEqual(summary["evaluated_action_count"], 3)
+        self.assertEqual(summary["configured_max_candidate_actions"], 3)
 
     def test_archetype_agent_rejects_empty_action_list(self) -> None:
         state = setup_base_game(self.catalog, player_ids=["p1"], random_seed=7)

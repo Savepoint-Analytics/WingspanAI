@@ -1,6 +1,9 @@
 from unittest import TestCase
 
-from wingspan_ai.agents import NetValueOpponentResponseAgent
+from wingspan_ai.agents import (
+    NetValueOpponentResponseAgent,
+    PublicOpponentBeliefModel,
+)
 from wingspan_ai.content import make_sample_catalog
 from wingspan_ai.content.schemas import (
     BirdCard,
@@ -35,11 +38,30 @@ class NetValueOpponentResponseAgentTests(TestCase):
 
         self.assertIn(action, legal_actions)
         self.assertEqual(summary["policy"], "net_value_opponent_response")
-        self.assertEqual(summary["opponent_model"], "full_state_oracle_v0")
+        self.assertEqual(summary["opponent_model"], "public_observation_belief_v0")
+        self.assertIn("public observations", summary["information_boundary"])
         self.assertLessEqual(summary["evaluated_action_count"], 4)
         self.assertEqual(summary["max_opponent_response_actions"], 3)
         self.assertIn("net_margin_delta", summary["selected_breakdown"])
         self.assertIn("selected_opponent_response", summary)
+
+    def test_public_belief_model_does_not_use_opponent_hidden_hand(self) -> None:
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=43)
+        model = PublicOpponentBeliefModel()
+        first_estimate = model.potential_total(
+            state,
+            observer_player_id="p1",
+            opponent_id="p2",
+        )
+
+        state.players[1].hand = list(reversed(self.catalog.birds[: len(state.players[1].hand)]))
+        second_estimate = model.potential_total(
+            state,
+            observer_player_id="p1",
+            opponent_id="p2",
+        )
+
+        self.assertEqual(first_estimate, second_estimate)
 
     def test_tray_card_draw_carries_shared_denial_value(self) -> None:
         state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=42)

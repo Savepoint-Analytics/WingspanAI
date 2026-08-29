@@ -274,29 +274,40 @@ def legal_actions_for_player(state: GameState, player_id: str) -> list[LegalActi
 def apply_action(state: GameState, action: LegalAction) -> GameState:
     """Apply one legal action and advance the turn pointer."""
 
+    next_state = state.model_copy(deep=True)
+    return apply_action_in_place(next_state, action)
+
+
+def apply_action_in_place(state: GameState, action: LegalAction) -> GameState:
+    """Apply one legal action by mutating an isolated state object.
+
+    Use this only when the caller already owns a throwaway state branch, such as
+    a rollout simulation. Regular game execution should keep using
+    ``apply_action`` so the input state remains unchanged.
+    """
+
     legal_actions = legal_actions_for_player(state, action.player_id)
     resolved_action = _resolve_legal_action(action, legal_actions)
     if resolved_action is None:
         raise ValueError(f"illegal action for {action.player_id}: {action.model_dump()}")
     action = resolved_action
 
-    next_state = state.model_copy(deep=True)
-    player = _get_player(next_state, action.player_id)
+    player = _get_player(state, action.player_id)
 
     if action.action_type == ActionType.PLAY_BIRD:
-        _apply_play_bird(player, action, next_state)
+        _apply_play_bird(player, action, state)
     elif action.action_type == ActionType.GAIN_FOOD:
-        _apply_gain_food(player, next_state, action)
+        _apply_gain_food(player, state, action)
     elif action.action_type == ActionType.LAY_EGGS:
-        _apply_lay_eggs(player, next_state, action)
+        _apply_lay_eggs(player, state, action)
     elif action.action_type == ActionType.DRAW_CARDS:
-        _apply_draw_cards(player, next_state, action)
+        _apply_draw_cards(player, state, action)
     else:
         raise ValueError(f"unsupported action type: {action.action_type}")
 
-    resolve_opponent_reaction_powers(next_state, action.player_id, action)
-    _advance_turn(next_state)
-    return next_state
+    resolve_opponent_reaction_powers(state, action.player_id, action)
+    _advance_turn(state)
+    return state
 
 
 def _resolve_legal_action(

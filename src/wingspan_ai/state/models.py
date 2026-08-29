@@ -162,6 +162,14 @@ class PublicPlayerState(BaseModel):
     hand_count: int
     bonus_card_count: int
 
+    @property
+    def total_eggs(self) -> int:
+        return sum(slot.eggs for slots in self.habitats.values() for slot in slots)
+
+    @property
+    def played_birds(self) -> list[BirdSlot]:
+        return [slot for habitat in Habitat for slot in self.habitats[habitat]]
+
 
 class PrivatePlayerState(BaseModel):
     """Private information visible to one player or training/debug logs."""

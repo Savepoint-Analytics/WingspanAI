@@ -160,6 +160,7 @@ class SimulationBatchFlowTests(TestCase):
                 monte_carlo_rollout_count=2,
                 monte_carlo_rollout_depth=2,
                 monte_carlo_max_decision_time_ms=5.0,
+                monte_carlo_max_candidate_actions=4,
             )
 
             manifest_path = Path(results[0]["batch_manifest"]["path"])
@@ -168,7 +169,9 @@ class SimulationBatchFlowTests(TestCase):
             self.assertEqual(results[0]["monte_carlo_rollout_count"], 2)
             self.assertEqual(results[0]["monte_carlo_rollout_depth"], 2)
             self.assertEqual(results[0]["monte_carlo_max_decision_time_ms"], 5.0)
+            self.assertEqual(results[0]["monte_carlo_max_candidate_actions"], 4)
             self.assertEqual(manifest["monte_carlo_rollout_count"], 2)
+            self.assertEqual(manifest["monte_carlo_max_candidate_actions"], 4)
             self.assertEqual(manifest["games"][0]["monte_carlo_rollout_depth"], 2)
 
     def test_simulation_batch_records_net_value_budget_controls(self) -> None:

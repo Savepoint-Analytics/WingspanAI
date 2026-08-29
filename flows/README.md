@@ -31,8 +31,11 @@ run_simulation_batch(
     monte_carlo_rollout_count=4,
     monte_carlo_rollout_depth=6,
     monte_carlo_max_decision_time_ms=250.0,
+    monte_carlo_max_candidate_actions=4,
 )
 ```
+
+The default Monte Carlo setting uses `min_rollouts_per_action=0`, so a strict time budget may stop before every candidate receives a rollout. Unevaluated candidates receive a static fallback score and are marked in decision telemetry.
 
 Net-value opponent-response batches can cap both own-action and opponent-response breadth:
 

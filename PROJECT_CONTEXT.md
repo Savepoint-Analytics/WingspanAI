@@ -776,7 +776,41 @@ The project now has explicit compute controls before any 50-100 seed lookahead m
 The net-value response template captures the competitive idea Alex raised: choose moves based on expected margin and opponent reaction, not only self-score maximization. The first implementation is intentionally marked `full_state_oracle_v0`; it is useful for plumbing and controlled ablations, but should move to public observations plus belief state before claim-grade experiments.
 
 ### Follow-up tasks
-- [ ] Add strict candidate sampling for Monte Carlo when a hard wall-clock cap matters more than one rollout per legal action.
-- [ ] Replace full-state opponent scoring in `NetValueOpponentResponseAgent` with public observation plus Bayesian belief estimates.
-- [ ] Add controlled fixtures for pink/passive trigger liability and round-goal blocking.
-- [ ] Prototype a lower-copy transition path for speculative evaluation.
+- [x] Add strict candidate sampling for Monte Carlo when a hard wall-clock cap matters more than one rollout per legal action.
+- [x] Replace full-state opponent scoring in `NetValueOpponentResponseAgent` with public observation plus belief estimates.
+- [ ] Design controlled fixtures for pink/passive trigger liability, tray/food denial, engine blocking, and round-goal blocking before implementation; each fixture should be well reasoned and backed by a hypothesis/data plan.
+- [x] Prototype a lower-copy transition path for speculative evaluation.
+
+## Update: 2026-08-29 - Strict lookahead budgets and public-belief opponent scoring
+
+### What changed
+Added `apply_action_in_place` as an explicit lower-copy transition path for callers that already own an isolated speculative branch. Normal simulator execution still uses `apply_action`, which deep-copies before mutating so existing callers remain protected.
+
+Updated `MonteCarloRolloutAgent` with strict breadth control through `max_candidate_actions` and default `min_rollouts_per_action=0`. Under tight wall-clock budgets, the agent may stop before launching any rollout; unevaluated candidates receive static fallback scores and telemetry marks `used_static_fallback=true`.
+
+Replaced `NetValueOpponentResponseAgent` opponent scoring with `public_observation_belief_v0`. Opponent potential, denial, and next-response estimates now use public boards, public tray cards, birdfeeder dice, hand counts, bonus-card counts, round goals, visible resources, and a first heuristic belief model rather than hidden opponent hands or bonus cards. The acting player's own value still uses their private hand, which matches the acting player's information.
+
+### Profile and smoke checks
+Fresh `analysis/apply_action_profile.py --iterations 25` results on seed 1:
+
+- Legal action generation: 0.044 ms.
+- `GameState.model_copy(deep=True)`: 8.092 ms.
+- Full `apply_action`: 9.960 ms.
+- Branch copy + `apply_action_in_place`: 8.101 ms.
+- Isolated in-place transition: 0.062 ms.
+
+One-seed smoke probes with replay validation passed:
+
+- Strict Monte Carlo: `rollout_count=4`, `rollout_depth=6`, `max_decision_time_ms=75.0`, `max_candidate_actions=4`; player 2 won 66-35.
+- Public-belief net value: `max_candidate_actions=5`, `max_opponent_response_actions=3`; player 2 won 66-38.
+
+These are plumbing checks only, not strategic evidence.
+
+### Why it matters
+The project now has a hard-throughput option for Monte Carlo and a safe way to avoid repeated deep copies once a speculative branch is already isolated. The net-value agent also no longer relies on simulator-private opponent state, which is a necessary step before using blocking or opponent-response results as research evidence.
+
+### Follow-up tasks
+- [ ] Calibrate `public_observation_belief_v0` against observed action choices and batch outcomes.
+- [ ] Extend lower-copy branch evaluation into potential-points and net-value search loops where branch ownership is clear.
+- [ ] Design, but do not yet implement, controlled blocking fixtures with explicit hypotheses, required simulator support, and data needed to validate the expected direction.
+- [ ] Run a small 5-10 seed sanity matrix after calibration, then decide whether a 50-100 seed matrix is justified.

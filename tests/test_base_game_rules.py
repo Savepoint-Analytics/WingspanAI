@@ -15,6 +15,7 @@ from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import (
     InitialSelection,
     apply_action,
+    apply_action_in_place,
     apply_initial_selection_choice,
     legal_actions_for_current_player,
     score_player,
@@ -91,6 +92,7 @@ class BaseGameRulesTests(TestCase):
         )
 
         next_player = next_state.players[0]
+        self.assertEqual(player.hand, [card])
         self.assertTrue(
             all(next_player.food_tokens[food_type] == 0 for food_type in card.food_cost.fixed)
         )
@@ -99,6 +101,29 @@ class BaseGameRulesTests(TestCase):
             next_player.habitats[Habitat.FOREST][0].card.common_name,
             card.common_name,
         )
+
+    def test_apply_action_in_place_mutates_isolated_branch(self) -> None:
+        card = self.catalog.birds[0]
+        branch_state = self.state.model_copy(deep=True)
+        player = branch_state.players[0]
+        player.hand = [card]
+        player.food_tokens = {food_type: 0 for food_type in FoodType}
+        for food_type, count in card.food_cost.fixed.items():
+            player.food_tokens[food_type] = count
+
+        returned_state = apply_action_in_place(
+            branch_state,
+            LegalAction(
+                action_type=ActionType.PLAY_BIRD,
+                player_id="p1",
+                bird_common_name=card.common_name,
+                habitat=Habitat.FOREST,
+            ),
+        )
+
+        self.assertIs(returned_state, branch_state)
+        self.assertEqual(branch_state.players[0].hand, [])
+        self.assertEqual(len(self.state.players[0].hand), 3)
 
     def test_gaining_food_removes_die_and_adds_token(self) -> None:
         self.state.birdfeeder = BirdfeederState(dice=[FoodType.SEED])
