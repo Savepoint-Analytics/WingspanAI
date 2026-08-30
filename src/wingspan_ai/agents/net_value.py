@@ -6,6 +6,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 
 from wingspan_ai.agents.potential_points import evaluate_state_potential
+from wingspan_ai.agents.setup import NetValueSetupPolicy, SetupPolicyMixin
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, FoodType, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
@@ -216,7 +217,7 @@ class PublicOpponentBeliefModel:
 
 
 @dataclass
-class NetValueOpponentResponseAgent:
+class NetValueOpponentResponseAgent(SetupPolicyMixin):
     """Choose actions by expected score-margin gain after the next opponent response.
 
     Opponent estimates use public observations plus a first belief heuristic.
@@ -225,6 +226,7 @@ class NetValueOpponentResponseAgent:
     """
 
     agent_id: str = "net_value_opponent_response"
+    setup_policy: NetValueSetupPolicy = field(default_factory=NetValueSetupPolicy, kw_only=True)
     denial_weight: float = 1.0
     max_candidate_actions: int | None = 12
     max_opponent_response_actions: int | None = 8

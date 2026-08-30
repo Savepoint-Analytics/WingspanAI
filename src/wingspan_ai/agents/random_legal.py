@@ -5,13 +5,14 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
+from wingspan_ai.agents.setup import SetupPolicyMixin
 from wingspan_ai.rules.actions import LegalAction
 from wingspan_ai.rules.base_game import legal_actions_for_current_player
 from wingspan_ai.state.models import GameState
 
 
 @dataclass
-class RandomLegalAgent:
+class RandomLegalAgent(SetupPolicyMixin):
     """Select uniformly from the legal action list using local seeded randomness."""
 
     agent_id: str = "random_legal"

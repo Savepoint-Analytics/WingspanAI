@@ -6,6 +6,7 @@ import random
 from dataclasses import dataclass, field
 from time import perf_counter
 
+from wingspan_ai.agents.setup import SetupPolicyMixin
 from wingspan_ai.rules.actions import LegalAction, render_action
 from wingspan_ai.rules.base_game import (
     apply_action_in_place,
@@ -26,7 +27,7 @@ class RolloutActionEvaluation:
 
 
 @dataclass
-class MonteCarloRolloutAgent:
+class MonteCarloRolloutAgent(SetupPolicyMixin):
     """Estimate action value through random legal continuations."""
 
     agent_id: str = "monte_carlo_rollout"

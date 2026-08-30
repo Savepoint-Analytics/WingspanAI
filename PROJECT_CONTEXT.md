@@ -843,3 +843,28 @@ This is calibration plumbing, not strategy evidence. Against a random legal oppo
 - [ ] Add an opponent-response probability layer so net-value can use expected response value, not only best response.
 - [ ] Calibrate response-family probabilities separately for random, greedy, potential-points, archetype, and net-value opponents.
 - [ ] Decide which calibrated opponent type should be used for blocking fixtures before implementing those fixtures.
+
+## Update: 2026-08-29 - Opening setup policies added
+
+### What changed
+Added `src/wingspan_ai/agents/setup.py` with first-class policies for opening bird, bonus-card, and starting-food selection:
+
+- `DefaultSetupPolicy`: preserves the prior deterministic control opener.
+- `PotentialPointsSetupPolicy`: scores opening selections for playability, tempo, power value, bonus alignment, habitat coverage, and first round-goal alignment.
+- `ArchetypeSetupPolicy`: adapts opening choices for egg-focus, engine-builder, food-acceleration, card-draw, bonus-card-focus, and round-goal-chase strategies.
+- `NetValueSetupPolicy`: starts from potential-points setup and adds public tray/round-goal denial priors without looking at opponent hidden hands or bonus cards.
+
+The runner now passes an `InitialSelectionContext` into setup policies. That context contains only public setup information beyond the acting player's own private hand: face-up bird tray, round goals, round state, and player count. Setup-selection telemetry now records `setup_policy_id`.
+
+Guardrailed agents delegate setup selection to the wrapped base agent, so guardrailed potential-points and guardrailed archetypes keep their intended opening policy.
+
+### Why it matters
+Earlier smoke matrices compared midgame decision policies while giving almost every automated agent the same generic opening. That likely compressed or distorted strategy differences, especially for engine, food, card-draw, bonus-card, and round-goal archetypes.
+
+Opening setup is now part of the agent policy surface. Future comparisons should treat setup policy as an experiment parameter, not background noise.
+
+### Follow-up tasks
+- [ ] Compare default setup versus strategic setup for the same turn policy over fixed seeds.
+- [ ] Add setup-selection summaries to batch comparison reports.
+- [ ] Calibrate opening weights from first-play timing, playable-bird rate, bonus progress, and final margin.
+- [ ] Re-run small baseline matrices before interpreting earlier win-rate differences.

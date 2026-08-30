@@ -198,6 +198,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/rules/base_game.py`: setup, legal action generation, state transitions, habitat activation, power scaffolding, round advancement, and scoring.
 - `src/wingspan_ai/simulation/artifacts.py`: writes outcome, event, and public-state snapshot artifacts.
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
+- `src/wingspan_ai/agents/setup.py`: opening setup policies for kept birds, bonus cards, and starting food.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
 - `src/wingspan_ai/agents/potential_points.py`: expected-value greedy variant that estimates final-score potential from resources, playable birds, powers, bonus-card progress, round-goal pressure, and endgame conversion.
 - `src/wingspan_ai/agents/net_value.py`: score-margin agent scaffold that estimates next opponent response and shared-resource denial value from public observations plus a first belief heuristic.

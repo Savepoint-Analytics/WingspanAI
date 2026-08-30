@@ -24,9 +24,10 @@ Power timing valuation plan:
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from math import ceil
 
+from wingspan_ai.agents.setup import PotentialPointsSetupPolicy, SetupPolicyMixin
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, FoodCost, FoodType, Habitat, PowerColor
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
@@ -97,9 +98,13 @@ class ActionPotentialEvaluation:
 
 
 @dataclass
-class PotentialPointsAgent:
+class PotentialPointsAgent(SetupPolicyMixin):
     """Choose actions by estimated final-score potential instead of current points only."""
 
+    setup_policy: PotentialPointsSetupPolicy = field(
+        default_factory=PotentialPointsSetupPolicy,
+        kw_only=True,
+    )
     agent_id: str = "potential_points"
     final_search_turns: int = 5
     search_depth: int = 3

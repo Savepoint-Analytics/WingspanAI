@@ -26,6 +26,12 @@ Implemented archetype names:
 
 These are not intended to be strong yet. Their near-term job is to create distinct telemetry signatures so later analysis can detect strategy differences and compare them against random, greedy, and rollout policies. Food-oriented heuristics now prefer dice that help pay for visible cards in hand, which is especially important when choosing from the birdfeeder during normal gain-food actions or deterministic reaction powers.
 
+## Opening Setup
+
+Opening setup is now policy-driven. Random, greedy, and Monte Carlo use `default_setup_v1`; `PotentialPointsAgent` uses `potential_points_setup_v1`; each archetype uses `archetype_<name>_setup_v1`; and `NetValueOpponentResponseAgent` uses `net_value_setup_v1`. Guardrailed agents delegate setup to their wrapped base agent.
+
+See `docs/agents/opening_setup_policies.md` for the exact opening dimensions and current caveats.
+
 ## Rollout Agent Caveats
 
 The first Monte Carlo agent uses random legal continuations and the current implemented scoring surface. It does not yet model hidden information, most unimplemented bird powers, or opponent strategy adaptation. Treat it as a plumbing test for action-value estimation, not as a claim of strong play.

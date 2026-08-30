@@ -12,9 +12,14 @@ from typing import Any, Protocol
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from wingspan_ai.agents.setup import InitialSelectionContext
 from wingspan_ai.content.schemas import BirdCard, FoodType, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
-from wingspan_ai.rules.base_game import legal_actions_for_current_player
+from wingspan_ai.rules.base_game import (
+    InitialSelection,
+    choose_default_initial_selection,
+    legal_actions_for_current_player,
+)
 from wingspan_ai.state.models import GameState, PlayerState
 
 
@@ -332,6 +337,19 @@ class GuardrailedAgent:
             self.guardrails = ActionGuardrailEvaluator(self.guardrails)
         if self.agent_id is None:
             self.agent_id = f"guardrailed_{self.base_agent.agent_id}"
+
+    def choose_initial_selection(
+        self,
+        player: PlayerState,
+        context: InitialSelectionContext | None = None,
+    ) -> InitialSelection:
+        chooser = getattr(self.base_agent, "choose_initial_selection", None)
+        if callable(chooser):
+            parameters = signature(chooser).parameters
+            if len(parameters) == 1:
+                return chooser(player)
+            return chooser(player, context)
+        return choose_default_initial_selection(player)
 
     def choose_action(self, state: GameState) -> LegalAction:
         legal_actions = legal_actions_for_current_player(state)

@@ -5,13 +5,14 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 
+from wingspan_ai.agents.setup import SetupPolicyMixin
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import apply_action, legal_actions_for_current_player, score_player
 from wingspan_ai.state.models import GameState
 
 
 @dataclass
-class GreedyBaselineAgent:
+class GreedyBaselineAgent(SetupPolicyMixin):
     """Choose the action with the largest immediate implemented score delta."""
 
     agent_id: str = "greedy_immediate_score"

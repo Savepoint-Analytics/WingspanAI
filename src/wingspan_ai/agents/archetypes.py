@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 
+from wingspan_ai.agents.setup import ArchetypeSetupPolicy, InitialSelectionContext
 from wingspan_ai.rules.actions import ActionType, LegalAction
-from wingspan_ai.rules.base_game import apply_action, legal_actions_for_current_player, score_player
-from wingspan_ai.state.models import GameState
+from wingspan_ai.rules.base_game import (
+    InitialSelection,
+    apply_action,
+    legal_actions_for_current_player,
+    score_player,
+)
+from wingspan_ai.state.models import GameState, PlayerState
 
 
 class StrategyArchetype(StrEnum):
@@ -28,10 +34,22 @@ class StrategyArchetypeAgent:
 
     archetype: StrategyArchetype
     agent_id: str | None = None
+    setup_policy: ArchetypeSetupPolicy | None = field(default=None, kw_only=True)
 
     def __post_init__(self) -> None:
         if self.agent_id is None:
             self.agent_id = f"archetype_{self.archetype.value}"
+        if self.setup_policy is None:
+            self.setup_policy = ArchetypeSetupPolicy(self.archetype.value)
+
+    def choose_initial_selection(
+        self,
+        player: PlayerState,
+        context: InitialSelectionContext | None = None,
+    ) -> InitialSelection:
+        if self.setup_policy is None:
+            self.setup_policy = ArchetypeSetupPolicy(self.archetype.value)
+        return self.setup_policy.choose_initial_selection(player, context)
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
         if not legal_actions:

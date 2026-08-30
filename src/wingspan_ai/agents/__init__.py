@@ -25,24 +25,38 @@ from wingspan_ai.agents.potential_points import (
     evaluate_state_potential,
 )
 from wingspan_ai.agents.random_legal import RandomLegalAgent
+from wingspan_ai.agents.setup import (
+    ArchetypeSetupPolicy,
+    DefaultSetupPolicy,
+    InitialSelectionContext,
+    NetValueSetupPolicy,
+    PotentialPointsSetupPolicy,
+    SetupPolicyMixin,
+)
 
 __all__ = [
     "ActionGuardrailEvaluator",
+    "ArchetypeSetupPolicy",
+    "DefaultSetupPolicy",
     "GreedyBaselineAgent",
     "GuardrailConfig",
     "GuardrailedAgent",
     "HumanCliAgent",
+    "InitialSelectionContext",
     "MonteCarloRolloutAgent",
     "ActionNetValueEvaluation",
     "NetValueBreakdown",
     "NetValueOpponentResponseAgent",
+    "NetValueSetupPolicy",
     "OpponentResponseEstimate",
     "PublicOpponentBelief",
     "PublicOpponentBeliefModel",
     "PolicyGuardrail",
     "PotentialPointsAgent",
+    "PotentialPointsSetupPolicy",
     "PotentialValueBreakdown",
     "RandomLegalAgent",
+    "SetupPolicyMixin",
     "StrategyArchetype",
     "StrategyArchetypeAgent",
     "evaluate_state_potential",

@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from inspect import signature
 from time import perf_counter
 from typing import Protocol
 from uuid import uuid4
 
+from wingspan_ai.agents.setup import InitialSelectionContext
 from wingspan_ai.content.schemas import ContentCatalog
 from wingspan_ai.rules.actions import LegalAction, render_action
 from wingspan_ai.rules.base_game import (
@@ -83,12 +85,10 @@ def run_single_game(
     setup_selection_events: list[dict] = []
     for player, agent in zip(state.players, agents, strict=True):
         player.agent_id = agent.agent_id
-        selection_chooser = getattr(agent, "choose_initial_selection", None)
-        selection_source = "agent" if callable(selection_chooser) else "default"
-        selection = (
-            selection_chooser(player)
-            if callable(selection_chooser)
-            else choose_default_initial_selection(player)
+        selection, selection_source, setup_policy_id = _choose_agent_initial_selection(
+            agent,
+            player,
+            _initial_selection_context(state),
         )
         discarded_birds_for_player, discarded_bonus_for_player = apply_initial_selection_choice(
             player, selection
@@ -100,6 +100,7 @@ def run_single_game(
                 "player_id": player.player_id,
                 "agent_id": agent.agent_id,
                 "selection_source": selection_source,
+                "setup_policy_id": setup_policy_id,
                 "kept_bird_names": list(selection.kept_bird_names),
                 "kept_bonus_card_names": list(selection.kept_bonus_card_names),
                 "starting_food": [food.value for food in selection.starting_food],
@@ -203,6 +204,33 @@ def run_single_game(
         events=sink.events,
         public_state_snapshots=public_state_snapshots,
     )
+
+
+def _initial_selection_context(state: GameState) -> InitialSelectionContext:
+    return InitialSelectionContext(
+        bird_tray=tuple(state.bird_tray),
+        round_goal_names=tuple(goal.name for goal in state.round_goals),
+        round_state=state.round_state,
+        player_count=len(state.players),
+    )
+
+
+def _choose_agent_initial_selection(
+    agent: AgentPolicy,
+    player,
+    context: InitialSelectionContext,
+):
+    selection_chooser = getattr(agent, "choose_initial_selection", None)
+    if callable(selection_chooser):
+        parameters = signature(selection_chooser).parameters
+        selection = (
+            selection_chooser(player)
+            if len(parameters) == 1
+            else selection_chooser(player, context)
+        )
+        setup_policy = getattr(agent, "setup_policy", None)
+        return selection, "agent", getattr(setup_policy, "policy_id", None)
+    return choose_default_initial_selection(player), "default", "default_setup_v1"
 
 
 def _build_outcome(

@@ -41,7 +41,7 @@ Base-game setup should be deterministic for a given seed:
 7. Select four round goals.
 8. Initialize round 1 with eight action cubes per player.
 
-Initial hand/food selection now uses an explicit `InitialSelection` object. The runner asks agents for `choose_initial_selection(player)` when available, otherwise it falls back to a deterministic v1 chooser: keep three birds, keep one bonus card, and choose two starting food tokens biased toward kept bird costs. This gives baseline agents a consistent resource starting point while leaving a clean hook for stronger setup policies.
+Initial hand/food selection now uses an explicit `InitialSelection` object. The runner asks agents for `choose_initial_selection(player, context)` when available, otherwise it falls back to `DefaultSetupPolicy`: keep three low-cost birds, keep one bonus card, and choose two starting food tokens biased toward kept bird costs. Automated agents can now attach setup policies for potential-points, archetype, and net-value openings while only receiving public setup context beyond their own private hand.
 
 ## Legal Actions
 

@@ -15,6 +15,7 @@ Key rules docs:
 - `agents/baseline_agents.md`: random, greedy, archetype, and Monte Carlo baseline definitions.
 - `agents/bayesian_belief_model_plan.md`: first Bayesian belief model plan.
 - `agents/net_value_opponent_response_agent.md`: score-margin, blocking, and next-opponent-response agent template.
+- `agents/opening_setup_policies.md`: opening hand, bonus-card, and starting-food setup policy definitions.
 - `events/simulation_event_taxonomy.md`: current simulation telemetry envelope and emitted event names.
 - `events/postgresql_event_table_design.md`: draft event-log database tables and indexes.
 - `experiments/case_study_outline.md`: public case-study narrative outline.
