@@ -212,6 +212,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/storage/object_storage.py`: S3-compatible MinIO artifact upload helper.
 - `src/wingspan_ai/config.py`: local `.env` loader and connection config helpers.
 - `src/wingspan_ai/simulation/runner.py`: single-game runner with event emission and outcomes.
+- `analysis/net_value_calibration.py`: compares net-value public-belief response predictions against observed next opponent actions from batch artifacts.
 - `src/wingspan_ai/simulation/replay.py`: deterministic state hashing helpers for replay/debug audits.
 - `src/wingspan_ai/rules/scoring_audit.py`: bonus-card and round-goal scoring coverage audit helper.
 - `src/wingspan_ai/rules/audit.py`: combined scoring and power coverage summary for batches and tournaments.

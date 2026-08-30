@@ -810,7 +810,36 @@ These are plumbing checks only, not strategic evidence.
 The project now has a hard-throughput option for Monte Carlo and a safe way to avoid repeated deep copies once a speculative branch is already isolated. The net-value agent also no longer relies on simulator-private opponent state, which is a necessary step before using blocking or opponent-response results as research evidence.
 
 ### Follow-up tasks
-- [ ] Calibrate `public_observation_belief_v0` against observed action choices and batch outcomes.
+- [x] Add a calibration harness for `public_observation_belief_v0` against observed action choices and batch outcomes.
 - [ ] Extend lower-copy branch evaluation into potential-points and net-value search loops where branch ownership is clear.
 - [ ] Design, but do not yet implement, controlled blocking fixtures with explicit hypotheses, required simulator support, and data needed to validate the expected direction.
 - [ ] Run a small 5-10 seed sanity matrix after calibration, then decide whether a 50-100 seed matrix is justified.
+
+## Update: 2026-08-29 - Public-belief calibration harness added
+
+### What changed
+Added `analysis/net_value_calibration.py`, which reads simulation batch manifests and pairs each `NetValueOpponentResponseAgent` prediction with the opponent's next observed `action_selected` event. Net-value decision telemetry now includes ranked public response candidate values so calibration can report exact top-action matches and whether the observed action was inside the public candidate set.
+
+Fixed a round-boundary edge case where the response estimator could label the acting player as the next opponent when turn order returned to the same player at a new round. The estimator now skips self-turns and targets the next actual opponent with available action cubes.
+
+Documented the first calibration readout in `docs/experiments/public_belief_calibration.md`.
+
+### First smoke readout
+Three-seed public-belief calibration probe against random player one:
+
+- Predictions matched to observed next actions: 78.
+- Exact action-family matches: 13.
+- Exact match rate: 16.7%.
+- Observed action in uncapped public candidate set: 100.0%.
+- Average observed candidate rank: 2.90.
+- Predicted action mix: 39 lay-eggs, 39 play-bird, 0 draw-card, 0 gain-food.
+- Observed random action mix: 35 draw-card, 18 gain-food, 8 lay-eggs, 17 play-bird.
+- Player two win rate: 100.0%, with average final margin +32.33.
+
+### Interpretation
+This is calibration plumbing, not strategy evidence. Against a random legal opponent, exact best-response prediction should be low. The important finding is that the public response candidate template covers observed actions when uncapped, but the top-value heuristic is biased toward play-bird and lay-eggs. Draw-card and gain-food response likelihood need explicit probability calibration before the agent should drive controlled blocking experiments.
+
+### Follow-up tasks
+- [ ] Add an opponent-response probability layer so net-value can use expected response value, not only best response.
+- [ ] Calibrate response-family probabilities separately for random, greedy, potential-points, archetype, and net-value opponents.
+- [ ] Decide which calibrated opponent type should be used for blocking fixtures before implementing those fixtures.

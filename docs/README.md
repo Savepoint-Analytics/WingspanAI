@@ -20,6 +20,7 @@ Key rules docs:
 - `experiments/case_study_outline.md`: public case-study narrative outline.
 - `experiments/lookahead_compute_profile.md`: `apply_action` deep-copy profile and budgeted lookahead-agent probes.
 - `experiments/potential_points_matrix10_smoke.md`: 10-seed baseline matrix findings, decision timing, and current interpretation caveats.
+- `experiments/public_belief_calibration.md`: first calibration harness and smoke readout for the net-value public opponent belief model.
 - `rules/game_content_schema.md`: current content schema and enum design.
 - `rules/power_handler_registry.md`: registry metadata approach for bird power handlers.
 - `rules/scoring_handler_audit.md`: current scoring coverage audit utility and remaining validation work.

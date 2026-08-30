@@ -28,11 +28,21 @@ class OpponentResponseEstimate:
     response_action_type: str | None
     response_value_delta: float
     response_legal_action_count: int
+    response_candidate_values: tuple[dict[str, float | str], ...] = ()
 
     def telemetry_payload(self) -> dict:
         return {
-            **asdict(self),
+            "opponent_id": self.opponent_id,
+            "response_action_type": self.response_action_type,
             "response_value_delta": round(self.response_value_delta, 3),
+            "response_legal_action_count": self.response_legal_action_count,
+            "response_candidate_values": [
+                {
+                    **candidate,
+                    "value_delta": round(float(candidate["value_delta"]), 3),
+                }
+                for candidate in self.response_candidate_values
+            ],
         }
 
 
@@ -176,6 +186,7 @@ class PublicOpponentBeliefModel:
             opponent_id=opponent_id,
         )
         candidates = _public_response_candidates(public_state, public_player, belief)
+        candidate_count = len(candidates)
         if max_response_actions is not None:
             candidates = sorted(candidates, key=lambda item: item.value_delta, reverse=True)[
                 :max_response_actions
@@ -193,7 +204,14 @@ class PublicOpponentBeliefModel:
             opponent_id=opponent_id,
             response_action_type=response.action_type.value,
             response_value_delta=response.value_delta,
-            response_legal_action_count=len(candidates),
+            response_legal_action_count=candidate_count,
+            response_candidate_values=tuple(
+                {
+                    "action_type": candidate.action_type.value,
+                    "value_delta": candidate.value_delta,
+                }
+                for candidate in sorted(candidates, key=lambda item: item.value_delta, reverse=True)
+            ),
         )
 
 
@@ -356,15 +374,34 @@ def _estimate_next_opponent_response(
             response_action_type=None,
             response_value_delta=0.0,
             response_legal_action_count=0,
-        )
+    )
 
-    opponent = state.active_player
+    opponent_id = _next_opponent_player_id(state, observer_player_id)
+    if opponent_id is None:
+        return OpponentResponseEstimate(
+            opponent_id=None,
+            response_action_type=None,
+            response_value_delta=0.0,
+            response_legal_action_count=0,
+        )
     return belief_model.best_response(
         state,
         observer_player_id=observer_player_id,
-        opponent_id=opponent.player_id,
+        opponent_id=opponent_id,
         max_response_actions=max_response_actions,
     )
+
+
+def _next_opponent_player_id(state: GameState, observer_player_id: str) -> str | None:
+    player_count = len(state.players)
+    if player_count <= 1:
+        return None
+    for offset in range(player_count):
+        player_index = (state.round_state.active_player_index + offset) % player_count
+        player = state.players[player_index]
+        if player.player_id != observer_player_id and player.action_cubes_available > 0:
+            return player.player_id
+    return None
 
 
 def _candidate_actions(
