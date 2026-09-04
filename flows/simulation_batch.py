@@ -21,10 +21,18 @@ from wingspan_ai.agents import (
     StrategyArchetypeAgent,
     load_guardrail_config,
 )
+from wingspan_ai.agents.setup import (
+    ArchetypeSetupPolicy,
+    DefaultSetupPolicy,
+    NetValueSetupPolicy,
+    PotentialPointsSetupPolicy,
+)
 from wingspan_ai.config import database_url_from_env, load_dotenv, object_storage_config_from_env
+from wingspan_ai.content.filters import filter_catalog_by_power_status
 from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH, load_base_game_content_catalog
 from wingspan_ai.content.sample_catalog import make_sample_catalog
-from wingspan_ai.rules import audit_rule_coverage
+from wingspan_ai.provenance import code_provenance
+from wingspan_ai.rules import MultiplayerAuditError, audit_rule_coverage
 from wingspan_ai.simulation import (
     run_single_game,
     validate_simulation_replay,
@@ -81,6 +89,15 @@ VALID_PLAYER_TWO_AGENT_KINDS = frozenset(
         "monte_carlo_rollout",
     }
 )
+#: Prefix marking a roster entry as a guardrailed variant of a base agent,
+#: e.g. "guardrailed:potential_points". This makes guardrailed agents
+#: first-class competitors in a round robin, rather than a seat-level setting.
+GUARDRAILED_PREFIX = "guardrailed:"
+DEFAULT_GUARDRAIL_CONFIG_PATH = "configs/guardrails/base_heuristic.yaml"
+SetupPolicyKind = Literal["agent_default", "control", "strategic"]
+VALID_SETUP_POLICY_KINDS = frozenset({"agent_default", "control", "strategic"})
+#: Wingspan supports 1-5 players; the simulator is verified for 2-5.
+MAX_PLAYER_COUNT = 5
 DEFAULT_ARTIFACT_ROOT = "artifacts"
 DEFAULT_RUN_LABEL = "core_random_vs_greedy"
 MANIFEST_FILENAME = "batch_manifest.json"
@@ -100,13 +117,21 @@ def run_seeded_game(
     batch_id: str | None = None,
     require_valid_replay: bool = True,
     guardrail_config_path: str | None = None,
+    player_one_agent_kind: PlayerTwoAgentKind = "random_legal",
     player_two_agent_kind: PlayerTwoAgentKind = "greedy_immediate",
+    player_agent_kinds: list[str] | None = None,
+    guardrail_seats: tuple[str, ...] = ("p2",),
+    setup_policy_kind: SetupPolicyKind = "agent_default",
+    seat_rotation: int = 0,
+    power_status_filter: list[str] | None = None,
+    excluded_power_handler_keys: list[str] | None = None,
     monte_carlo_rollout_count: int = 8,
     monte_carlo_rollout_depth: int = 12,
     monte_carlo_max_decision_time_ms: float | None = None,
     monte_carlo_max_candidate_actions: int | None = 12,
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
+    net_value_response_mode: str = "expected",
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch."""
 
@@ -114,7 +139,14 @@ def run_seeded_game(
     resolved_batch_kind = _validate_batch_kind(batch_kind)
     resolved_batch_label = _validate_path_segment(batch_label, "batch_label")
     resolved_batch_id = _validate_path_segment(batch_id or _new_batch_id(), "batch_id")
-    resolved_player_two_agent_kind = _validate_player_two_agent_kind(player_two_agent_kind)
+    resolved_lineup = _resolve_agent_lineup(
+        player_agent_kinds,
+        player_one_agent_kind,
+        player_two_agent_kind,
+    )
+    resolved_player_one_agent_kind = resolved_lineup[0]
+    resolved_player_two_agent_kind = resolved_lineup[1] if len(resolved_lineup) > 1 else None
+    resolved_setup_policy_kind = _validate_setup_policy_kind(setup_policy_kind)
     resolved_workbook_path = Path(workbook_path)
     workbook_exists = resolved_workbook_path.exists()
     catalog = (
@@ -122,36 +154,54 @@ def run_seeded_game(
         if workbook_exists
         else make_sample_catalog()
     )
-    base_agent = _make_player_two_agent(
-        resolved_player_two_agent_kind,
-        random_seed=random_seed,
-        monte_carlo_rollout_count=monte_carlo_rollout_count,
-        monte_carlo_rollout_depth=monte_carlo_rollout_depth,
-        monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
-        monte_carlo_max_candidate_actions=monte_carlo_max_candidate_actions,
-        net_value_max_candidate_actions=net_value_max_candidate_actions,
-        net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
-    )
+    content_filter_payload = None
+    if power_status_filter is not None or excluded_power_handler_keys is not None:
+        filter_result = filter_catalog_by_power_status(
+            catalog,
+            power_status_filter,
+            excluded_handler_keys=excluded_power_handler_keys,
+        )
+        catalog = filter_result.catalog
+        content_filter_payload = filter_result.as_manifest_payload()
+
     guardrail_config = (
-        load_guardrail_config(guardrail_config_path)
-        if guardrail_config_path is not None
-        else None
+        load_guardrail_config(guardrail_config_path) if guardrail_config_path is not None else None
     )
-    player_two_agent = (
-        GuardrailedAgent(
+
+    def build_seat_agent(agent_kind: PlayerTwoAgentKind, seat: str):
+        base_agent = _make_agent(
+            agent_kind,
+            seat=seat,
+            setup_policy_kind=resolved_setup_policy_kind,
+            random_seed=random_seed,
+            monte_carlo_rollout_count=monte_carlo_rollout_count,
+            monte_carlo_rollout_depth=monte_carlo_rollout_depth,
+            monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
+            monte_carlo_max_candidate_actions=monte_carlo_max_candidate_actions,
+            net_value_max_candidate_actions=net_value_max_candidate_actions,
+            net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
+            net_value_response_mode=net_value_response_mode,
+        )
+        if guardrail_config is None or seat not in guardrail_seats:
+            return base_agent
+        return GuardrailedAgent(
             base_agent,
             guardrail_config,
-            agent_id=_guardrailed_agent_id(resolved_player_two_agent_kind),
+            agent_id=_guardrailed_agent_id(agent_kind, seat),
         )
-        if guardrail_config is not None
-        else base_agent
-    )
+
+    # Agent identity travels with the policy, not the seat. `seat_rotation`
+    # rotates the lineup so the same matchup can be replayed with each agent in
+    # each seat, which is how seat advantage is cancelled (see ADR 0002).
+    lineup_agents = [
+        build_seat_agent(agent_kind, f"p{index + 1}")
+        for index, agent_kind in enumerate(resolved_lineup)
+    ]
+    resolved_seat_rotation = seat_rotation % len(lineup_agents)
+    seated_agents = lineup_agents[resolved_seat_rotation:] + lineup_agents[:resolved_seat_rotation]
     result = run_single_game(
         catalog,
-        [
-            RandomLegalAgent(agent_id="random_legal_p1", random_seed=random_seed),
-            player_two_agent,
-        ],
+        seated_agents,
         random_seed=random_seed,
         game_id=f"{resolved_batch_id}_seed_{random_seed}",
     )
@@ -161,7 +211,12 @@ def run_seeded_game(
         error_summary = "; ".join(replay_validation.errors[:3])
         raise RuntimeError(f"Replay validation failed for seed {random_seed}: {error_summary}")
 
-    rule_audits = audit_rule_coverage(catalog)
+    rule_audits = audit_rule_coverage(catalog, player_count=len(lineup_agents))
+    multiplayer_audit = rule_audits.get("multiplayer") or {}
+    # A 3+ player result is only meaningful if the player-count-sensitive rules
+    # hold. Fail loudly rather than let a bad multiplayer batch look valid.
+    if len(lineup_agents) >= 3 and not multiplayer_audit.get("publication_safe", False):
+        raise MultiplayerAuditError(list(multiplayer_audit.get("failed_checks", [])))
 
     artifact_dir = None
     if artifact_root is not None:
@@ -182,16 +237,27 @@ def run_seeded_game(
         "batch_kind": resolved_batch_kind,
         "batch_label": resolved_batch_label,
         "catalog_source": str(resolved_workbook_path) if workbook_exists else "sample_catalog",
+        "player_one_agent_kind": resolved_player_one_agent_kind,
+        "player_one_agent_id": lineup_agents[0].agent_id,
         "player_two_agent_kind": resolved_player_two_agent_kind,
-        "player_two_agent_id": player_two_agent.agent_id,
+        "player_two_agent_id": (lineup_agents[1].agent_id if len(lineup_agents) > 1 else None),
+        "player_agent_kinds": list(resolved_lineup),
+        "player_agent_ids": [agent.agent_id for agent in lineup_agents],
+        "player_count": len(lineup_agents),
+        "seat_rotation": resolved_seat_rotation,
+        "seated_agent_ids": [agent.agent_id for agent in seated_agents],
+        "setup_policy_kind": resolved_setup_policy_kind,
         "guardrail_config_path": guardrail_config_path,
+        "guardrail_seats": list(guardrail_seats),
         "guardrail_config_name": guardrail_config.name if guardrail_config is not None else None,
+        "content_filter": content_filter_payload,
         "monte_carlo_rollout_count": monte_carlo_rollout_count,
         "monte_carlo_rollout_depth": monte_carlo_rollout_depth,
         "monte_carlo_max_decision_time_ms": monte_carlo_max_decision_time_ms,
         "monte_carlo_max_candidate_actions": monte_carlo_max_candidate_actions,
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
+        "net_value_response_mode": net_value_response_mode,
         "replay_validation": replay_validation_payload,
         "rule_audits": rule_audits,
     }
@@ -232,10 +298,7 @@ def run_seeded_game(
                 resolved_batch_label,
                 resolved_batch_id,
             )
-            key_prefix = (
-                f"{batch_prefix}/seed_{random_seed}/"
-                f"{result.outcome.simulation_run_id}"
-            )
+            key_prefix = f"{batch_prefix}/seed_{random_seed}/{result.outcome.simulation_run_id}"
             uploaded_uris = upload_directory_to_object_storage(
                 artifact_dir,
                 storage_config,
@@ -255,8 +318,17 @@ def run_seeded_game(
         "batch_kind": resolved_batch_kind,
         "batch_label": resolved_batch_label,
         "catalog_source": batch_metadata["catalog_source"],
+        "player_one_agent_kind": resolved_player_one_agent_kind,
+        "player_one_agent_id": lineup_agents[0].agent_id,
         "player_two_agent_kind": resolved_player_two_agent_kind,
-        "player_two_agent_id": player_two_agent.agent_id,
+        "player_two_agent_id": (lineup_agents[1].agent_id if len(lineup_agents) > 1 else None),
+        "player_agent_kinds": list(resolved_lineup),
+        "player_agent_ids": [agent.agent_id for agent in lineup_agents],
+        "player_count": len(lineup_agents),
+        "seat_rotation": resolved_seat_rotation,
+        "seated_agent_ids": [agent.agent_id for agent in seated_agents],
+        "setup_policy_kind": resolved_setup_policy_kind,
+        "content_filter": content_filter_payload,
         "guardrail_config_path": guardrail_config_path,
         "guardrail_config_name": batch_metadata["guardrail_config_name"],
         "monte_carlo_rollout_count": monte_carlo_rollout_count,
@@ -293,15 +365,43 @@ def _validate_batch_kind(batch_kind: str) -> BatchKind:
 
 
 def _validate_player_two_agent_kind(agent_kind: str) -> PlayerTwoAgentKind:
-    if agent_kind not in VALID_PLAYER_TWO_AGENT_KINDS:
+    base_kind = agent_kind.removeprefix(GUARDRAILED_PREFIX)
+    if base_kind not in VALID_PLAYER_TWO_AGENT_KINDS:
         allowed = ", ".join(sorted(VALID_PLAYER_TWO_AGENT_KINDS))
-        raise ValueError(f"player_two_agent_kind must be one of: {allowed}")
+        raise ValueError(
+            f"agent kind must be one of: {allowed}, optionally prefixed with '{GUARDRAILED_PREFIX}'"
+        )
     return agent_kind  # type: ignore[return-value]
 
 
-def _make_player_two_agent(
+def _apply_setup_policy(agent, agent_kind: PlayerTwoAgentKind, setup_policy_kind: str):
+    """Override an agent's opening policy so setup can be a crossed factor.
+
+    ``agent_default`` leaves each agent with whatever opening policy it ships
+    with. ``control`` forces every agent onto the deterministic baseline opener,
+    which reproduces the pre-setup-policy comparisons. ``strategic`` gives every
+    agent the strongest opening policy that matches its turn policy.
+    """
+
+    if setup_policy_kind == "agent_default":
+        return agent
+    if setup_policy_kind == "control":
+        agent.setup_policy = DefaultSetupPolicy()
+        return agent
+    if agent_kind.startswith("archetype_"):
+        agent.setup_policy = ArchetypeSetupPolicy(agent_kind.removeprefix("archetype_"))
+    elif agent_kind == "net_value_response":
+        agent.setup_policy = NetValueSetupPolicy()
+    else:
+        agent.setup_policy = PotentialPointsSetupPolicy()
+    return agent
+
+
+def _make_agent(
     agent_kind: PlayerTwoAgentKind,
     *,
+    seat: str = "p2",
+    setup_policy_kind: SetupPolicyKind = "agent_default",
     random_seed: int = 0,
     monte_carlo_rollout_count: int = 8,
     monte_carlo_rollout_depth: int = 12,
@@ -309,55 +409,104 @@ def _make_player_two_agent(
     monte_carlo_max_candidate_actions: int | None = 12,
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
+    net_value_response_mode: str = "expected",
+    guardrail_config_path: str | None = None,
 ):
+    # A "guardrailed:" prefix wraps the base agent in its own guardrail layer,
+    # so a roster can pit an agent against its guardrailed twin.
+    wants_guardrails = agent_kind.startswith(GUARDRAILED_PREFIX)
+    agent_kind = agent_kind.removeprefix(GUARDRAILED_PREFIX)  # type: ignore[assignment]
+
+    # Each lineup slot gets its own agent RNG stream. Sharing `random_seed`
+    # across seats made mirror matchups (random vs random, Monte Carlo vs
+    # Monte Carlo) start from identical streams and make correlated early
+    # choices, which is a confound rather than reproducibility.
+    seat_ordinal = int(seat[1:]) if seat[1:].isdigit() else 0
+    agent_random_seed = random_seed * 100 + seat_ordinal
+    archetypes = {
+        "archetype_egg_focus": (StrategyArchetype.EGG_FOCUS, "egg_focus"),
+        "archetype_engine_builder": (StrategyArchetype.ENGINE_BUILDER, "engine_builder"),
+        "archetype_food_acceleration": (StrategyArchetype.FOOD_ACCELERATION, "food_acceleration"),
+        "archetype_card_draw": (StrategyArchetype.CARD_DRAW, "card_draw"),
+        "archetype_bonus_card_focus": (StrategyArchetype.BONUS_CARD_FOCUS, "bonus_card_focus"),
+        "archetype_round_goal_chase": (StrategyArchetype.ROUND_GOAL_CHASE, "round_goal_chase"),
+    }
+
     if agent_kind == "random_legal":
-        return RandomLegalAgent(agent_id="random_legal_p2", random_seed=random_seed)
-    if agent_kind == "potential_points":
-        return PotentialPointsAgent(agent_id="potential_points_p2")
-    if agent_kind == "net_value_response":
-        return NetValueOpponentResponseAgent(
-            agent_id="net_value_response_p2",
+        agent = RandomLegalAgent(agent_id=f"random_legal_{seat}", random_seed=agent_random_seed)
+    elif agent_kind == "potential_points":
+        agent = PotentialPointsAgent(agent_id=f"potential_points_{seat}")
+    elif agent_kind == "net_value_response":
+        agent = NetValueOpponentResponseAgent(
+            agent_id=f"net_value_response_{seat}",
             max_candidate_actions=net_value_max_candidate_actions,
             max_opponent_response_actions=net_value_max_opponent_response_actions,
+            response_mode=net_value_response_mode,
         )
-    if agent_kind == "archetype_egg_focus":
-        return StrategyArchetypeAgent(StrategyArchetype.EGG_FOCUS, agent_id="egg_focus_p2")
-    if agent_kind == "archetype_engine_builder":
-        return StrategyArchetypeAgent(
-            StrategyArchetype.ENGINE_BUILDER,
-            agent_id="engine_builder_p2",
-        )
-    if agent_kind == "archetype_food_acceleration":
-        return StrategyArchetypeAgent(
-            StrategyArchetype.FOOD_ACCELERATION,
-            agent_id="food_acceleration_p2",
-        )
-    if agent_kind == "archetype_card_draw":
-        return StrategyArchetypeAgent(StrategyArchetype.CARD_DRAW, agent_id="card_draw_p2")
-    if agent_kind == "archetype_bonus_card_focus":
-        return StrategyArchetypeAgent(
-            StrategyArchetype.BONUS_CARD_FOCUS,
-            agent_id="bonus_card_focus_p2",
-        )
-    if agent_kind == "archetype_round_goal_chase":
-        return StrategyArchetypeAgent(
-            StrategyArchetype.ROUND_GOAL_CHASE,
-            agent_id="round_goal_chase_p2",
-        )
-    if agent_kind == "monte_carlo_rollout":
-        return MonteCarloRolloutAgent(
-            agent_id="monte_carlo_rollout_p2",
+    elif agent_kind in archetypes:
+        archetype, archetype_label = archetypes[agent_kind]
+        agent = StrategyArchetypeAgent(archetype, agent_id=f"{archetype_label}_{seat}")
+    elif agent_kind == "monte_carlo_rollout":
+        agent = MonteCarloRolloutAgent(
+            agent_id=f"monte_carlo_rollout_{seat}",
             rollout_count=monte_carlo_rollout_count,
             rollout_depth=monte_carlo_rollout_depth,
             max_decision_time_ms=monte_carlo_max_decision_time_ms,
             max_candidate_actions=monte_carlo_max_candidate_actions,
-            random_seed=random_seed,
+            random_seed=agent_random_seed,
         )
-    return GreedyBaselineAgent(agent_id="greedy_immediate_p2")
+    else:
+        agent = GreedyBaselineAgent(agent_id=f"greedy_immediate_{seat}")
+
+    # Apply the setup policy to the base agent before wrapping: GuardrailedAgent
+    # delegates opening selection downward, so a policy set on the wrapper is
+    # never consulted.
+    agent = _apply_setup_policy(agent, agent_kind, setup_policy_kind)
+    if not wants_guardrails:
+        return agent
+    config = load_guardrail_config(guardrail_config_path or DEFAULT_GUARDRAIL_CONFIG_PATH)
+    return GuardrailedAgent(agent, config, agent_id=f"guardrailed_{agent.agent_id}")
 
 
-def _guardrailed_agent_id(agent_kind: PlayerTwoAgentKind) -> str:
-    return f"guardrailed_{agent_kind}_p2"
+def _make_player_two_agent(agent_kind: PlayerTwoAgentKind, **kwargs):
+    """Backwards-compatible alias for the player-two seat."""
+
+    return _make_agent(agent_kind, seat="p2", **kwargs)
+
+
+def _guardrailed_agent_id(agent_kind: PlayerTwoAgentKind, seat: str = "p2") -> str:
+    return f"guardrailed_{agent_kind}_{seat}"
+
+
+def _resolve_agent_lineup(
+    player_agent_kinds: list[str] | None,
+    player_one_agent_kind: str,
+    player_two_agent_kind: str,
+) -> list[PlayerTwoAgentKind]:
+    """Resolve the seated agent lineup, validating every entry.
+
+    `player_agent_kinds` supports 1-5 player games. When omitted, the two-player
+    `player_one_agent_kind` / `player_two_agent_kind` pair is used so existing
+    callers and docs keep working unchanged.
+    """
+
+    kinds = (
+        list(player_agent_kinds)
+        if player_agent_kinds
+        else [player_one_agent_kind, player_two_agent_kind]
+    )
+    if not 1 <= len(kinds) <= MAX_PLAYER_COUNT:
+        raise ValueError(
+            f"player_agent_kinds must contain 1 to {MAX_PLAYER_COUNT} agents, got {len(kinds)}"
+        )
+    return [_validate_player_two_agent_kind(kind) for kind in kinds]
+
+
+def _validate_setup_policy_kind(setup_policy_kind: str) -> SetupPolicyKind:
+    if setup_policy_kind not in VALID_SETUP_POLICY_KINDS:
+        allowed = ", ".join(sorted(VALID_SETUP_POLICY_KINDS))
+        raise ValueError(f"setup_policy_kind must be one of: {allowed}")
+    return setup_policy_kind  # type: ignore[return-value]
 
 
 def _validate_path_segment(value: str, name: str) -> str:
@@ -402,6 +551,7 @@ def _write_batch_manifest(
     seeds: list[int],
     results: list[dict[str, Any]],
     guardrail_config_path: str | None,
+    seat_rotation: int = 0,
     monte_carlo_rollout_count: int,
     monte_carlo_rollout_depth: int,
     monte_carlo_max_decision_time_ms: float | None,
@@ -411,6 +561,7 @@ def _write_batch_manifest(
 ) -> Path:
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
+        "code_provenance": code_provenance(),
         "batch_id": batch_id,
         "batch_kind": batch_kind,
         "batch_label": batch_label,
@@ -420,8 +571,14 @@ def _write_batch_manifest(
         "workbook_path": workbook_path,
         "catalog_sources": sorted({result["catalog_source"] for result in results}),
         "guardrail_config_path": guardrail_config_path,
+        "player_one_agent_kinds": sorted({result["player_one_agent_kind"] for result in results}),
+        "player_one_agent_ids": sorted({result["player_one_agent_id"] for result in results}),
         "player_two_agent_kinds": sorted({result["player_two_agent_kind"] for result in results}),
         "player_two_agent_ids": sorted({result["player_two_agent_id"] for result in results}),
+        "seat_rotation": seat_rotation,
+        "player_counts": sorted({result["player_count"] for result in results}),
+        "setup_policy_kinds": sorted({result["setup_policy_kind"] for result in results}),
+        "content_filter": results[0].get("content_filter") if results else None,
         "monte_carlo_rollout_count": monte_carlo_rollout_count,
         "monte_carlo_rollout_depth": monte_carlo_rollout_depth,
         "monte_carlo_max_decision_time_ms": monte_carlo_max_decision_time_ms,
@@ -439,9 +596,7 @@ def _write_batch_manifest(
         "game_count": len(results),
         "event_count": sum(result["event_count"] for result in results),
         "replay_validation": {
-            "all_valid": all(
-                result["replay_validation"]["is_valid"] for result in results
-            ),
+            "all_valid": all(result["replay_validation"]["is_valid"] for result in results),
             "valid_game_count": sum(
                 1 for result in results if result["replay_validation"]["is_valid"]
             ),
@@ -455,17 +610,20 @@ def _write_batch_manifest(
                 "outcome": result["outcome"],
                 "event_count": result["event_count"],
                 "ruleset_id": result["ruleset_id"],
+                "player_one_agent_kind": result["player_one_agent_kind"],
+                "player_one_agent_id": result["player_one_agent_id"],
                 "player_two_agent_kind": result["player_two_agent_kind"],
                 "player_two_agent_id": result["player_two_agent_id"],
+                "seat_rotation": result["seat_rotation"],
+                "player_count": result["player_count"],
+                "player_agent_kinds": result["player_agent_kinds"],
+                "seated_agent_ids": result["seated_agent_ids"],
+                "setup_policy_kind": result["setup_policy_kind"],
                 "guardrail_config_name": result["guardrail_config_name"],
                 "monte_carlo_rollout_count": result["monte_carlo_rollout_count"],
                 "monte_carlo_rollout_depth": result["monte_carlo_rollout_depth"],
-                "monte_carlo_max_decision_time_ms": result[
-                    "monte_carlo_max_decision_time_ms"
-                ],
-                "monte_carlo_max_candidate_actions": result[
-                    "monte_carlo_max_candidate_actions"
-                ],
+                "monte_carlo_max_decision_time_ms": result["monte_carlo_max_decision_time_ms"],
+                "monte_carlo_max_candidate_actions": result["monte_carlo_max_candidate_actions"],
                 "net_value_max_candidate_actions": result["net_value_max_candidate_actions"],
                 "net_value_max_opponent_response_actions": result[
                     "net_value_max_opponent_response_actions"
@@ -500,13 +658,21 @@ def run_simulation_batch(
     batch_id: str | None = None,
     require_valid_replay: bool = True,
     guardrail_config_path: str | None = None,
+    player_one_agent_kind: PlayerTwoAgentKind = "random_legal",
     player_two_agent_kind: PlayerTwoAgentKind = "greedy_immediate",
+    player_agent_kinds: list[str] | None = None,
+    guardrail_seats: tuple[str, ...] = ("p2",),
+    setup_policy_kind: SetupPolicyKind = "agent_default",
+    seat_rotation: int = 0,
+    power_status_filter: list[str] | None = None,
+    excluded_power_handler_keys: list[str] | None = None,
     monte_carlo_rollout_count: int = 8,
     monte_carlo_rollout_depth: int = 12,
     monte_carlo_max_decision_time_ms: float | None = None,
     monte_carlo_max_candidate_actions: int | None = 12,
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
+    net_value_response_mode: str = "expected",
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -514,7 +680,6 @@ def run_simulation_batch(
     resolved_batch_kind = _validate_batch_kind(batch_kind)
     resolved_batch_label = _validate_path_segment(batch_label, "batch_label")
     resolved_batch_id = _validate_path_segment(batch_id or _new_batch_id(), "batch_id")
-    resolved_player_two_agent_kind = _validate_player_two_agent_kind(player_two_agent_kind)
     resolved_seeds = seeds or [1, 2, 3]
     started_at = datetime.now(UTC).isoformat()
     results = [
@@ -529,13 +694,21 @@ def run_simulation_batch(
             batch_id=resolved_batch_id,
             require_valid_replay=require_valid_replay,
             guardrail_config_path=guardrail_config_path,
-            player_two_agent_kind=resolved_player_two_agent_kind,
+            player_one_agent_kind=player_one_agent_kind,
+            player_two_agent_kind=player_two_agent_kind,
+            player_agent_kinds=player_agent_kinds,
+            guardrail_seats=guardrail_seats,
+            setup_policy_kind=setup_policy_kind,
+            seat_rotation=seat_rotation,
+            power_status_filter=power_status_filter,
+            excluded_power_handler_keys=excluded_power_handler_keys,
             monte_carlo_rollout_count=monte_carlo_rollout_count,
             monte_carlo_rollout_depth=monte_carlo_rollout_depth,
             monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
             monte_carlo_max_candidate_actions=monte_carlo_max_candidate_actions,
             net_value_max_candidate_actions=net_value_max_candidate_actions,
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
+            net_value_response_mode=net_value_response_mode,
         )
         for seed in resolved_seeds
     ]
@@ -560,6 +733,7 @@ def run_simulation_batch(
             seeds=resolved_seeds,
             results=results,
             guardrail_config_path=guardrail_config_path,
+            seat_rotation=seat_rotation,
             monte_carlo_rollout_count=monte_carlo_rollout_count,
             monte_carlo_rollout_depth=monte_carlo_rollout_depth,
             monte_carlo_max_decision_time_ms=monte_carlo_max_decision_time_ms,
@@ -582,12 +756,14 @@ def run_simulation_batch(
                     manifest_path,
                     storage_config,
                     object_key=(
-                        f"{_batch_object_prefix(
-                            storage_config.prefix,
-                            resolved_batch_kind,
-                            resolved_batch_label,
-                            resolved_batch_id,
-                        )}/{MANIFEST_FILENAME}"
+                        f"{
+                            _batch_object_prefix(
+                                storage_config.prefix,
+                                resolved_batch_kind,
+                                resolved_batch_label,
+                                resolved_batch_id,
+                            )
+                        }/{MANIFEST_FILENAME}"
                     ),
                 )
                 manifest_storage_result["uploaded"] = {

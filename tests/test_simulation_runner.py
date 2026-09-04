@@ -1,8 +1,9 @@
 from tempfile import TemporaryDirectory
-from unittest import TestCase
+from unittest import TestCase, skipIf
 
 from wingspan_ai.agents import GreedyBaselineAgent, RandomLegalAgent
 from wingspan_ai.content import make_sample_catalog
+from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH, load_base_game_content_catalog
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import legal_actions_for_current_player, score_player
 from wingspan_ai.simulation import (
@@ -187,3 +188,133 @@ class SimulationRunnerTests(TestCase):
         ]
 
         self.assertTrue(any("rng_draws" in event.payload for event in resolved_events))
+
+
+class ScoreIntegrityTests(TestCase):
+    """Guard that reported totals are actually the sum of earned categories.
+
+    `GameOutcome.scores` and the per-category breakdown are produced by separate
+    calls and persisted into separate columns. Nothing previously asserted they
+    agree, so a scoring bug could inflate a total without any category showing
+    where the points came from — or vice versa.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = make_sample_catalog()
+
+    def _finished_games(self, seeds=(1, 2, 3)):
+        for seed in seeds:
+            yield run_single_game(
+                self.catalog,
+                [
+                    RandomLegalAgent(agent_id="p1", random_seed=seed),
+                    GreedyBaselineAgent(agent_id="p2"),
+                ],
+                random_seed=seed,
+                game_id=f"score_integrity_{seed}",
+            )
+
+    def test_reported_total_equals_sum_of_categories(self) -> None:
+        for result in self._finished_games():
+            for player in result.state.players:
+                breakdown = score_player(result.state, player.player_id)
+                category_sum = (
+                    breakdown.bird_points
+                    + breakdown.bonus_points
+                    + breakdown.round_goal_points
+                    + breakdown.egg_points
+                    + breakdown.cached_food_points
+                    + breakdown.tucked_card_points
+                )
+                self.assertEqual(
+                    category_sum,
+                    breakdown.total,
+                    f"{result.outcome.game_id}/{player.player_id}",
+                )
+                self.assertEqual(
+                    breakdown.total,
+                    result.outcome.scores[player.player_id],
+                    f"outcome disagrees with breakdown for {player.player_id}",
+                )
+
+    def test_game_ended_telemetry_matches_the_outcome(self) -> None:
+        """The persisted breakdown and total come from different payload fields."""
+
+        for result in self._finished_games(seeds=(4,)):
+            ended = next(e for e in result.events if e.event_name == "game_ended")
+            scores = ended.payload["outcome"]["scores"]
+            for player_id, breakdown in ended.payload["score_breakdowns"].items():
+                category_sum = sum(
+                    value for key, value in breakdown.items() if key != "player_id"
+                )
+                self.assertEqual(category_sum, scores[player_id], player_id)
+
+    def _categories_ever_scored(self, catalog, seeds) -> set[str]:
+        categories = {
+            "bird_points",
+            "bonus_points",
+            "round_goal_points",
+            "egg_points",
+            "cached_food_points",
+            "tucked_card_points",
+        }
+        seen: set[str] = set()
+        for seed in seeds:
+            result = run_single_game(
+                catalog,
+                [
+                    RandomLegalAgent(agent_id="p1", random_seed=seed),
+                    GreedyBaselineAgent(agent_id="p2"),
+                ],
+                random_seed=seed,
+                game_id=f"reachability_{seed}",
+            )
+            for player in result.state.players:
+                breakdown = score_player(result.state, player.player_id)
+                seen |= {c for c in categories if getattr(breakdown, c) > 0}
+        return seen
+
+    @skipIf(
+        not DEFAULT_WORKBOOK_PATH.exists(),
+        f"{DEFAULT_WORKBOOK_PATH} is not present",
+    )
+    def test_every_scoring_category_is_reachable_on_real_content(self) -> None:
+        """A category never scored is more likely unimplemented than unused.
+
+        Silently removes a whole scoring path from every strategy conclusion.
+        """
+
+        catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
+        seen = self._categories_ever_scored(catalog, range(1, 9))
+
+        unreachable = sorted(
+            {
+                "bird_points",
+                "bonus_points",
+                "round_goal_points",
+                "egg_points",
+                "cached_food_points",
+                "tucked_card_points",
+            }
+            - seen
+        )
+        self.assertEqual(unreachable, [], f"never scored across 8 workbook games: {unreachable}")
+
+    def test_sample_catalog_cannot_exercise_power_based_scoring(self) -> None:
+        """Documents a real limitation of the synthetic catalog.
+
+        `make_sample_catalog` builds birds with `PowerColor.NONE`, so nothing
+        caches food or tucks cards, and its placeholder bonus cards never score.
+        Any smoke run or test using it is blind to three of the six scoring
+        categories. Asserted so the limitation cannot be forgotten, and so this
+        test starts failing if the sample catalog gains powered birds.
+        """
+
+        seen = self._categories_ever_scored(self.catalog, range(1, 13))
+
+        self.assertIn("bird_points", seen)
+        self.assertIn("egg_points", seen)
+        self.assertNotIn("cached_food_points", seen)
+        self.assertNotIn("tucked_card_points", seen)
+        self.assertNotIn("bonus_points", seen)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from inspect import signature
 from time import perf_counter
@@ -188,6 +189,7 @@ def run_single_game(
                 for record in state.rng_draw_records[rng_record_count_before:]
             ],
         )
+        _notify_agents_of_action(agents, action_state, action, active_player.player_id)
 
         if state.round_state.round_number != previous_round and not state.round_state.game_over:
             _emit_round_started(sink, state, resolved_run_id)
@@ -281,6 +283,27 @@ def _base_event(
 
 def _public_state_ref(state: GameState) -> str:
     return f"{state.game_id}:global_turn:{state.round_state.global_turn_number}"
+
+
+def _notify_agents_of_action(
+    agents: Sequence[AgentPolicy],
+    state_before: GameState,
+    action: LegalAction,
+    acting_player_id: str,
+) -> None:
+    """Let observing agents update beliefs from a resolved action.
+
+    The hook is optional and read-only: it receives the pre-action state so an
+    observer sees exactly what was visible when the choice was made, and it must
+    not mutate game state. Only non-acting agents are notified, because an agent
+    does not need to infer its own type.
+    """
+
+    for agent in agents:
+        observer = getattr(agent, "observe_action", None)
+        if observer is None:
+            continue
+        observer(state_before, action, acting_player_id)
 
 
 def _record_public_snapshot(snapshots: dict[str, dict], state: GameState) -> None:
