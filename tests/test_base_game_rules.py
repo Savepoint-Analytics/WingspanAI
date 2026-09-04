@@ -507,3 +507,124 @@ class BaseGameRulesTests(TestCase):
                 for record in next_state.rng_draw_records
             )
         )
+
+
+class SeedNamespaceTests(TestCase):
+    """`random_seed` is the sole reproducibility key; `game_id` is storage only.
+
+    Including `game_id` in RNG seed material used to make two batches with the
+    same numeric seeds diverge mid-game, which silently unmatched every
+    cross-batch A/B comparison. See ADR 0003.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = make_sample_catalog()
+
+    def _play_out(self, game_id: str, random_seed: int = 5) -> list:
+        from wingspan_ai.rules.base_game import legal_actions_for_current_player
+
+        state = setup_base_game(
+            self.catalog,
+            player_ids=["player_1", "player_2"],
+            random_seed=random_seed,
+            game_id=game_id,
+        )
+        # Deterministically drive the game and record every birdfeeder roll,
+        # which is the only place game_id ever entered the RNG.
+        for _turn in range(40):
+            if state.round_state.game_over:
+                break
+            actions = legal_actions_for_current_player(state)
+            if not actions:
+                break
+            state = apply_action(state, actions[-1])
+        return [list(record.result) for record in state.rng_draw_records]
+
+    def test_stochastic_draws_are_identical_across_game_ids(self) -> None:
+        first = self._play_out("batch_a_seed_5")
+        second = self._play_out("batch_b_seed_5")
+
+        self.assertTrue(first, "expected at least one recorded stochastic draw")
+        self.assertEqual(first, second)
+
+    def test_different_seeds_still_diverge(self) -> None:
+        self.assertNotEqual(
+            self._play_out("same_id", random_seed=5),
+            self._play_out("same_id", random_seed=6),
+        )
+
+    def test_game_id_is_absent_from_recorded_seed_material(self) -> None:
+        state = setup_base_game(
+            self.catalog,
+            player_ids=["player_1", "player_2"],
+            random_seed=5,
+            game_id="distinctive_game_id_marker",
+        )
+        from wingspan_ai.rules.base_game import _roll_birdfeeder_for_state
+
+        _roll_birdfeeder_for_state(state, "probe", record=True)
+
+        seed_material = state.rng_draw_records[-1].seed_material
+        self.assertNotIn("distinctive_game_id_marker", seed_material)
+        self.assertTrue(seed_material.startswith("5:"))
+
+
+class CrossProcessDeterminismTests(TestCase):
+    """The simulator must reproduce a seed across separate Python processes.
+
+    `BirdCard.habitats` is a `set[Habitat]` and `Habitat` is a `StrEnum`, so
+    iterating it directly follows string-hash order. Python randomizes string
+    hashing per process, which made legal-action ordering differ between runs:
+    three identical invocations of seed 1 produced 41/9, 23/19 and 50/17. Within
+    a single process it looked deterministic, which is why it went unnoticed.
+
+    This test runs the same seed under two different PYTHONHASHSEED values, which
+    is the exact condition that exposed the bug.
+    """
+
+    SCRIPT = (
+        "from wingspan_ai.content import make_sample_catalog\n"
+        "from wingspan_ai.agents import RandomLegalAgent\n"
+        "from wingspan_ai.simulation import run_single_game\n"
+        "r = run_single_game(\n"
+        "    make_sample_catalog(),\n"
+        "    [RandomLegalAgent(agent_id='a', random_seed=1),\n"
+        "     RandomLegalAgent(agent_id='b', random_seed=1)],\n"
+        "    random_seed=1, game_id='determinism_probe')\n"
+        "print(sorted(r.outcome.scores.items()))\n"
+    )
+
+    def _run_with_hash_seed(self, hash_seed: str) -> str:
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        env = dict(os.environ)
+        env["PYTHONHASHSEED"] = hash_seed
+        src = str(Path(__file__).resolve().parents[1] / "src")
+        env["PYTHONPATH"] = src + os.pathsep + env.get("PYTHONPATH", "")
+        result = subprocess.run(
+            [sys.executable, "-c", self.SCRIPT],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    def test_outcome_is_identical_under_different_hash_seeds(self) -> None:
+        self.assertEqual(self._run_with_hash_seed("0"), self._run_with_hash_seed("12345"))
+
+    def test_legal_play_bird_actions_follow_canonical_habitat_order(self) -> None:
+        from wingspan_ai.content.schemas import Habitat
+        from wingspan_ai.rules.base_game import ordered_habitats
+
+        canonical = list(Habitat)
+        self.assertEqual(
+            ordered_habitats({Habitat.WETLAND, Habitat.FOREST}),
+            [h for h in canonical if h in {Habitat.WETLAND, Habitat.FOREST}],
+        )
+        # Order must come from the enum, not from set iteration.
+        self.assertEqual(ordered_habitats(set(canonical)), canonical)

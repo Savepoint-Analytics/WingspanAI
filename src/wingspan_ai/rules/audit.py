@@ -5,12 +5,20 @@ from __future__ import annotations
 from typing import Any
 
 from wingspan_ai.content.schemas import ContentCatalog
+from wingspan_ai.rules.multiplayer_audit import audit_multiplayer_rules
 from wingspan_ai.rules.power_registry import audit_power_coverage
 from wingspan_ai.rules.scoring_audit import audit_scoring_coverage
 
 
-def audit_rule_coverage(catalog: ContentCatalog) -> dict[str, Any]:
-    """Return JSON-ready rule coverage summaries for powers and scoring."""
+def audit_rule_coverage(
+    catalog: ContentCatalog,
+    player_count: int | None = None,
+) -> dict[str, Any]:
+    """Return JSON-ready rule coverage summaries for powers and scoring.
+
+    Pass ``player_count`` to include the player-count-sensitive multiplayer
+    rule audit, which must pass before any multiplayer result is published.
+    """
 
     power_audit = audit_power_coverage(catalog)
     scoring_audit = audit_scoring_coverage(catalog)
@@ -43,4 +51,7 @@ def audit_rule_coverage(catalog: ContentCatalog) -> dict[str, Any]:
             "unsupported_round_goals": scoring_audit.unsupported_round_goals,
             "source_references": scoring_audit.source_references,
         },
+        "multiplayer": (
+            audit_multiplayer_rules(player_count) if player_count is not None else None
+        ),
     }

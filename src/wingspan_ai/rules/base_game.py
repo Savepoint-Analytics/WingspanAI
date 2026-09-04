@@ -11,6 +11,7 @@ from itertools import combinations_with_replacement
 
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import (
+    BonusCard,
     ContentCatalog,
     ContentPack,
     FoodCost,
@@ -20,7 +21,13 @@ from wingspan_ai.content.schemas import (
     RulesModule,
 )
 from wingspan_ai.rules.actions import ActionType, LegalAction
-from wingspan_ai.rules.power_registry import classify_power_handler_key
+from wingspan_ai.rules.bonus_scoring import score_bonus_card
+from wingspan_ai.rules.power_registry import (
+    DRAW_CARDS_PATTERN,
+    GAIN_FOOD_PATTERN,
+    MAX_CHAINED_POWER_DEPTH,
+    classify_power_handler_key,
+)
 from wingspan_ai.state.models import (
     BirdfeederState,
     BirdSlot,
@@ -36,6 +43,12 @@ STARTING_BONUS_CARD_COUNT = 2
 STARTING_SELECTED_BIRD_COUNT = 3
 BIRD_FOOD_SELECTION_TOTAL = 5
 BIRD_TRAY_SIZE = 3
+#: Units produced per action at 0-1, 2-3 and 4-5 birds in the row.
+_HABITAT_YIELD_TIERS: dict[Habitat, tuple[int, int, int]] = {
+    Habitat.FOREST: (1, 2, 3),
+    Habitat.GRASSLAND: (2, 3, 4),
+    Habitat.WETLAND: (1, 2, 3),
+}
 BIRDFEEDER_DICE_COUNT = 5
 CORE_RULEBOOK = "rulebook_pdfs/WS_Core_Rulebook.pdf"
 TURN_STRUCTURE_RULE_SOURCE = {
@@ -383,88 +396,22 @@ def score_player(state: GameState, player_id: str) -> FinalScoreBreakdown:
 
 
 def _score_bonus_cards(player: PlayerState) -> int:
-    points = 0
-    for bonus_card in player.bonus_cards:
-        bonus_name = bonus_card.name.split("[", maxsplit=1)[0].strip()
-        played_slots = player.played_birds
-        if bonus_name == "Bird Feeder":
-            count = sum(
-                1 for slot in played_slots if FoodType.SEED in slot.card.food_cost.fixed
-            )
-            points += 7 if count >= 8 else 3 if count >= 5 else 0
-        elif bonus_name == "Backyard Birder":
-            count = sum(1 for slot in played_slots if slot.card.victory_points < 4)
-            points += 6 if count >= 7 else 3 if count >= 5 else 0
-        elif bonus_name == "Bird Counter":
-            points += 2 * sum(1 for slot in played_slots if slot.card.flocking)
-        elif bonus_name == "Breeding Manager":
-            points += sum(1 for slot in played_slots if slot.eggs >= 4)
-        elif bonus_name == "Ecologist":
-            points += 2 * min(len(player.habitats[habitat]) for habitat in Habitat)
-        elif bonus_name == "Enclosure Builder":
-            points += _tiered_count_points(_count_nest_type(played_slots, "ground"), 4, 4, 6, 7)
-        elif bonus_name == "Falconer":
-            points += 2 * sum(1 for slot in played_slots if slot.card.predator)
-        elif bonus_name == "Fishery Manager":
-            points += _tiered_count_points(
-                _count_food_cost(played_slots, FoodType.FISH), 2, 3, 4, 8
-            )
-        elif bonus_name == "Food Web Expert":
-            points += 2 * sum(
-                1
-                for slot in played_slots
-                if slot.card.food_cost.fixed == {FoodType.INVERTEBRATE: 1}
-            )
-        elif bonus_name == "Forester":
-            points += _tiered_count_points(
-                _count_only_habitat(played_slots, Habitat.FOREST), 3, 4, 5, 8
-            )
-        elif bonus_name == "Large Bird Specialist":
-            count = sum(
-                1
-                for slot in played_slots
-                if slot.card.wingspan_cm is not None and slot.card.wingspan_cm > 65
-            )
-            points += _tiered_count_points(count, 4, 3, 6, 6)
-        elif bonus_name == "Nest Box Builder":
-            points += _tiered_count_points(_count_nest_type(played_slots, "cavity"), 4, 4, 6, 7)
-        elif bonus_name == "Omnivore Expert":
-            points += 2 * sum(1 for slot in played_slots if slot.card.food_cost.choice_food_count)
-        elif bonus_name == "Oologist":
-            count = sum(1 for slot in played_slots if slot.eggs >= 1)
-            points += 6 if count >= 9 else 3 if count >= 7 else 0
-        elif bonus_name == "Passerine Specialist":
-            count = sum(
-                1
-                for slot in played_slots
-                if slot.card.wingspan_cm is not None and slot.card.wingspan_cm <= 30
-            )
-            points += _tiered_count_points(count, 4, 3, 6, 6)
-        elif bonus_name == "Platform Builder":
-            points += _tiered_count_points(
-                _count_nest_type(played_slots, "platform"), 4, 4, 6, 7
-            )
-        elif bonus_name == "Prairie Manager":
-            points += _tiered_count_points(
-                _count_only_habitat(played_slots, Habitat.GRASSLAND), 2, 3, 4, 8
-            )
-        elif bonus_name == "Rodentologist":
-            points += 2 * _count_food_cost(played_slots, FoodType.RODENT)
-        elif bonus_name == "Visionary Leader":
-            points += 7 if len(player.hand) >= 8 else 4 if len(player.hand) >= 5 else 0
-        elif bonus_name == "Viticulturalist":
-            points += _tiered_count_points(
-                _count_food_cost(played_slots, FoodType.FRUIT), 2, 3, 4, 7
-            )
-        elif bonus_name == "Wetland Scientist":
-            points += _tiered_count_points(
-                _count_only_habitat(played_slots, Habitat.WETLAND), 3, 3, 5, 7
-            )
-        elif bonus_name == "Wildlife Gardener":
-            points += _tiered_count_points(_count_nest_type(played_slots, "bowl"), 4, 4, 6, 7)
-        elif bonus_name in {"Cartographer", "Historian", "Photographer", "Anatomist"}:
-            points += _score_name_based_bonus(bonus_name, played_slots)
-    return points
+    return sum(
+        _score_single_bonus_card(bonus_card, player)
+        for bonus_card in player.bonus_cards
+    )
+
+
+def _score_single_bonus_card(bonus_card: BonusCard, player: PlayerState) -> int:
+    """Score one bonus card against a player's current board.
+
+    Delegates to `rules.bonus_scoring`, which derives both the qualifying count
+    and the point formula from the card's own printed text and the workbook's
+    per-bird `bonus_card_tags`. The previous hand-written branch restated both
+    in code and scored five of twenty-six cards incorrectly.
+    """
+
+    return score_bonus_card(bonus_card, player)
 
 
 def _tiered_count_points(
@@ -639,10 +586,23 @@ def score_round_goal_competitive(
     return scores
 
 
+def ordered_habitats(habitats) -> list[Habitat]:
+    """Return habitats in canonical enum order.
+
+    `BirdCard.habitats` is a `set[Habitat]`, and `Habitat` is a `StrEnum`, so
+    iterating it directly follows string hash order. Python randomizes string
+    hashing per process, which made legal-action ordering differ between runs
+    and broke cross-process reproducibility. Always order sets of habitats
+    through this helper before they can influence action order.
+    """
+
+    return [habitat for habitat in Habitat if habitat in habitats]
+
+
 def _legal_play_bird_actions(player: PlayerState) -> list[LegalAction]:
     actions: list[LegalAction] = []
     for card in player.hand:
-        for habitat in card.habitats:
+        for habitat in ordered_habitats(card.habitats):
             slot_index = len(player.habitats[habitat])
             if slot_index >= 5:
                 continue
@@ -770,7 +730,7 @@ def _apply_play_bird(player: PlayerState, action: LegalAction, state: GameState)
     player.hand.pop(hand_index)
     played_slot = BirdSlot(card=card)
     player.habitats[action.habitat].append(played_slot)
-    resolve_played_bird_power(player, played_slot, state)
+    resolve_played_bird_power(player, played_slot, state, habitat=action.habitat)
 
 
 def _apply_gain_food(player: PlayerState, state: GameState, action: LegalAction) -> None:
@@ -863,25 +823,30 @@ def resolve_played_bird_power(
     player: PlayerState,
     slot: BirdSlot,
     state: GameState | None = None,
+    habitat: Habitat | None = None,
+    depth: int = 0,
 ) -> None:
-    """Resolve a narrow set of implemented white powers when a bird is played."""
+    """Resolve implemented white powers when a bird is played."""
 
     if slot.card.power.color.value != "white":
         return
-    _resolve_power_text(player, slot, slot.card.power.text, state)
+    _resolve_power_text(player, slot, slot.card.power.text, state, habitat=habitat, depth=depth)
 
 
 def resolve_habitat_powers(
     player: PlayerState,
     habitat: Habitat,
     state: GameState | None = None,
+    depth: int = 0,
 ) -> None:
-    """Resolve a narrow set of implemented brown powers in habitat order."""
+    """Resolve implemented brown powers in right-to-left activation order."""
 
-    for slot in reversed(player.habitats[habitat]):
+    # Snapshot the habitat before iterating: move and play-additional-bird handlers
+    # mutate the habitat list while powers are resolving.
+    for slot in list(reversed(player.habitats[habitat])):
         if slot.card.power.color.value != "brown":
             continue
-        _resolve_power_text(player, slot, slot.card.power.text, state)
+        _resolve_power_text(player, slot, slot.card.power.text, state, habitat=habitat, depth=depth)
 
 
 def _resolve_power_text(
@@ -889,6 +854,8 @@ def _resolve_power_text(
     slot: BirdSlot,
     power_text: str | None,
     state: GameState | None = None,
+    habitat: Habitat | None = None,
+    depth: int = 0,
 ) -> None:
     if not power_text:
         return
@@ -908,11 +875,17 @@ def _resolve_power_text(
     if handler_key == "discard_egg_gain_wild_food":
         _resolve_discard_egg_gain_wild_food_power(player, state)
         return
+    if handler_key == "discard_egg_draw_cards":
+        _resolve_discard_egg_draw_cards_power(player, power_text, state)
+        return
     if handler_key == "discard_to_tuck":
         _resolve_discard_to_tuck_power(player, slot, power_text, state)
         return
     if handler_key == "draw_card":
-        _draw_cards_from_deck(player, state, 1)
+        _draw_cards_from_deck(player, state, _draw_count_from_power_text(power_text))
+        return
+    if handler_key == "draw_cards_then_discard":
+        _resolve_draw_cards_then_discard_power(player, power_text, state)
         return
     if handler_key == "lay_egg":
         _place_eggs_on_player_birds(player, 1)
@@ -927,13 +900,47 @@ def _resolve_power_text(
         _resolve_all_players_gain_food_power(state, power_text)
         return
     if handler_key == "all_players_lay_eggs" and state is not None:
-        for candidate in state.players:
-            _place_eggs_on_player_birds(candidate, 1)
+        _resolve_all_players_lay_eggs_power(player, state, power_text)
+        return
+    if handler_key == "all_players_draw_cards" and state is not None:
+        _resolve_all_players_draw_cards_power(state, power_text)
+        return
+    if handler_key == "each_player_gains_birdfeeder_food" and state is not None:
+        _resolve_each_player_gains_birdfeeder_food_power(player, state)
+        return
+    if handler_key == "fewest_birds_draw_cards" and state is not None:
+        _resolve_fewest_birds_draw_cards_power(state, power_text)
+        return
+    if handler_key == "fewest_birds_gain_food" and state is not None:
+        _resolve_fewest_birds_gain_food_power(state, power_text)
         return
     if handler_key == "deck_search_tuck_by_wingspan":
         _resolve_deck_search_tuck_by_wingspan_power(player, slot, power_text, state)
         return
+    if handler_key == "move_bird_habitat":
+        _resolve_move_bird_habitat_power(player, slot, habitat)
+        return
+    if handler_key == "repeat_brown_power":
+        _resolve_repeat_brown_power(player, slot, state, habitat, depth)
+        return
+    if handler_key == "trade_food_with_supply":
+        _resolve_trade_food_with_supply_power(player)
+        return
+    if handler_key == "draw_bonus_cards_keep_one" and state is not None:
+        _resolve_draw_bonus_cards_keep_one_power(player, power_text, state)
+        return
+    if handler_key == "draw_cards_player_select" and state is not None:
+        _resolve_draw_cards_player_select_power(player, state)
+        return
+    if handler_key == "draw_tray_cards" and state is not None:
+        _resolve_draw_tray_cards_power(player, state)
+        return
+    if handler_key == "play_additional_bird" and state is not None:
+        _resolve_play_additional_bird_power(player, slot, power_text, state, habitat, depth)
+        return
 
+    # Fallback text matching for content that predates registry classification,
+    # including the synthetic sample catalog used when the workbook is absent.
     lowered = power_text.lower()
     for food_type in BASE_FOOD_TYPES:
         token = f"gain 1 [{_food_power_token(food_type)}]"
@@ -956,6 +963,32 @@ def _resolve_power_text(
 
     if "lay 1 [egg]" in lowered:
         _place_eggs_on_player_birds(player, 1)
+
+
+def _draw_count_from_power_text(power_text: str) -> int:
+    match = DRAW_CARDS_PATTERN.search(power_text.lower())
+    return int(match.group(1)) if match is not None else 1
+
+
+def _habitat_from_power_text(power_text: str) -> Habitat | None:
+    lowered = power_text.lower()
+    for candidate in Habitat:
+        if f"[{candidate.value}]" in lowered:
+            return candidate
+    return None
+
+
+def _find_slot_habitat(player: PlayerState, slot: BirdSlot) -> Habitat | None:
+    for candidate in Habitat:
+        if any(played is slot for played in player.habitats[candidate]):
+            return candidate
+    return None
+
+
+def _players_with_fewest_birds(state: GameState, habitat: Habitat) -> list[PlayerState]:
+    counts = {player.player_id: len(player.habitats[habitat]) for player in state.players}
+    fewest = min(counts.values())
+    return [player for player in state.players if counts[player.player_id] == fewest]
 
 
 def _resolve_tuck_card_power(
@@ -1006,6 +1039,27 @@ def _resolve_discard_egg_gain_wild_food_power(
     player.food_tokens[preferred_food] = player.food_tokens.get(preferred_food, 0) + 1
 
 
+def _resolve_discard_egg_draw_cards_power(
+    player: PlayerState,
+    power_text: str,
+    state: GameState | None,
+) -> None:
+    if player.total_eggs <= 0:
+        return
+    _spend_eggs(player, 1)
+    _draw_cards_from_deck(player, state, _draw_count_from_power_text(power_text))
+
+
+def _resolve_draw_cards_then_discard_power(
+    player: PlayerState,
+    power_text: str,
+    state: GameState | None,
+) -> None:
+    _draw_cards_from_deck(player, state, _draw_count_from_power_text(power_text))
+    if player.hand:
+        _discard_card_for_action(player, _choose_discard_card_for_food(player))
+
+
 def _resolve_discard_to_tuck_power(
     player: PlayerState,
     slot: BirdSlot,
@@ -1035,23 +1089,249 @@ def _resolve_discard_to_tuck_power(
 
 
 def _resolve_gain_food_from_supply_power(player: PlayerState, power_text: str) -> None:
-    lowered = power_text.lower()
-    for food_type in BASE_FOOD_TYPES:
-        if f"gain 1 [{_food_power_token(food_type)}]" in lowered:
-            player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
-            return
-    if "gain 1 [wild]" in lowered:
-        preferred_food = _preferred_food_for_hand(player)[0]
-        player.food_tokens[preferred_food] = player.food_tokens.get(preferred_food, 0) + 1
+    match = GAIN_FOOD_PATTERN.search(power_text.lower())
+    if match is None:
+        return
+    count = int(match.group(1))
+    token = match.group(2)
+    if token == "wild":
+        food_type = _preferred_food_for_hand(player)[0]
+    else:
+        food_type = _food_type_from_power_token(token)
+    player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + count
 
 
 def _resolve_all_players_gain_food_power(state: GameState, power_text: str) -> None:
+    match = GAIN_FOOD_PATTERN.search(power_text.lower())
+    if match is None or match.group(2) == "wild":
+        return
+    count = int(match.group(1))
+    food_type = _food_type_from_power_token(match.group(2))
+    for candidate in state.players:
+        candidate.food_tokens[food_type] = candidate.food_tokens.get(food_type, 0) + count
+
+
+def _resolve_all_players_lay_eggs_power(
+    player: PlayerState,
+    state: GameState,
+    power_text: str,
+) -> None:
     lowered = power_text.lower()
-    for food_type in BASE_FOOD_TYPES:
-        if f"gain 1 [{_food_power_token(food_type)}]" in lowered:
-            for candidate in state.players:
-                candidate.food_tokens[food_type] = candidate.food_tokens.get(food_type, 0) + 1
-            return
+    nest_match = re.search(r"\[(bowl|cavity|ground|platform)\]", lowered)
+    nest_type = nest_match.group(1) if nest_match is not None else None
+    for candidate in state.players:
+        _place_eggs_on_player_birds(candidate, 1, nest_type=nest_type)
+    if "additional" in lowered:
+        _place_eggs_on_player_birds(player, 1, nest_type=nest_type)
+
+
+def _resolve_all_players_draw_cards_power(state: GameState, power_text: str) -> None:
+    count = _draw_count_from_power_text(power_text)
+    for candidate in state.players:
+        _draw_cards_from_deck(candidate, state, count)
+
+
+def _resolve_each_player_gains_birdfeeder_food_power(
+    player: PlayerState,
+    state: GameState,
+) -> None:
+    ordered = [player] + [
+        candidate for candidate in state.players if candidate.player_id != player.player_id
+    ]
+    for candidate in ordered:
+        _gain_preferred_food_from_birdfeeder(candidate, state)
+
+
+def _resolve_fewest_birds_draw_cards_power(state: GameState, power_text: str) -> None:
+    habitat = _habitat_from_power_text(power_text)
+    if habitat is None:
+        return
+    count = _draw_count_from_power_text(power_text)
+    for candidate in _players_with_fewest_birds(state, habitat):
+        _draw_cards_from_deck(candidate, state, count)
+
+
+def _resolve_fewest_birds_gain_food_power(state: GameState, power_text: str) -> None:
+    habitat = _habitat_from_power_text(power_text)
+    if habitat is None:
+        return
+    for candidate in _players_with_fewest_birds(state, habitat):
+        _gain_preferred_food_from_birdfeeder(candidate, state)
+
+
+def _resolve_move_bird_habitat_power(
+    player: PlayerState,
+    slot: BirdSlot,
+    habitat: Habitat | None,
+) -> None:
+    source_habitat = habitat if habitat is not None else _find_slot_habitat(player, slot)
+    if source_habitat is None:
+        return
+    source_slots = player.habitats[source_habitat]
+    # The power only applies while this bird is rightmost in its habitat.
+    if not source_slots or source_slots[-1] is not slot:
+        return
+    candidates = [
+        candidate
+        for candidate in Habitat
+        if candidate is not source_habitat and len(player.habitats[candidate]) < 5
+    ]
+    if not candidates:
+        return
+    target_habitat = min(candidates, key=lambda item: (len(player.habitats[item]), item.value))
+    source_slots.pop()
+    player.habitats[target_habitat].append(slot)
+
+
+def _resolve_repeat_brown_power(
+    player: PlayerState,
+    slot: BirdSlot,
+    state: GameState | None,
+    habitat: Habitat | None,
+    depth: int,
+) -> None:
+    if depth >= MAX_CHAINED_POWER_DEPTH:
+        return
+    source_habitat = habitat if habitat is not None else _find_slot_habitat(player, slot)
+    if source_habitat is None:
+        return
+    for candidate in reversed(player.habitats[source_habitat]):
+        if candidate is slot:
+            continue
+        if candidate.card.power.color.value != "brown" or not candidate.card.power.text:
+            continue
+        candidate_key = candidate.card.power.handler_key or classify_power_handler_key(
+            candidate.card.power.text,
+            candidate.card.power.color,
+        )
+        if candidate_key == "repeat_brown_power":
+            continue
+        _resolve_power_text(
+            player,
+            candidate,
+            candidate.card.power.text,
+            state,
+            habitat=source_habitat,
+            depth=depth + 1,
+        )
+        return
+
+
+def _resolve_trade_food_with_supply_power(player: PlayerState) -> None:
+    available = [food for food in BASE_FOOD_TYPES if player.food_tokens.get(food, 0) > 0]
+    if not available:
+        return
+    wanted_food = _preferred_food_for_hand(player)[0]
+    surplus_food = max(available, key=lambda food: (player.food_tokens.get(food, 0), food.value))
+    if surplus_food == wanted_food:
+        return
+    player.food_tokens[surplus_food] -= 1
+    player.food_tokens[wanted_food] = player.food_tokens.get(wanted_food, 0) + 1
+
+
+def _resolve_draw_bonus_cards_keep_one_power(
+    player: PlayerState,
+    power_text: str,
+    state: GameState,
+) -> None:
+    count_match = re.search(r"draw (\d+) new bonus cards", power_text.lower())
+    count = int(count_match.group(1)) if count_match is not None else 2
+    drawn_cards = _draw_many(state.decks.bonus_deck, count)
+    if not drawn_cards:
+        return
+    _record_deck_draw(
+        state,
+        player.player_id,
+        "bird_power_draw_bonus_cards",
+        [card.name for card in drawn_cards],
+    )
+    kept_card = max(
+        drawn_cards,
+        key=lambda card: (_score_single_bonus_card(card, player), card.name),
+    )
+    player.bonus_cards.append(kept_card)
+    state.decks.bonus_discard.extend(card for card in drawn_cards if card is not kept_card)
+
+
+def _resolve_draw_cards_player_select_power(player: PlayerState, state: GameState) -> None:
+    drawn_cards = _draw_many(state.decks.bird_deck, len(state.players) + 1)
+    if not drawn_cards:
+        return
+    _record_deck_draw(
+        state,
+        player.player_id,
+        "bird_power_draw_player_select",
+        [card.common_name for card in drawn_cards],
+    )
+    remaining = sorted(
+        drawn_cards,
+        key=lambda card: (-card.victory_points, card.common_name),
+    )
+    player.hand.append(remaining.pop(0))
+    for opponent in state.players:
+        if opponent.player_id == player.player_id:
+            continue
+        if not remaining:
+            break
+        opponent.hand.append(remaining.pop(0))
+    # "You keep the extra card."
+    player.hand.extend(remaining)
+
+
+def _resolve_draw_tray_cards_power(player: PlayerState, state: GameState) -> None:
+    if not state.bird_tray:
+        return
+    taken_card_names = [card.common_name for card in state.bird_tray]
+    player.hand.extend(state.bird_tray)
+    state.bird_tray = []
+    _record_deck_draw(state, player.player_id, "bird_power_draw_tray", taken_card_names)
+    _refresh_bird_tray(state)
+
+
+def _resolve_play_additional_bird_power(
+    player: PlayerState,
+    slot: BirdSlot,
+    power_text: str,
+    state: GameState,
+    habitat: Habitat | None,
+    depth: int,
+) -> None:
+    if depth >= MAX_CHAINED_POWER_DEPTH:
+        return
+    target_habitat = _habitat_from_power_text(power_text)
+    if target_habitat is None:
+        target_habitat = habitat if habitat is not None else _find_slot_habitat(player, slot)
+    if target_habitat is None:
+        return
+    slot_index = len(player.habitats[target_habitat])
+    if slot_index >= 5:
+        return
+    egg_cost = egg_cost_for_slot(slot_index)
+    playable = [
+        (index, card)
+        for index, card in enumerate(player.hand)
+        if target_habitat in card.habitats
+        and _can_pay_food_cost(player, card.food_cost)
+        and player.total_eggs >= egg_cost
+    ]
+    if not playable:
+        return
+    hand_index, card = max(
+        playable,
+        key=lambda item: (item[1].victory_points, item[1].common_name),
+    )
+    _spend_food_cost(player, card.food_cost)
+    _spend_eggs(player, egg_cost)
+    player.hand.pop(hand_index)
+    played_slot = BirdSlot(card=card)
+    player.habitats[target_habitat].append(played_slot)
+    resolve_played_bird_power(
+        player,
+        played_slot,
+        state,
+        habitat=target_habitat,
+        depth=depth + 1,
+    )
 
 
 def _resolve_deck_search_tuck_by_wingspan_power(
@@ -1116,28 +1396,33 @@ def resolve_opponent_reaction_powers(
                     slot.tucked_cards += 1
 
 
+def habitat_action_yield(habitat: Habitat, bird_count: int) -> int:
+    """Units produced by one action in a habitat, given how full the row is.
+
+    This is Wingspan's core engine: a fuller row makes every future action in
+    it more productive, so the 2nd and 4th birds in a row are worth more than
+    the 3rd and 5th. Exposed publicly so agent valuation reads the rule rather
+    than keeping its own copy of the curve.
+    """
+
+    tiers = _HABITAT_YIELD_TIERS[habitat]
+    if bird_count >= 4:
+        return tiers[2]
+    if bird_count >= 2:
+        return tiers[1]
+    return tiers[0]
+
+
 def _forest_food_count(forest_bird_count: int) -> int:
-    if forest_bird_count >= 4:
-        return 3
-    if forest_bird_count >= 2:
-        return 2
-    return 1
+    return habitat_action_yield(Habitat.FOREST, forest_bird_count)
 
 
 def _grassland_egg_count(grassland_bird_count: int) -> int:
-    if grassland_bird_count >= 4:
-        return 4
-    if grassland_bird_count >= 2:
-        return 3
-    return 2
+    return habitat_action_yield(Habitat.GRASSLAND, grassland_bird_count)
 
 
 def _wetland_card_count(wetland_bird_count: int) -> int:
-    if wetland_bird_count >= 4:
-        return 3
-    if wetland_bird_count >= 2:
-        return 2
-    return 1
+    return habitat_action_yield(Habitat.WETLAND, wetland_bird_count)
 
 
 def _can_spend_card_for_extra_food(player: PlayerState) -> bool:
@@ -1230,7 +1515,11 @@ def _roll_birdfeeder_for_state(
     action_type: str | None = None,
     record: bool = False,
 ) -> list[FoodType]:
-    seed = f"{state.random_seed}:{state.game_id}:{state.round_state.global_turn_number}:{salt}"
+    # `random_seed` is the sole reproducibility key; `game_id` is a storage key
+    # only. Including `game_id` here made two batches with the same seeds but
+    # different batch IDs diverge mid-game, which silently unmatched every
+    # cross-batch A/B comparison. See ADR 0003.
+    seed = f"{state.random_seed}:{state.round_state.global_turn_number}:{salt}"
     result = _roll_birdfeeder(random.Random(seed))
     if record:
         state.rng_draw_records.append(
