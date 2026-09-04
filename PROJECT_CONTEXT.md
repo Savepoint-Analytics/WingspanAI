@@ -1886,3 +1886,69 @@ from checking: the seat p-values before the stability test, and "safe to delete"
 directory named `pre_fix`. The check that would have caught this one was ten seconds of
 `grep minio`. Before asserting a property of the system — safe, stale, reproducible,
 uploaded — verify it against the system.
+
+---
+
+## Update: 2026-09-04 - Feeder odds is a null; seat power finally computed
+
+### The corrected simulator did not change the standings
+Round robin v5, 200 games per arm on the six-face die. `potential_points` first
+(0.681) and `greedy_immediate` last (0.275, identical to v2). Scores rose across
+the board, consistent with the bonus-scoring fix. The middle three are not
+separated at 80 games each, and per-agent movement versus v2 is a four-change
+contrast that should not be attributed to any one fix.
+
+### Second null in a row for a modelling improvement
+`VALUE_FEEDER_ODDS` on versus off, 200 games each: pooled average score 59.38 vs
+59.39, **delta -0.01 (p=0.993)**. No agent moves significantly.
+
+After mat scaling, this is the second fidelity improvement that closed a real gap
+and changed nothing. The consistent reading is that these heuristic agents are
+not limited by the fidelity of their food or habitat valuation, so sharpening it
+has nothing to bite on. Both terms stay on for correctness, and neither should be
+described as an improvement.
+
+That pattern is itself worth stating: **modelling the game more faithfully has
+not, so far, made the agents stronger.** If a third such term also lands null, the
+honest conclusion is that agent strength lives somewhere else — search depth,
+opponent modelling, or the action-selection structure — and further fidelity work
+should be justified on correctness alone.
+
+### Power analysis, computed rather than guessed
+The estimator is a paired within-agent contrast, so the relevant spread is the
+seat-delta SD of **9.54**, not the raw score SD of 16.40 — counterbalancing
+removes 42%. Quoting the raw figure is what produced the inflated "300+ games"
+estimate in earlier write-ups.
+
+At 80% power, alpha 0.05: 2 points needs **179 paired units**, 3 points needs 80,
+1 point needs 714. The two-player run at n=200 detects down to 1.89 points.
+
+The sharper point is about magnitude, not false positives. The 4-player run had
+60 paired units and could only detect **3.45 points or more**. It reported
+**+3.24** — sitting at its own detection limit, which is the signature of an
+inflated estimate rather than a real effect. The earlier 3-player +3.63 and the
+4-player +3.24/-3.65 are all near the detection limits of the runs that produced
+them.
+
+So the seat question is cheaper to answer than assumed: ~179 units per player
+count, not 300+. Two players is answered and null. Three, four and five have
+never been run at adequate power.
+
+### A fourth seat finding evaporated
+Two players pooled at +1.567 (p=0.0186), carried entirely by seeds 5-6 (+5.54);
+excluding that block leaves +0.57 (p=0.43).
+
+**Method note now standing:** set the stability block size to match how the run
+was actually chunked. At the default 5 this looked like a possible power artifact;
+at the 2 that mirrored the chunking it was unmistakably one block. A block size
+unrelated to how work was batched can both hide and manufacture fragility.
+
+### On publishing
+Assessed and recorded: the bug fixes are not an article. The die-face error, the
+bonus-scoring error and the upload gap are defects, not findings. What is
+publishable is how they survived — a constant calibrated to its own bug and
+documented with a formula that made it look derived; 269 tests passing a
+distribution change without edits; four significant seat findings that were all
+artifacts. That is an engineering and methods case study, not a research
+contribution, and should be labelled as such. Publishing anything using Wingspan
+card data needs legal review first.

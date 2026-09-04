@@ -13,6 +13,8 @@ Current helpers:
 - `seat_effect_paired.py`: paired within-agent seat contrasts over counterbalanced round-robin artifacts.
   Every report carries an automatic leave-one-block-out stability check; pooled effects that depend on a
   single seed block are labelled FRAGILE and must not be reported as findings.
+- `seat_power_analysis.py`: minimum detectable seat effect and required sample size, from the measured
+  paired-delta variance in the artifacts. Use it before running a seat study, not after.
 - `net_value_calibration.py`: pairs net-value response predictions with the opponent's next observed action. Reports exact-match rate plus log loss, Brier score, and improvement over a uniform guess.
 
 ## SQL Analysis Views
