@@ -202,6 +202,8 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
 - `src/wingspan_ai/agents/potential_points.py`: expected-value greedy variant that estimates final-score potential from resources, playable birds, powers, bonus-card progress, round-goal pressure, and endgame conversion.
 - `src/wingspan_ai/agents/net_value.py`: score-margin agent scaffold that estimates next opponent response and shared-resource denial value from public observations plus a first belief heuristic.
+- `src/wingspan_ai/belief/models.py`: Bayesian opponent-type posterior and action-family response distribution.
+- `src/wingspan_ai/content/filters.py`: experiment-level catalog filtering by power implementation status or handler key.
 - `src/wingspan_ai/agents/guardrails.py`: YAML-configured policy guardrails that filter or rescore legal actions before agent selection.
 - `src/wingspan_ai/agents/human_cli.py`: terminal-backed human player policy for local human-vs-agent smoke games.
 - `src/wingspan_ai/agents/archetypes.py`: scripted strategy archetype bots for behavioural signatures.
@@ -218,6 +220,9 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/rules/scoring_audit.py`: bonus-card and round-goal scoring coverage audit helper.
 - `src/wingspan_ai/rules/audit.py`: combined scoring and power coverage summary for batches and tournaments.
 - `src/wingspan_ai/experiments/mlflow_tracking.py`: MLflow logging skeleton for simulation results.
+- `flows/round_robin.py`: agent-vs-agent round robin with seat swapping and a crossed setup-policy factor.
+- `analysis/sql/analysis_views.sql`: 12 analysis views over runs, scores, actions, decisions, setup, matchups, and run quality.
+- `analysis/apply_sql_views.py`: applies and probes the PostgreSQL analysis view layer.
 - `flows/simulation_batch.py`: Prefect-compatible seeded batch flow with replay validation, rule-fidelity audits, workload namespaces, batch-scoped game IDs, PostgreSQL/MinIO persistence, and a batch manifest.
 - `analysis/simulation_summary.py`: first reusable analysis helpers for outcomes and action frequency.
 - `analysis/simulation_batch_comparison.py`: compares batch manifests, action mixes, score margins, and potential/guardrail decision telemetry.
@@ -229,6 +234,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `docs/agents/net_value_opponent_response_agent.md`: score-margin and opponent-response agent template.
 - `docs/agents/guardrail_policies.md`: YAML guardrail policy schema, telemetry, and usage notes.
 - `docs/agents/bayesian_belief_model_plan.md`: first Bayesian belief model plan.
+- `docs/agents/opponent_response_belief_model.md`: Bayesian opponent-type response belief model.
 - `docs/events/simulation_event_taxonomy.md`: event envelope, current event names, and replay direction.
 - `docs/events/postgresql_event_table_design.md`: draft PostgreSQL tables and indexes for events/outcomes.
 - `docs/experiments/case_study_outline.md`: first case-study outline.

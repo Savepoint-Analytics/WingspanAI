@@ -1,10 +1,26 @@
 # Potential-Points Matrix Smoke Run
 
-Status: smoke evidence, 2026-08-28
+Status: SUPERSEDED by `baseline_matrix10_v2.md`, 2026-08-31
+
+> This run predates the ADR 0003 and ADR 0004 fixes, the power-coverage sweep,
+> and the archetype repair. It is not reproducible and its archetype rows
+> measured a bug rather than a strategy. Retained as a record only.
 
 ## Purpose
 
 This run checks whether `PotentialPointsAgent` is winning for interpretable strategic reasons or because one current scoring category is obviously distorted. It also measures decision-time telemetry before scaling larger baseline comparisons.
+
+> **Seed-matching caveat added 2026-08-31.** `game_id` participates in RNG seed
+> material and is derived from `batch_id`. If the player-two variants below were
+> run as separate batches with their own batch IDs, they did **not** share deck
+> order, birdfeeder rolls, or setup deals, and the "seeds 1-10" pairing does not
+> hold. The comparison is noisier than reported. Re-run under a single shared
+> `batch_id` before treating any ordering here as a finding. See the 2026-08-31
+> entry in `PROJECT_CONTEXT.md`.
+
+> **Power coverage caveat.** This run used 71.8% power coverage. Coverage is now
+> 100%, and five opponent-affecting powers that previously resolved as pure
+> self-benefit have been fixed, so these numbers predate real rule changes.
 
 ## Setup
 

@@ -2,6 +2,11 @@
 
 Status: first calibration harness, 2026-08-29
 
+> **Superseded 2026-08-31.** The best-response estimator described here has been
+> replaced by a Bayesian opponent-type belief model. See
+> `../agents/opponent_response_belief_model.md` and
+> `belief_response_mode_ablation.md` for the seed-matched comparison.
+
 ## Purpose
 
 `NetValueOpponentResponseAgent` now uses `public_observation_belief_v0` instead of full-state opponent scoring. The next strongest move is to measure that belief model before adding carefully designed blocking fixtures.
