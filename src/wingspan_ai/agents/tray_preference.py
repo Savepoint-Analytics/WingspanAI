@@ -17,8 +17,10 @@ cards, and the public tray.
 
 from __future__ import annotations
 
+from wingspan_ai.agents.feeder_odds import affordability_outlook
 from wingspan_ai.content.schemas import BirdCard, FoodCost, FoodType, Habitat, PowerColor
 from wingspan_ai.rules.actions import LegalAction
+from wingspan_ai.rules.base_game import habitat_action_yield
 from wingspan_ai.state.models import GameState, PlayerState
 
 MAX_HABITAT_SLOTS = 5
@@ -59,11 +61,18 @@ def has_habitat_room(player: PlayerState, card: BirdCard) -> bool:
     )
 
 
-def base_card_affinity(card: BirdCard, player: PlayerState) -> float:
+def base_card_affinity(
+    card: BirdCard,
+    player: PlayerState,
+    state: GameState | None = None,
+) -> float:
     """Generic usefulness of a card to this player, ignoring strategy flavour.
 
     Returns 0 for a card the player has nowhere to play, since an unplayable
     card is worth no more than an unknown deck draw.
+
+    `state` is optional so this stays usable where no game state is at hand; it
+    only sharpens the affordability term.
     """
 
     if not has_habitat_room(player, card):
@@ -74,6 +83,13 @@ def base_card_affinity(card: BirdCard, player: PlayerState) -> float:
 
     if can_afford(player, card.food_cost):
         value += 1.00
+    elif state is not None:
+        # How likely the feeder is to cover what is missing, given the dice
+        # showing and how many the player's forest row lets them take. The
+        # fallback below treats every missing food as equally hard to find,
+        # which is wrong by a factor of two between seed and fish.
+        draws = habitat_action_yield(Habitat.FOREST, len(player.habitats[Habitat.FOREST]))
+        value += affordability_outlook(state, player, card, draws)
     else:
         # Partial credit: the shortfall may be gained before the card is played.
         shortfall = max(card.food_cost.minimum_total - sum(player.food_tokens.values()), 1)
@@ -95,12 +111,20 @@ def _bonus_name(name: str) -> str:
     return name.split("[", maxsplit=1)[0].strip()
 
 
-def egg_focus_affinity(card: BirdCard, player: PlayerState) -> float:
-    return base_card_affinity(card, player) + card.egg_limit * 0.60
+def egg_focus_affinity(
+    card: BirdCard,
+    player: PlayerState,
+    state: GameState | None = None,
+) -> float:
+    return base_card_affinity(card, player, state) + card.egg_limit * 0.60
 
 
-def engine_builder_affinity(card: BirdCard, player: PlayerState) -> float:
-    value = base_card_affinity(card, player)
+def engine_builder_affinity(
+    card: BirdCard,
+    player: PlayerState,
+    state: GameState | None = None,
+) -> float:
+    value = base_card_affinity(card, player, state)
     if card.power.color == PowerColor.BROWN:
         value += 1.50
     # Deepening an existing habitat compounds activations.
@@ -115,8 +139,12 @@ def engine_builder_affinity(card: BirdCard, player: PlayerState) -> float:
     return value + best_depth * 0.30
 
 
-def food_acceleration_affinity(card: BirdCard, player: PlayerState) -> float:
-    value = base_card_affinity(card, player)
+def food_acceleration_affinity(
+    card: BirdCard,
+    player: PlayerState,
+    state: GameState | None = None,
+) -> float:
+    value = base_card_affinity(card, player, state)
     text = _power_text(card)
     if "gain" in text and any(f"[{food.value}]" in text for food in FoodType):
         value += 1.50
@@ -126,8 +154,12 @@ def food_acceleration_affinity(card: BirdCard, player: PlayerState) -> float:
     return value + max(0.0, 3.0 - card.food_cost.minimum_total) * 0.30
 
 
-def card_draw_affinity(card: BirdCard, player: PlayerState) -> float:
-    value = base_card_affinity(card, player)
+def card_draw_affinity(
+    card: BirdCard,
+    player: PlayerState,
+    state: GameState | None = None,
+) -> float:
+    value = base_card_affinity(card, player, state)
     text = _power_text(card)
     if "draw" in text and "[card]" in text:
         value += 1.50
@@ -136,10 +168,14 @@ def card_draw_affinity(card: BirdCard, player: PlayerState) -> float:
     return value
 
 
-def bonus_card_focus_affinity(card: BirdCard, player: PlayerState) -> float:
+def bonus_card_focus_affinity(
+    card: BirdCard,
+    player: PlayerState,
+    state: GameState | None = None,
+) -> float:
     """Prefer cards satisfying the bonus cards this player actually holds."""
 
-    value = base_card_affinity(card, player)
+    value = base_card_affinity(card, player, state)
     held = {_bonus_name(bonus.name) for bonus in player.bonus_cards}
     matches = len(held & {_bonus_name(tag) for tag in card.bonus_card_tags})
     value += 2.50 * matches
@@ -155,7 +191,7 @@ def round_goal_chase_affinity(
 ) -> float:
     """Prefer cards advancing the current end-of-round goal."""
 
-    value = base_card_affinity(card, player)
+    value = base_card_affinity(card, player, state)
     goal_index = min(state.round_state.round_number - 1, len(state.round_goals) - 1)
     if goal_index < 0:
         return value

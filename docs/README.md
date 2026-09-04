@@ -46,6 +46,7 @@ Key rules docs:
 - `decisions/0003-random-seed-is-the-sole-reproducibility-key.md`: RNG namespace ADR.
 - `decisions/0004-cross-process-determinism-and-canonical-set-ordering.md`: cross-process determinism ADR.
 - `decisions/0005-artifact-storage-is-object-storage.md`: artifacts are durable in MinIO; local `artifacts/` is a prunable cache.
+- `rules/birdfeeder_dice.md`: the six-face die, reroll/refill rules, and derived probabilities.
 - `rules/game_content_schema.md`: current content schema and enum design.
 - `rules/power_handler_registry.md`: registry metadata approach for bird power handlers.
 - `rules/multiplayer_rule_audit.md`: 3-5 player rule verification and the publication gate.

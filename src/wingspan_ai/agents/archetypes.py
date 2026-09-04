@@ -6,6 +6,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from wingspan_ai.agents.feeder_odds import feeder_supply_value
 from wingspan_ai.agents.setup import ArchetypeSetupPolicy, InitialSelectionContext
 from wingspan_ai.agents.tray_preference import (
     bonus_card_focus_affinity,
@@ -169,10 +170,11 @@ def _tray_preference(
     elif archetype == StrategyArchetype.BONUS_CARD_FOCUS:
         scorer = bonus_card_focus_affinity
     else:
-        def scorer(card, owner):
-            return round_goal_chase_affinity(card, owner, state)
 
-    best = max(scorer(card, player) for card in cards)
+        def scorer(card, owner, game_state):
+            return round_goal_chase_affinity(card, owner, game_state)
+
+    best = max(scorer(card, player, state) for card in cards)
     # Centre on a typical affinity and bound the result. Added directly, this
     # term raised the value of *drawing* relative to playing or laying, which
     # pushed bonus-card-focus from a 37% draw rate to 63% and cost it 17 points
@@ -187,11 +189,7 @@ def _played_card(state: GameState, action: LegalAction):
     if action.action_type != ActionType.PLAY_BIRD or action.bird_common_name is None:
         return None
     return next(
-        (
-            card
-            for card in state.active_player.hand
-            if card.common_name == action.bird_common_name
-        ),
+        (card for card in state.active_player.hand if card.common_name == action.bird_common_name),
         None,
     )
 
@@ -299,11 +297,7 @@ def _bonus_card_focus_bonus(state: GameState, action: LegalAction) -> float:
         # the match term fires rarely. The play-bird floor must therefore sit
         # clearly above the draw floor, or the agent digs instead of building:
         # at equal floors it drew 63% of its turns and lost 17 points per game.
-        return (
-            6.0
-            + 6.0 * float(matches)
-            + (3.0 if card.bonus_card_power else 0.0)
-        )
+        return 6.0 + 6.0 * float(matches) + (3.0 if card.bonus_card_power else 0.0)
     if action.action_type == ActionType.DRAW_CARDS:
         # Digging for tag-matching birds is the strategy, but a subordinate one.
         return 3.0 + _hand_pressure(state)
@@ -348,4 +342,20 @@ def _food_need_score(state: GameState, action: LegalAction) -> float:
         for food_type, count in card.food_cost.fixed.items():
             deficits[food_type] += max(count - player.food_tokens.get(food_type, 0), 0)
     selected_foods = action.food_types or ((action.food_type,) if action.food_type else ())
-    return float(sum(deficits.get(food_type, 0) for food_type in selected_foods))
+    matched = float(sum(deficits.get(food_type, 0) for food_type in selected_foods))
+    return matched + _feeder_outlook(state, action)
+
+
+def _feeder_outlook(state: GameState, action: LegalAction) -> float:
+    """Value of what the feeder still stands to supply after this action.
+
+    `_food_need_score` only credits the foods this action already takes. It
+    cannot distinguish a feeder that will keep supplying what the player needs
+    from one that is about to run dry, because a legal action carries no
+    information about the dice left behind.
+    """
+
+    if action.action_type != ActionType.GAIN_FOOD:
+        return 0.0
+    taken = len(action.food_types or ((action.food_type,) if action.food_type else ()))
+    return feeder_supply_value(state, state.active_player, max(taken, 1))

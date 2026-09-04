@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from wingspan_ai.content.birdfeeder import BirdfeederFace
 from wingspan_ai.content.schemas import (
     BirdCard,
     BonusCard,
@@ -90,11 +91,15 @@ class DeckState(BaseModel):
 
 
 class BirdfeederState(BaseModel):
-    """Current birdfeeder dice faces."""
+    """Current birdfeeder dice faces.
+
+    Faces, not foods: the combined invertebrate/seed face supplies either food
+    at the player's choice, which collapsing to a single food would discard.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    dice: list[FoodType] = Field(default_factory=list)
+    dice: list[BirdfeederFace] = Field(default_factory=list)
 
 
 class RoundState(BaseModel):

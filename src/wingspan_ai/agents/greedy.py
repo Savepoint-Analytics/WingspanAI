@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 
+from wingspan_ai.agents.feeder_odds import feeder_supply_value
 from wingspan_ai.agents.setup import SetupPolicyMixin
 from wingspan_ai.agents.tray_preference import base_card_affinity, drawn_tray_cards
 from wingspan_ai.rules.actions import ActionType, LegalAction
@@ -82,15 +83,31 @@ def _tray_card_quality(state: GameState, action: LegalAction) -> float:
     cards = drawn_tray_cards(state, action)
     if not cards:
         return 0.0
-    best = max(base_card_affinity(card, player) for card in cards)
+    best = max(base_card_affinity(card, player, state) for card in cards)
     return min(best / 10.0, 0.99)
 
 
-def _food_need_score(state: GameState, action: LegalAction) -> int:
+def _food_need_score(state: GameState, action: LegalAction) -> float:
     player = state.active_player
     deficits: Counter = Counter()
     for card in player.hand:
         for food_type, count in card.food_cost.fixed.items():
             deficits[food_type] += max(count - player.food_tokens.get(food_type, 0), 0)
     selected_foods = action.food_types or ((action.food_type,) if action.food_type else ())
-    return sum(deficits.get(food_type, 0) for food_type in selected_foods)
+    matched = float(sum(deficits.get(food_type, 0) for food_type in selected_foods))
+    return matched + _feeder_outlook(state, action)
+
+
+def _feeder_outlook(state: GameState, action: LegalAction) -> float:
+    """Value of what the feeder still stands to supply after this action.
+
+    `_food_need_score` only credits the foods this action already takes. It
+    cannot distinguish a feeder that will keep supplying what the player needs
+    from one that is about to run dry, because a legal action carries no
+    information about the dice left behind.
+    """
+
+    if action.action_type != ActionType.GAIN_FOOD:
+        return 0.0
+    taken = len(action.food_types or ((action.food_type,) if action.food_type else ()))
+    return feeder_supply_value(state, state.active_player, max(taken, 1))

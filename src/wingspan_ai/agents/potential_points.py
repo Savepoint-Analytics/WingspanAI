@@ -27,7 +27,12 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from math import ceil
 
+from wingspan_ai.agents.feeder_odds import food_power_availability_multiplier
 from wingspan_ai.agents.setup import PotentialPointsSetupPolicy, SetupPolicyMixin
+from wingspan_ai.content.birdfeeder import (
+    BIRDFEEDER_DICE_COUNT,
+    probability_any_available,
+)
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, FoodCost, FoodType, Habitat, PowerColor
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
@@ -350,9 +355,15 @@ _OPPONENT_PLAY_BIRD_SHARE = 0.20
 _OPPONENT_LAY_EGGS_SHARE = 0.20
 _OPPONENT_GAIN_FOOD_SHARE = 0.35
 _DEFAULT_PINK_SHARE = 0.35
-#: A predator hunt succeeds when a rodent or fish shows on five birdfeeder dice:
-#: 1 - (3/5)^5. Predators only hunt when their habitat is activated.
-_PREDATOR_SUCCESS_RATE = 0.92
+#: A predator hunt succeeds when a rodent or fish shows on the birdfeeder dice.
+#: Derived from the die model rather than hardcoded: the previous 0.92 was
+#: 1 - (3/5)^5, correct only for the uniform five-food die the simulator used to
+#: roll. The real die has six faces, so rodent-or-fish is 2/6 per die and the
+#: true rate is 1 - (4/6)^5 = 0.868. Predators only hunt when their habitat is
+#: activated.
+_PREDATOR_SUCCESS_RATE = probability_any_available(
+    (FoodType.RODENT, FoodType.FISH), BIRDFEEDER_DICE_COUNT
+)
 
 
 def _pink_trigger_rate(
@@ -653,12 +664,21 @@ def _registered_food_power_value(
     lowered_power_text: str,
     demand: Counter[FoodType],
 ) -> float:
+    """Value a food-gaining power, weighted by how often its food shows.
+
+    A bird gaining fish and a bird gaining seed scored identically. Seed is
+    obtainable on two die faces of six and fish on one, so the fish bird pays out
+    roughly half as often. A wild or [die] power takes whatever the feeder offers
+    and so needs no weighting.
+    """
+
     if "wild" in lowered_power_text or "[die]" in lowered_power_text:
         return 0.85 if sum(demand.values()) > 0 else 0.25
     for food_type in BASE_FOOD_TYPES:
         token = f"[{_food_power_token(food_type)}]"
         if token in lowered_power_text:
-            return 0.85 if demand.get(food_type, 0) > 0 else 0.25
+            base = 0.85 if demand.get(food_type, 0) > 0 else 0.25
+            return base * food_power_availability_multiplier(food_type)
     return 0.85 if sum(demand.values()) > 0 else 0.25
 
 

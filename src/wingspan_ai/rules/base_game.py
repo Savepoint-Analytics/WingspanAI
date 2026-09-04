@@ -9,6 +9,16 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import combinations_with_replacement
 
+from wingspan_ai.content.birdfeeder import (
+    BIRDFEEDER_DICE_COUNT,
+    BirdfeederFace,
+    all_faces_match,
+    all_supplies,
+    face_foods,
+    obtainable_foods,
+    roll_dice,
+    supplying_die_index,
+)
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import (
     BonusCard,
@@ -49,7 +59,6 @@ _HABITAT_YIELD_TIERS: dict[Habitat, tuple[int, int, int]] = {
     Habitat.GRASSLAND: (2, 3, 4),
     Habitat.WETLAND: (1, 2, 3),
 }
-BIRDFEEDER_DICE_COUNT = 5
 CORE_RULEBOOK = "rulebook_pdfs/WS_Core_Rulebook.pdf"
 TURN_STRUCTURE_RULE_SOURCE = {
     "rulebook": CORE_RULEBOOK,
@@ -748,7 +757,9 @@ def _apply_gain_food(player: PlayerState, state: GameState, action: LegalAction)
             record=True,
         )
     for food_type in food_types:
-        if food_type not in state.birdfeeder.dice and _can_reroll_birdfeeder(state.birdfeeder):
+        if food_type not in obtainable_foods(state.birdfeeder.dice) and _can_reroll_birdfeeder(
+            state.birdfeeder
+        ):
             state.birdfeeder.dice = _roll_birdfeeder_for_state(
                 state,
                 f"gain_food_action_{food_type}",
@@ -756,9 +767,9 @@ def _apply_gain_food(player: PlayerState, state: GameState, action: LegalAction)
                 action_type=action.action_type.value,
                 record=True,
             )
-        if food_type not in state.birdfeeder.dice:
+        die_index = supplying_die_index(state.birdfeeder.dice, food_type)
+        if die_index is None:
             raise ValueError(f"selected food is not available in the birdfeeder: {food_type}")
-        die_index = state.birdfeeder.dice.index(food_type)
         state.birdfeeder.dice.pop(die_index)
         player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
     resolve_habitat_powers(player, Habitat.FOREST, state)
@@ -1461,18 +1472,10 @@ def _available_birdfeeder_rolls(
 
 
 def _food_choice_tuples(
-    dice: list[FoodType],
+    dice: list[BirdfeederFace],
     food_count: int,
 ) -> list[tuple[FoodType, ...]]:
-    if food_count <= 0:
-        return [()]
-    dice_counts = Counter(dice)
-    choices: set[tuple[FoodType, ...]] = set()
-    for combo in combinations_with_replacement(BASE_FOOD_TYPES, food_count):
-        combo_counts = Counter(combo)
-        if all(combo_counts[food] <= dice_counts.get(food, 0) for food in combo_counts):
-            choices.add(tuple(sorted(combo, key=BASE_FOOD_TYPES.index)))
-    return sorted(choices, key=lambda option: tuple(BASE_FOOD_TYPES.index(food) for food in option))
+    return all_supplies(dice, food_count, BASE_FOOD_TYPES)
 
 
 def _card_draw_choices(state: GameState, draw_count: int) -> list[tuple[tuple[int, ...], int]]:
@@ -1503,7 +1506,7 @@ def _action_food_types(action: LegalAction) -> tuple[FoodType, ...]:
 
 
 def _can_reroll_birdfeeder(birdfeeder: BirdfeederState) -> bool:
-    return len(set(birdfeeder.dice)) <= 1
+    return all_faces_match(birdfeeder.dice)
 
 
 def _roll_birdfeeder_for_state(
@@ -1627,12 +1630,13 @@ def _gain_preferred_food_from_birdfeeder(player: PlayerState, state: GameState) 
             action_type="bird_power",
             record=True,
         )
+    available = obtainable_foods(state.birdfeeder.dice)
     for food_type in preferred_foods:
-        if food_type in state.birdfeeder.dice:
+        if food_type in available:
             _gain_food_from_birdfeeder(player, state, food_type)
             return food_type
     if state.birdfeeder.dice:
-        food_type = state.birdfeeder.dice[0]
+        food_type = face_foods(state.birdfeeder.dice[0])[0]
         _gain_food_from_birdfeeder(player, state, food_type)
         return food_type
     return None
@@ -1643,9 +1647,10 @@ def _gain_food_from_birdfeeder(
     state: GameState,
     food_type: FoodType,
 ) -> None:
-    if food_type not in state.birdfeeder.dice:
+    die_index = supplying_die_index(state.birdfeeder.dice, food_type)
+    if die_index is None:
         return
-    state.birdfeeder.dice.pop(state.birdfeeder.dice.index(food_type))
+    state.birdfeeder.dice.pop(die_index)
     player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
 
 
@@ -1799,8 +1804,8 @@ def _draw_many(deck: list, count: int) -> list:
     return drawn
 
 
-def _roll_birdfeeder(rng: random.Random) -> list[FoodType]:
-    return [rng.choice(BASE_FOOD_TYPES) for _ in range(BIRDFEEDER_DICE_COUNT)]
+def _roll_birdfeeder(rng: random.Random) -> list[BirdfeederFace]:
+    return roll_dice(rng, BIRDFEEDER_DICE_COUNT)
 
 
 def _default_ruleset(player_count: int, random_seed: int) -> RulesetMetadata:
