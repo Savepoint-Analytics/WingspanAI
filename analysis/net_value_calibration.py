@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from collections import Counter
 from pathlib import Path
 from statistics import mean
@@ -52,6 +53,8 @@ def collect_calibration_rows(paths: list[str | Path]) -> list[dict[str, Any]]:
                 )
                 observed_action_type = observed_action.get("action_type")
                 candidate_values = response.get("response_candidate_values", [])
+                belief = response.get("response_belief") or {}
+                family_probabilities = belief.get("family_probabilities", {})
                 rows.append(
                     {
                         "batch_id": manifest.get("batch_id"),
@@ -87,6 +90,17 @@ def collect_calibration_rows(paths: list[str | Path]) -> list[dict[str, Any]]:
                         "candidate_action_types": [
                             candidate.get("action_type") for candidate in candidate_values
                         ],
+                        "response_mode": response.get("response_mode", "best"),
+                        "belief_model_id": belief.get("model_id"),
+                        "family_probabilities": family_probabilities,
+                        "observed_family_probability": (
+                            family_probabilities.get(observed_action_type)
+                            if observed_action_type is not None
+                            else None
+                        ),
+                        "most_likely_profile": belief.get("most_likely_profile"),
+                        "expected_response_value": belief.get("expected_value"),
+                        "best_response_value": belief.get("best_value"),
                         "score_margin": score_margin,
                         "player_two_won": "player_2" in outcome.get("winners", []),
                     }
@@ -107,9 +121,13 @@ def summarize_calibration(rows: list[dict[str, Any]]) -> dict[str, Any]:
         for row in observed_in_candidates
         if isinstance(row["observed_candidate_rank"], int)
     ]
+    probability_rows = [
+        row for row in matched_rows if row.get("observed_family_probability") is not None
+    ]
     return {
         "prediction_count": len(rows),
         "matched_observation_count": len(matched_rows),
+        **_probabilistic_scores(probability_rows),
         "exact_match_count": len(exact_matches),
         "exact_match_rate": len(exact_matches) / len(matched_rows)
         if matched_rows
@@ -154,6 +172,15 @@ def render_markdown_report(calibration: dict[str, Any]) -> str:
         f"| Matched observations | {summary['matched_observation_count']} |",
         f"| Exact action-family matches | {summary['exact_match_count']} |",
         f"| Exact match rate | {_format_optional(summary['exact_match_rate'], 3)} |",
+        "| Probabilistic predictions | "
+        f"{summary['probabilistic_prediction_count']} |",
+        f"| Mean log loss | {_format_optional(summary['mean_log_loss'], 4)} |",
+        f"| Uniform-guess log loss | {_format_optional(summary['uniform_log_loss'], 4)} |",
+        "| Log loss improvement vs uniform | "
+        f"{_format_optional(summary['log_loss_improvement'], 4)} |",
+        f"| Mean Brier score | {_format_optional(summary['mean_brier_score'], 4)} |",
+        "| Mean probability on observed family | "
+        f"{_format_optional(summary['mean_observed_family_probability'], 4)} |",
         "| Observed action in public candidate set | "
         f"{_format_optional(summary['observed_in_candidate_set_rate'], 3)} |",
         "| Avg observed candidate rank | "
@@ -268,6 +295,58 @@ def _candidate_rank(
         if candidate.get("action_type") == observed_action_type:
             return rank
     return None
+
+
+def _probabilistic_scores(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Score the belief model as a distribution, not a single point prediction.
+
+    Exact-match rate cannot distinguish a confidently wrong model from a
+    well-calibrated uncertain one. Log loss and Brier score can, and comparing
+    against a uniform guess shows whether the belief model adds information at
+    all.
+    """
+
+    if not rows:
+        return {
+            "probabilistic_prediction_count": 0,
+            "mean_log_loss": None,
+            "mean_brier_score": None,
+            "uniform_log_loss": None,
+            "log_loss_improvement": None,
+            "mean_observed_family_probability": None,
+        }
+
+    log_losses = []
+    brier_scores = []
+    uniform_losses = []
+    for row in rows:
+        probabilities = row.get("family_probabilities") or {}
+        observed = row["observed_action_type"]
+        observed_probability = max(float(row["observed_family_probability"]), 1e-9)
+        log_losses.append(-math.log(observed_probability))
+        families = set(probabilities) | {observed}
+        brier_scores.append(
+            sum(
+                (float(probabilities.get(family, 0.0)) - (1.0 if family == observed else 0.0))
+                ** 2
+                for family in families
+            )
+        )
+        uniform_losses.append(-math.log(1.0 / max(len(probabilities), 1)))
+
+    mean_log_loss = mean(log_losses)
+    mean_uniform_loss = mean(uniform_losses)
+    return {
+        "probabilistic_prediction_count": len(rows),
+        "mean_log_loss": mean_log_loss,
+        "mean_brier_score": mean(brier_scores),
+        "uniform_log_loss": mean_uniform_loss,
+        # Positive means the belief model beats a uniform guess.
+        "log_loss_improvement": mean_uniform_loss - mean_log_loss,
+        "mean_observed_family_probability": mean(
+            float(row["observed_family_probability"]) for row in rows
+        ),
+    }
 
 
 def _mean_optional(values: Any) -> float | None:
