@@ -1,7 +1,10 @@
-from unittest import TestCase
+from collections import Counter
+from unittest import TestCase, skipIf
 
 from wingspan_ai.agents import GreedyBaselineAgent, PotentialPointsAgent, evaluate_state_potential
+from wingspan_ai.agents.potential_points import _pink_trigger_rate, _played_power_value
 from wingspan_ai.content import make_sample_catalog
+from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH, load_base_game_content_catalog
 from wingspan_ai.content.schemas import (
     BirdCard,
     ContentPack,
@@ -13,6 +16,7 @@ from wingspan_ai.content.schemas import (
     PowerColor,
     PowerImplementationStatus,
 )
+from wingspan_ai.rules import habitat_action_yield
 from wingspan_ai.rules.actions import ActionType
 from wingspan_ai.rules.base_game import legal_actions_for_current_player, setup_base_game
 from wingspan_ai.state.models import BirdSlot
@@ -199,3 +203,168 @@ def _bird(
             implementation_status=PowerImplementationStatus.NO_OP_FOR_V1,
         ),
     )
+
+
+@skipIf(
+    not DEFAULT_WORKBOOK_PATH.exists(),
+    f"{DEFAULT_WORKBOOK_PATH} is not present",
+)
+class PinkPowerValuationTests(TestCase):
+    """Pink powers fire on opponents' turns, so their value depends on opponents.
+
+    Previously every pink power was valued at a flat `turns_remaining * 0.35`,
+    so a vulture paying out only when an opponent's predator succeeds scored
+    identically whether opponents held zero predators or five.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
+        cls.by_name = {bird.common_name: bird for bird in cls.catalog.birds}
+        cls.predator = next(bird for bird in cls.catalog.birds if bird.predator)
+
+    def _state_with(self, pink_card_name: str, opponent_predators: int = 0):
+        state = setup_base_game(
+            self.catalog, player_ids=["player_1", "player_2"], random_seed=1
+        )
+        me, opponent = state.players
+        opponent.action_cubes_available = 8
+        opponent.habitats[Habitat.FOREST] = [
+            BirdSlot(card=self.predator) for _ in range(opponent_predators)
+        ]
+        slot = BirdSlot(card=self.by_name[pink_card_name])
+        me.habitats[Habitat.FOREST] = [slot]
+        return state, me, slot
+
+    def test_predator_pink_is_worthless_without_opponent_predators(self) -> None:
+        state, me, slot = self._state_with("Black Vulture", opponent_predators=0)
+
+        self.assertEqual(_pink_trigger_rate(state, me, slot, 8), 0.0)
+
+    def test_predator_pink_scales_with_opponent_predator_count(self) -> None:
+        rates = []
+        for count in (1, 2, 3):
+            state, me, slot = self._state_with("Black Vulture", opponent_predators=count)
+            rates.append(_pink_trigger_rate(state, me, slot, 8))
+
+        self.assertEqual(rates, sorted(rates))
+        self.assertGreater(rates[-1], rates[0])
+
+    def test_habitat_gated_pink_is_worthless_when_that_habitat_is_full(self) -> None:
+        """Eastern Kingbird fires when an opponent plays into their forest."""
+
+        state, me, slot = self._state_with("Eastern Kingbird", opponent_predators=0)
+        with_room = _pink_trigger_rate(state, me, slot, 8)
+
+        state.players[1].habitats[Habitat.FOREST] = [
+            BirdSlot(card=self.predator) for _ in range(5)
+        ]
+        when_full = _pink_trigger_rate(state, me, slot, 8)
+
+        self.assertGreater(with_room, 0.0)
+        self.assertEqual(when_full, 0.0)
+
+    def test_brood_parasite_is_valued_by_board_capacity_not_its_own(self) -> None:
+        """Both cowbirds have `egg_limit` 0 and lay on *other* birds.
+
+        Checking the power card's own capacity valued these 5 VP and 3 VP cards
+        at exactly zero.
+        """
+
+        bowl_bird = next(
+            bird
+            for bird in self.catalog.birds
+            if bird.nest_type is not None
+            and bird.nest_type.value == "bowl"
+            and bird.egg_limit > 0
+        )
+        state, me, slot = self._state_with("Bronzed Cowbird")
+        state.players[1].habitats[Habitat.FOREST] = [BirdSlot(card=bowl_bird)]
+        self.assertEqual(slot.card.egg_limit, 0)
+
+        triggers = _pink_trigger_rate(state, me, slot, 8)
+        demand = Counter({FoodType.INVERTEBRATE: 1})
+        without_targets = _played_power_value(
+            slot, demand, 3.0, 8, pink_triggers=triggers, player=me
+        )
+        me.habitats[Habitat.GRASSLAND] = [BirdSlot(card=bowl_bird) for _ in range(2)]
+        with_targets = _played_power_value(
+            slot, demand, 3.0, 8, pink_triggers=triggers, player=me
+        )
+
+        self.assertEqual(without_targets, 0.0)
+        self.assertGreater(with_targets, 0.0)
+
+
+@skipIf(
+    not DEFAULT_WORKBOOK_PATH.exists(),
+    f"{DEFAULT_WORKBOOK_PATH} is not present",
+)
+class HabitatYieldValuationTests(TestCase):
+    """The player-mat yield curve is Wingspan's core engine and was unvalued.
+
+    Forest produces 1/2/3 food at 0-1, 2-3 and 4-5 birds, so the 2nd and 4th
+    birds in a row are worth more than the 3rd and 5th. Before this, adding a
+    powerless bird moved the estimate by a flat +10.70 either way.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
+        cls.plain = next(
+            bird
+            for bird in cls.catalog.birds
+            if bird.power.color == PowerColor.NONE and Habitat.FOREST in bird.habitats
+        )
+
+    def _total_with_forest_birds(self, count: int) -> float:
+        state = setup_base_game(
+            self.catalog, player_ids=["player_1", "player_2"], random_seed=1
+        )
+        state.players[0].habitats[Habitat.FOREST] = [
+            BirdSlot(card=self.plain) for _ in range(count)
+        ]
+        return evaluate_state_potential(state, "player_1").total
+
+    def test_crossing_a_yield_threshold_is_worth_more_than_not_crossing(self) -> None:
+        totals = [self._total_with_forest_birds(n) for n in range(5)]
+        crossing = totals[2] - totals[1]   # 1 -> 2 birds unlocks 2 food per action
+        not_crossing = totals[3] - totals[2]  # 2 -> 3 unlocks nothing
+
+        self.assertGreater(crossing, not_crossing)
+
+    def test_agent_valuation_tracks_the_rules_curve(self) -> None:
+        """The agent must read the rule, not keep its own copy of the curve."""
+
+        from wingspan_ai.agents.potential_points import _egg_rate
+
+        for count in range(6):
+            state = setup_base_game(
+                self.catalog, player_ids=["player_1", "player_2"], random_seed=1
+            )
+            player = state.players[0]
+            player.habitats[Habitat.GRASSLAND] = [
+                BirdSlot(card=self.plain) for _ in range(count)
+            ]
+            self.assertEqual(
+                _egg_rate(player), habitat_action_yield(Habitat.GRASSLAND, count)
+            )
+
+    def test_ablation_switch_removes_the_component(self) -> None:
+        from wingspan_ai.agents import potential_points as module
+
+        state = setup_base_game(
+            self.catalog, player_ids=["player_1", "player_2"], random_seed=1
+        )
+        state.players[0].habitats[Habitat.FOREST] = [
+            BirdSlot(card=self.plain) for _ in range(4)
+        ]
+        with_feature = evaluate_state_potential(state, "player_1").habitat_yield_potential
+        module.VALUE_HABITAT_YIELD = False
+        try:
+            without = evaluate_state_potential(state, "player_1").habitat_yield_potential
+        finally:
+            module.VALUE_HABITAT_YIELD = True
+
+        self.assertGreater(with_feature, 0.0)
+        self.assertEqual(without, 0.0)

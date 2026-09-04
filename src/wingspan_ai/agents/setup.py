@@ -14,6 +14,7 @@ from wingspan_ai.rules.base_game import (
     BIRD_FOOD_SELECTION_TOTAL,
     InitialSelection,
     choose_default_initial_selection,
+    ordered_habitats,
 )
 from wingspan_ai.state.models import PlayerState, RoundState
 
@@ -351,7 +352,7 @@ def _round_goal_setup_score(
     score = 0.0
     for card in cards:
         if "[bird]" in first_goal:
-            for habitat in card.habitats:
+            for habitat in ordered_habitats(card.habitats):
                 if habitat.value in first_goal:
                     score += 1.2
             if all(habitat.value not in first_goal for habitat in card.habitats):

@@ -3,15 +3,27 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
-from wingspan_ai.agents.potential_points import evaluate_state_potential
+from wingspan_ai.agents.potential_points import _played_power_value, evaluate_state_potential
 from wingspan_ai.agents.setup import NetValueSetupPolicy, SetupPolicyMixin
+from wingspan_ai.belief import (
+    OpponentBeliefState,
+    ResponseDistribution,
+    bonus_fit_value,
+    estimate_bonus_card_posterior,
+)
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, FoodType, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
-from wingspan_ai.rules.base_game import apply_action, legal_actions_for_current_player
+from wingspan_ai.rules.base_game import (
+    apply_action,
+    legal_actions_for_current_player,
+    ordered_habitats,
+)
 from wingspan_ai.state.models import (
+    BirdSlot,
     GameState,
     PublicGameState,
     PublicPlayerState,
@@ -19,6 +31,13 @@ from wingspan_ai.state.models import (
 )
 
 PUBLIC_OBSERVATION_BELIEF_MODEL_ID = "public_observation_belief_v0"
+#: Player mats hold five birds per habitat.
+MAX_HABITAT_SLOTS = 5
+#: Weight on a denied card's printed victory points, relative to its power value.
+VICTORY_POINT_DENIAL_WEIGHT = 0.12
+#: Weight on expected bonus-card fit. A niche bird completing a bonus card an
+#: opponent likely holds is worth denying even when its printed points are low.
+BONUS_FIT_DENIAL_WEIGHT = 1.10
 
 
 @dataclass(frozen=True)
@@ -30,6 +49,8 @@ class OpponentResponseEstimate:
     response_value_delta: float
     response_legal_action_count: int
     response_candidate_values: tuple[dict[str, float | str], ...] = ()
+    response_mode: str = "best"
+    response_distribution: ResponseDistribution | None = None
 
     def telemetry_payload(self) -> dict:
         return {
@@ -44,6 +65,12 @@ class OpponentResponseEstimate:
                 }
                 for candidate in self.response_candidate_values
             ],
+            "response_mode": self.response_mode,
+            "response_belief": (
+                self.response_distribution.as_telemetry_payload()
+                if self.response_distribution is not None
+                else None
+            ),
         }
 
 
@@ -155,6 +182,47 @@ class PublicOpponentBeliefModel:
         )
         return _public_potential_total(public_state, public_player, belief)
 
+    def expected_response(
+        self,
+        state: GameState,
+        *,
+        observer_player_id: str,
+        opponent_id: str,
+        max_response_actions: int | None,
+        belief_state: OpponentBeliefState,
+    ) -> OpponentResponseEstimate:
+        """Estimate the opponent's reply as a distribution, not a single best move.
+
+        Returns a probability-weighted response value. A best-response estimate
+        systematically overstates how well the opponent will reply, which biases
+        the acting agent toward over-defensive play against weaker opponents.
+        """
+
+        best = self.best_response(
+            state,
+            observer_player_id=observer_player_id,
+            opponent_id=opponent_id,
+            max_response_actions=max_response_actions,
+        )
+        if best.opponent_id is None or not best.response_candidate_values:
+            return best
+
+        candidate_values = {
+            ActionType(str(candidate["action_type"])): float(candidate["value_delta"])
+            for candidate in best.response_candidate_values
+        }
+        distribution = belief_state.predict(candidate_values)
+        most_likely = distribution.most_likely_family
+        return OpponentResponseEstimate(
+            opponent_id=best.opponent_id,
+            response_action_type=most_likely.value if most_likely is not None else None,
+            response_value_delta=distribution.expected_value,
+            response_legal_action_count=best.response_legal_action_count,
+            response_candidate_values=best.response_candidate_values,
+            response_mode="expected",
+            response_distribution=distribution,
+        )
+
     def best_response(
         self,
         state: GameState,
@@ -234,7 +302,62 @@ class NetValueOpponentResponseAgent(SetupPolicyMixin):
     opponent_belief_model: PublicOpponentBeliefModel = field(
         default_factory=PublicOpponentBeliefModel,
     )
+    #: "expected" weights opponent replies by likelihood; "best" reproduces the
+    #: original argmax estimate and is kept for controlled ablations.
+    response_mode: str = "expected"
+    _belief_states: dict[str, OpponentBeliefState] = field(default_factory=dict, init=False)
     _last_evaluations: list[ActionNetValueEvaluation] = field(default_factory=list, init=False)
+
+    def belief_state_for(self, opponent_id: str) -> OpponentBeliefState:
+        """Return this agent's current belief about one opponent's type."""
+
+        belief_state = self._belief_states.get(opponent_id)
+        if belief_state is None:
+            belief_state = OpponentBeliefState.uniform(opponent_id)
+            self._belief_states[opponent_id] = belief_state
+        return belief_state
+
+    def observe_action(
+        self,
+        state_before: GameState,
+        action: LegalAction,
+        acting_player_id: str,
+    ) -> None:
+        """Bayes-update the opponent-type posterior from a resolved action.
+
+        Called by the runner after every action. Uses only the public candidate
+        values this agent could compute for itself, so the update never depends
+        on the opponent's hidden hand or bonus cards.
+        """
+
+        own_player_id = self._own_player_id(state_before)
+        # Skip when this agent is not seated in the game, or when the action is
+        # its own: an agent does not need to infer its own type.
+        if own_player_id is None or acting_player_id == own_player_id:
+            return
+
+        estimate = self.opponent_belief_model.best_response(
+            state_before,
+            observer_player_id=own_player_id,
+            opponent_id=acting_player_id,
+            max_response_actions=None,
+        )
+        if not estimate.response_candidate_values:
+            return
+        candidate_values = {
+            ActionType(str(candidate["action_type"])): float(candidate["value_delta"])
+            for candidate in estimate.response_candidate_values
+        }
+        self._belief_states[acting_player_id] = self.belief_state_for(acting_player_id).observe(
+            action.action_type,
+            candidate_values,
+        )
+
+    def _own_player_id(self, state: GameState) -> str | None:
+        for player in state.players:
+            if player.agent_id == self.agent_id:
+                return player.player_id
+        return None
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
         if not legal_actions:
@@ -298,6 +421,8 @@ class NetValueOpponentResponseAgent(SetupPolicyMixin):
                 observer_player_id=player_id,
                 belief_model=self.opponent_belief_model,
                 max_response_actions=self.max_opponent_response_actions,
+                response_mode=self.response_mode,
+                belief_state_for=self.belief_state_for,
             )
             denial_value = (
                 self.denial_weight
@@ -357,6 +482,20 @@ class NetValueOpponentResponseAgent(SetupPolicyMixin):
             "selected_action_label": render_action(selected_action),
             "selected_breakdown": selected.breakdown.telemetry_payload(),
             "selected_opponent_response": selected.opponent_response.telemetry_payload(),
+            "response_mode": self.response_mode,
+            "opponent_belief_states": {
+                opponent_id: {
+                    "observation_count": belief_state.observation_count,
+                    "profile_posterior": {
+                        profile.value: round(probability, 4)
+                        for profile, probability in sorted(
+                            belief_state.profile_posterior.items(),
+                            key=lambda item: (-item[1], item[0].value),
+                        )
+                    },
+                }
+                for opponent_id, belief_state in sorted(self._belief_states.items())
+            },
             "top_alternatives": [
                 evaluation.telemetry_payload() for evaluation in ranked[: self.top_alternatives]
             ],
@@ -369,6 +508,8 @@ def _estimate_next_opponent_response(
     observer_player_id: str,
     belief_model: PublicOpponentBeliefModel,
     max_response_actions: int | None,
+    response_mode: str = "best",
+    belief_state_for: Callable[[str], OpponentBeliefState] | None = None,
 ) -> OpponentResponseEstimate:
     if state.round_state.game_over:
         return OpponentResponseEstimate(
@@ -385,6 +526,14 @@ def _estimate_next_opponent_response(
             response_action_type=None,
             response_value_delta=0.0,
             response_legal_action_count=0,
+        )
+    if response_mode == "expected" and belief_state_for is not None:
+        return belief_model.expected_response(
+            state,
+            observer_player_id=observer_player_id,
+            opponent_id=opponent_id,
+            max_response_actions=max_response_actions,
+            belief_state=belief_state_for(opponent_id),
         )
     return belief_model.best_response(
         state,
@@ -475,7 +624,7 @@ def _shared_resource_denial_value(
     belief_model: PublicOpponentBeliefModel,
 ) -> float:
     if action.action_type == ActionType.DRAW_CARDS:
-        return _tray_card_denial_value(state, action)
+        return _tray_card_denial_value(state, action, opponent_ids=opponent_ids)
     if action.action_type == ActionType.GAIN_FOOD:
         return _food_denial_value(
             state,
@@ -487,16 +636,154 @@ def _shared_resource_denial_value(
     return 0.0
 
 
-def _tray_card_denial_value(state: GameState, action: LegalAction) -> float:
+def _tray_card_denial_value(
+    state: GameState,
+    action: LegalAction,
+    *,
+    opponent_ids: list[str] | None = None,
+) -> float:
+    """Value taking a tray card by what it would be worth to the opponents.
+
+    Previously this scored a card's *intrinsic* strength via
+    `_public_card_threat_value`, which reads only the card. That could not
+    express "this is exactly what my opponent needs", and it could not tell a
+    repeatable brown engine apart from a one-shot white power: a brown
+    "gain 1 [invertebrate]" that fires on every habitat activation scored the
+    same as a white one that fires once.
+
+    Denial is now estimated by asking what the card would actually do on each
+    opponent's board, reusing `_played_power_value` — the same routine that
+    values a played bird for its owner — driven by how often that opponent is
+    likely to activate the relevant habitat in their remaining turns. A card no
+    opponent has room to play is worth little to deny.
+    """
+
     tray_indices = action.tray_indices or (
         (action.tray_index,) if action.tray_index is not None else ()
     )
+    if not tray_indices:
+        return 0.0
+
+    public_state = to_public_state(state)
+    opponents = [
+        player
+        for player in public_state.players
+        if opponent_ids is None or player.player_id in opponent_ids
+    ]
+    if not opponents:
+        return 0.0
+
     value = 0.0
     for tray_index in tray_indices:
         if tray_index is None or tray_index >= len(state.bird_tray):
             continue
-        value += _public_card_threat_value(state.bird_tray[tray_index])
+        card = state.bird_tray[tray_index]
+        # Deny the opponent who would gain most from it.
+        value += max(
+            (
+                _opponent_card_value(card, public_state, opponent)
+                for opponent in opponents
+            ),
+            default=0.0,
+        )
     return value
+
+
+def _opponent_card_value(
+    card: BirdCard,
+    public_state: PublicGameState,
+    opponent: PublicPlayerState,
+) -> float:
+    """Estimate what one tray card would be worth on one opponent's board."""
+
+    turns_remaining = opponent.action_cubes_available
+    if turns_remaining <= 0:
+        return 0.0
+
+    playable_habitats = [
+        habitat
+        for habitat in ordered_habitats(card.habitats)
+        if len(opponent.habitats[habitat]) < MAX_HABITAT_SLOTS
+    ]
+    if not playable_habitats:
+        # No room to play it, so denying it gains almost nothing.
+        return 0.0
+
+    demand = Counter(
+        {
+            food_type: int(round(amount))
+            for food_type, amount in _public_food_demand(public_state, opponent).items()
+        }
+    )
+    slot = BirdSlot(card=card)
+    best_power_value = max(
+        _played_power_value(
+            slot,
+            demand,
+            _public_expected_habitat_activations(
+                public_state,
+                opponent,
+                habitat,
+                turns_remaining,
+            ),
+            turns_remaining,
+        )
+        for habitat in playable_habitats
+    )
+    # Bonus-card fit: a niche card completing a bonus card this opponent likely
+    # holds is worth far more to them than its printed points imply.
+    posterior = estimate_bonus_card_posterior(
+        opponent.played_birds,
+        opponent.bonus_card_count,
+    )
+    bonus_fit = bonus_fit_value(card, posterior) * BONUS_FIT_DENIAL_WEIGHT
+    affordability = _public_affordability(card, opponent)
+    return (
+        best_power_value
+        + card.victory_points * VICTORY_POINT_DENIAL_WEIGHT
+        + bonus_fit
+    ) * affordability
+
+
+def _public_expected_habitat_activations(
+    public_state: PublicGameState,
+    opponent: PublicPlayerState,
+    habitat: Habitat,
+    turns_remaining: int,
+) -> float:
+    """Public-information mirror of `_expected_habitat_activations`.
+
+    An opponent's hand is hidden, so food demand comes from the public estimate
+    and hand size, rather than from reading their cards.
+    """
+
+    if turns_remaining <= 0:
+        return 0.0
+    if habitat == Habitat.FOREST:
+        demand = sum(_public_food_demand(public_state, opponent).values())
+        share = 0.45 if demand > 0 else 0.18
+    elif habitat == Habitat.GRASSLAND:
+        egg_room = sum(slot.available_egg_capacity for slot in opponent.played_birds)
+        share = 0.4 if egg_room else 0.05
+    else:
+        thin_hand = opponent.hand_count < max(3, turns_remaining // 2)
+        share = 0.28 if thin_hand else 0.14
+    if public_state.round_state.round_number >= 4:
+        share *= 0.75
+    return min(float(turns_remaining), turns_remaining * share)
+
+
+def _public_affordability(card: BirdCard, opponent: PublicPlayerState) -> float:
+    """Discount a card an opponent cannot pay for soon. Food tokens are public."""
+
+    required = card.food_cost.minimum_total
+    if required <= 0:
+        return 1.0
+    available = sum(opponent.food_tokens.values())
+    if available >= required:
+        return 1.0
+    # Partial credit: they may gain the shortfall before the card matters.
+    return max(0.25, available / required)
 
 
 def _food_denial_value(

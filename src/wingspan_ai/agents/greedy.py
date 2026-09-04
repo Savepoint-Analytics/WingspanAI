@@ -6,6 +6,7 @@ from collections import Counter
 from dataclasses import dataclass
 
 from wingspan_ai.agents.setup import SetupPolicyMixin
+from wingspan_ai.agents.tray_preference import base_card_affinity, drawn_tray_cards
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import apply_action, legal_actions_for_current_player, score_player
 from wingspan_ai.state.models import GameState
@@ -56,16 +57,33 @@ class GreedyBaselineAgent(SetupPolicyMixin):
         }
 
 
-def _heuristic_tiebreaker(state: GameState, action: LegalAction) -> int:
+def _heuristic_tiebreaker(state: GameState, action: LegalAction) -> float:
     if action.action_type == ActionType.PLAY_BIRD:
-        return 40
+        return 40.0
     if action.action_type == ActionType.LAY_EGGS:
-        return 30
+        return 30.0
     if action.action_type == ActionType.GAIN_FOOD:
-        return 20 + _food_need_score(state, action)
+        return 20.0 + _food_need_score(state, action)
     if action.action_type == ActionType.DRAW_CARDS:
-        return 10
-    return 0
+        # Every draw yields zero immediate points, so without this the agent
+        # was indifferent between tray cards and always took index 0.
+        return 10.0 + _tray_card_quality(state, action)
+    return 0.0
+
+
+def _tray_card_quality(state: GameState, action: LegalAction) -> float:
+    """Best face-up card this draw would take, scaled to stay a tie-break.
+
+    Capped below 1.0 so it orders equal-scoring draws without ever
+    outranking a genuinely higher-scoring action.
+    """
+
+    player = state.active_player
+    cards = drawn_tray_cards(state, action)
+    if not cards:
+        return 0.0
+    best = max(base_card_affinity(card, player) for card in cards)
+    return min(best / 10.0, 0.99)
 
 
 def _food_need_score(state: GameState, action: LegalAction) -> int:

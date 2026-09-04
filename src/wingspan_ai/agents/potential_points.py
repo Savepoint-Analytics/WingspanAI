@@ -34,7 +34,9 @@ from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import (
     apply_action,
     egg_cost_for_slot,
+    habitat_action_yield,
     legal_actions_for_current_player,
+    ordered_habitats,
     score_player,
 )
 from wingspan_ai.rules.power_registry import classify_power_handler_key
@@ -51,6 +53,7 @@ class PotentialValueBreakdown:
     egg_conversion_potential: float
     card_conversion_potential: float
     engine_power_potential: float
+    habitat_yield_potential: float
     bonus_card_potential: float
     round_goal_potential: float
     endgame_conversion_potential: float
@@ -65,6 +68,7 @@ class PotentialValueBreakdown:
             + self.egg_conversion_potential
             + self.card_conversion_potential
             + self.engine_power_potential
+            + self.habitat_yield_potential
             + self.bonus_card_potential
             + self.round_goal_potential
             + self.endgame_conversion_potential
@@ -231,6 +235,7 @@ def evaluate_state_potential(state: GameState, player_id: str) -> PotentialValue
             egg_conversion_potential=0,
             card_conversion_potential=0,
             engine_power_potential=0,
+            habitat_yield_potential=0,
             bonus_card_potential=0,
             round_goal_potential=0,
             endgame_conversion_potential=0,
@@ -247,6 +252,8 @@ def evaluate_state_potential(state: GameState, player_id: str) -> PotentialValue
         egg_conversion_potential=_egg_conversion_potential(player, turns_remaining),
         card_conversion_potential=_card_conversion_potential(player, turns_remaining),
         engine_power_potential=_engine_power_potential(state, player, demand, turns_remaining),
+        habitat_yield_potential=_habitat_yield_potential(state, player, turns_remaining)
+        * phase_discount,
         bonus_card_potential=_bonus_card_potential(player, turns_remaining) * phase_discount,
         round_goal_potential=_round_goal_potential(state, player, turns_remaining),
         endgame_conversion_potential=_endgame_conversion_potential(player, turns_remaining),
@@ -336,6 +343,151 @@ def _card_conversion_potential(player: PlayerState, turns_remaining: int) -> flo
     return playable_count * 0.65 + speculative_count * 0.2
 
 
+#: Share of an opponent's turns spent on each action family, used to estimate
+#: how often a pink (opponent-turn) power will actually trigger. Rough priors
+#: from observed agent action mixes; refine from telemetry when available.
+_OPPONENT_PLAY_BIRD_SHARE = 0.20
+_OPPONENT_LAY_EGGS_SHARE = 0.20
+_OPPONENT_GAIN_FOOD_SHARE = 0.35
+_DEFAULT_PINK_SHARE = 0.35
+#: A predator hunt succeeds when a rodent or fish shows on five birdfeeder dice:
+#: 1 - (3/5)^5. Predators only hunt when their habitat is activated.
+_PREDATOR_SUCCESS_RATE = 0.92
+
+
+def _pink_trigger_rate(
+    state: GameState,
+    observer: PlayerState,
+    slot: BirdSlot,
+    turns_remaining: int,
+) -> float:
+    """Estimate how many times a pink power will actually fire.
+
+    Pink powers trigger on *opponents'* turns, so their value depends on what
+    opponents are positioned to do — not just on how long the game has left.
+    Previously every pink power was valued at a flat `turns_remaining * 0.35`,
+    so a vulture that pays out only when an opponent's predator succeeds scored
+    the same whether opponents held zero predators or five.
+
+    Uses only board state, which is public information.
+    """
+
+    opponents = [p for p in state.players if p.player_id != observer.player_id]
+    if not opponents or turns_remaining <= 0:
+        return 0.0
+    opponent_turns = sum(
+        min(opponent.action_cubes_available, turns_remaining) for opponent in opponents
+    )
+    if opponent_turns <= 0:
+        return 0.0
+
+    text = (slot.card.power.text or "").lower()
+
+    if "[predator]" in text and "succeed" in text:
+        # Pays out only when an opponent's played predator hunts and hits.
+        predators = sum(
+            1 for opponent in opponents for played in opponent.played_birds
+            if played.card.predator
+        )
+        if predators == 0:
+            return 0.0
+        # Each predator fires roughly when its habitat is activated.
+        predator_activations = opponent_turns * _OPPONENT_GAIN_FOOD_SHARE * min(predators, 3) / 3
+        return predator_activations * _PREDATOR_SUCCESS_RATE
+
+    if "plays a bird" in text:
+        habitat = _habitat_from_power_text(text)
+        if habitat is None:
+            return opponent_turns * _OPPONENT_PLAY_BIRD_SHARE
+        # Only opponents with room in that habitat can trigger it.
+        with_room = sum(1 for o in opponents if len(o.habitats[habitat]) < 5)
+        if with_room == 0:
+            return 0.0
+        return opponent_turns * _OPPONENT_PLAY_BIRD_SHARE * (with_room / len(opponents))
+
+    if "lay eggs" in text:
+        with_capacity = sum(1 for o in opponents if o.available_egg_capacity > 0)
+        if with_capacity == 0:
+            return 0.0
+        return opponent_turns * _OPPONENT_LAY_EGGS_SHARE * (with_capacity / len(opponents))
+
+    if "gain food" in text:
+        return opponent_turns * _OPPONENT_GAIN_FOOD_SHARE
+
+    return opponent_turns * _DEFAULT_PINK_SHARE
+
+
+def _habitat_from_power_text(text: str) -> Habitat | None:
+    for habitat in Habitat:
+        if f"[{habitat.value}]" in text:
+            return habitat
+    return None
+
+
+#: Ablation switch for measuring what mat-yield valuation contributes.
+#: Set False to reproduce the pre-2026-09-02 behaviour, where crossing a
+#: habitat yield threshold was worth no more than not crossing one.
+VALUE_HABITAT_YIELD = True
+
+#: Points-equivalent of one unit produced by a habitat action. Food and cards
+#: are inputs that still need converting, so they are worth well under a point.
+#:
+#: Grassland is deliberately absent: `_egg_conversion_potential` already values
+#: egg capacity times the grassland egg rate, so counting it here too double-
+#: counts the same points. Including it made the agent pay ~3.7 points to play a
+#: 1-point bird purely to unlock egg-laying it was already being credited for.
+#: Multiplier on the mat-yield unit values, kept as an explicit ablation knob.
+#:
+#: Measured 2026-09-03 over 60 seed-matched games per arm. At 1.0 the term
+#: changed 0.64% of decisions; at 2.0 it changed 3.37%. Neither moved win rate
+#: beyond one game in twenty-four, so the mechanic is modelled because it is
+#: real, not because it was shown to pay. Left at 1.0: the doubled weight has
+#: no evidence behind it, and the unit values are reasoned from food and cards
+#: being inputs rather than points.
+HABITAT_YIELD_WEIGHT_SCALE = 1.0
+
+#: A player spreads actions over three habitats, so any one row is used on
+#: roughly a third of turns regardless of momentary need.
+_NEUTRAL_HABITAT_SHARE = 1.0 / 3.0
+
+_HABITAT_YIELD_UNIT_VALUE: dict[Habitat, float] = {
+    Habitat.FOREST: 0.55,
+    Habitat.WETLAND: 0.45,
+}
+
+
+def _habitat_yield_potential(
+    state: GameState,
+    player: PlayerState,
+    turns_remaining: int,
+) -> float:
+    """Value the player-mat yield curve, which is Wingspan's core engine.
+
+    A fuller habitat row makes every future action in it more productive: forest
+    gives 1/2/3 food at 0-1, 2-3 and 4-5 birds, grassland 2/3/4 eggs, wetland
+    1/2/3 cards. So the 2nd and 4th birds in a row are worth more than the 3rd
+    and 5th.
+
+    Nothing valued this before. Adding a powerless bird to the forest moved the
+    agent's estimate by a flat +10.70 whether or not it crossed a threshold, so
+    agents never preferred the bird that unlocked a bigger row yield.
+    """
+
+    if turns_remaining <= 0 or not VALUE_HABITAT_YIELD:
+        return 0.0
+    # A neutral share per habitat rather than `_expected_habitat_activations`,
+    # which scales with *current* food demand. Row yield is a structural
+    # property of the board: coupling it to demand meant that gaining the food
+    # you needed collapsed the estimate, penalising the agent for satisfying
+    # its own requirements.
+    expected_uses = turns_remaining * _NEUTRAL_HABITAT_SHARE
+    total = 0.0
+    for habitat, unit_value in _HABITAT_YIELD_UNIT_VALUE.items():
+        yield_per_action = habitat_action_yield(habitat, len(player.habitats[habitat]))
+        total += expected_uses * yield_per_action * unit_value
+    return total * HABITAT_YIELD_WEIGHT_SCALE
+
+
 def _engine_power_potential(
     state: GameState,
     player: PlayerState,
@@ -346,7 +498,14 @@ def _engine_power_potential(
     for habitat, slots in player.habitats.items():
         expected_triggers = _expected_habitat_activations(state, player, habitat, turns_remaining)
         for slot in slots:
-            total += _played_power_value(slot, demand, expected_triggers, turns_remaining)
+            total += _played_power_value(
+                slot,
+                demand,
+                expected_triggers,
+                turns_remaining,
+                pink_triggers=_pink_trigger_rate(state, player, slot, turns_remaining),
+                player=player,
+            )
     return total
 
 
@@ -355,6 +514,8 @@ def _played_power_value(
     demand: Counter[FoodType],
     expected_triggers: float,
     turns_remaining: int,
+    pink_triggers: float | None = None,
+    player=None,
 ) -> float:
     power = slot.card.power
     if power.color == PowerColor.NONE or (not power.text and not power.handler_key):
@@ -365,11 +526,12 @@ def _played_power_value(
     if power.color == PowerColor.BROWN:
         return expected_triggers * _per_trigger_power_value(handler_key, lowered, demand, slot)
     if power.color == PowerColor.PINK:
-        return (turns_remaining * 0.35) * _per_trigger_power_value(
-            handler_key,
-            lowered,
-            demand,
-            slot,
+        # Callers without opponent context fall back to the old flat proxy.
+        triggers = (
+            pink_triggers if pink_triggers is not None else turns_remaining * 0.35
+        )
+        return triggers * _per_trigger_power_value(
+            handler_key, lowered, demand, slot, player
         )
     if power.color == PowerColor.TEAL:
         remaining_triggers = _remaining_teal_triggers(turns_remaining)
@@ -381,11 +543,38 @@ def _played_power_value(
     return 0.0
 
 
+def _board_egg_capacity(player, lowered_power_text: str) -> int:
+    """Egg capacity available to a power that lays on *other* birds.
+
+    Powers phrased "lay 1 [egg] on a bird with a [bowl] nest" place the egg
+    elsewhere on the board, so the power card's own capacity is the wrong test.
+    Both brood-parasite cowbirds have `egg_limit` 0 and were therefore valued at
+    exactly zero despite being 5 VP and 3 VP cards with a recurring power.
+    """
+
+    nest_type = None
+    for candidate in ("bowl", "cavity", "ground", "platform"):
+        if f"[{candidate}]" in lowered_power_text:
+            nest_type = candidate
+            break
+    total = 0
+    for played in getattr(player, "played_birds", []):
+        if played.available_egg_capacity <= 0:
+            continue
+        if nest_type is not None:
+            card_nest = played.card.nest_type
+            if card_nest is None or card_nest.value not in {nest_type, "wild"}:
+                continue
+        total += played.available_egg_capacity
+    return total
+
+
 def _per_trigger_power_value(
     handler_key: str | None,
     lowered_power_text: str,
     demand: Counter[FoodType],
     slot: BirdSlot,
+    player=None,
 ) -> float:
     handler_value = _registered_per_trigger_power_value(
         handler_key,
@@ -406,7 +595,14 @@ def _per_trigger_power_value(
     if "draw" in lowered_power_text and "[card]" in lowered_power_text:
         value += 0.55
     if "lay" in lowered_power_text and "[egg]" in lowered_power_text:
-        value += 0.9 if slot.available_egg_capacity > 0 else 0.0
+        targets_other_birds = (
+            "another bird" in lowered_power_text or "nest" in lowered_power_text
+        )
+        if targets_other_birds and player is not None:
+            capacity = _board_egg_capacity(player, lowered_power_text)
+        else:
+            capacity = slot.available_egg_capacity
+        value += 0.9 if capacity > 0 else 0.0
     for food_type in BASE_FOOD_TYPES:
         if f"[{_food_power_token(food_type)}]" in lowered_power_text:
             value += 0.85 if demand.get(food_type, 0) > 0 else 0.25
@@ -612,7 +808,11 @@ def _power_handler_key(
 
 def _estimated_actions_to_play(state: GameState, player: PlayerState, card: BirdCard) -> int:
     food_actions = ceil(_food_deficit(player, card.food_cost) / max(_forest_food_rate(player), 1))
-    open_habitats = [habitat for habitat in card.habitats if len(player.habitats[habitat]) < 5]
+    open_habitats = [
+        habitat
+        for habitat in ordered_habitats(card.habitats)
+        if len(player.habitats[habitat]) < 5
+    ]
     if not open_habitats:
         return 999
     egg_cost = min(egg_cost_for_slot(len(player.habitats[habitat])) for habitat in open_habitats)
@@ -652,12 +852,11 @@ def _forest_food_rate(player: PlayerState) -> int:
 
 
 def _egg_rate(player: PlayerState) -> int:
-    grassland_count = len(player.habitats[Habitat.GRASSLAND])
-    if grassland_count >= 4:
-        return 4
-    if grassland_count >= 2:
-        return 3
-    return 2
+    # Reads the rule rather than duplicating the curve, so a rules change
+    # cannot silently leave the agent valuing a stale yield table.
+    return habitat_action_yield(
+        Habitat.GRASSLAND, len(player.habitats[Habitat.GRASSLAND])
+    )
 
 
 def _expected_habitat_activations(
