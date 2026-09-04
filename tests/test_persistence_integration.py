@@ -107,3 +107,69 @@ class PersistenceIntegrationTests(TestCase):
             parsed = urlparse(uri)
             self.assertEqual(parsed.scheme, "s3")
             client.head_object(Bucket=parsed.netloc, Key=parsed.path.lstrip("/"))
+
+
+@skipUnless(
+    os.getenv("RUN_DB_INTEGRATION") == "1",
+    "set RUN_DB_INTEGRATION=1 to run the live PostgreSQL and MinIO regression test",
+)
+class RoundRobinUploadIntegrationTests(TestCase):
+    """A round robin must actually reach object storage, not merely intend to.
+
+    The unit-level contract lives in tests/test_artifact_upload_contract.py. This
+    is the end-to-end half: it catches a break anywhere between the flow default
+    and bytes landing in the bucket.
+    """
+
+    def test_round_robin_uploads_every_cell_by_default(self) -> None:
+        storage_config = object_storage_config_from_env()
+        self.assertIsNotNone(storage_config, "MinIO credentials are not configured")
+        assert storage_config is not None
+
+        # Imported normally rather than via importlib: round_robin defines
+        # dataclasses, and a module loaded outside sys.modules cannot resolve
+        # its own annotations.
+        from flows import round_robin
+
+        batch_id = f"integration_rr_{uuid4().hex[:12]}"
+        with TemporaryDirectory() as tmp_dir:
+            summary = round_robin.run_round_robin(
+                workbook_path="missing-workbook.xlsx",
+                seeds=[902],
+                player_count=2,
+                roster=["random_legal", "greedy_immediate"],
+                artifact_root=tmp_dir,
+                persist_postgres=False,
+                batch_kind="smoke",
+                batch_label="round_robin_upload_integration",
+                batch_id=batch_id,
+            )
+
+        # Not passing upload_artifacts at all is the case that regressed.
+        provenance = summary["code_provenance"]
+        self.assertIsNotNone(provenance["git_commit"])
+        self.assertIn("reproducible", provenance)
+
+        import boto3
+
+        client = boto3.client(
+            "s3",
+            endpoint_url=storage_config.endpoint_url,
+            aws_access_key_id=storage_config.access_key_id,
+            aws_secret_access_key=storage_config.secret_access_key,
+            region_name=storage_config.region_name,
+        )
+        prefix = f"{storage_config.prefix.strip('/')}/smoke"
+        keys = [
+            obj["Key"]
+            for page in client.get_paginator("list_objects_v2").paginate(
+                Bucket=storage_config.bucket_name, Prefix=prefix
+            )
+            for obj in page.get("Contents", [])
+            if batch_id in obj["Key"]
+        ]
+        self.assertTrue(keys, f"round robin uploaded nothing under {prefix} for {batch_id}")
+        self.assertTrue(
+            any(key.endswith("batch_manifest.json") for key in keys),
+            "expected at least one batch manifest in object storage",
+        )
