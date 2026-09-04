@@ -2,7 +2,11 @@ from collections import Counter
 from unittest import TestCase, skipIf
 
 from wingspan_ai.agents import GreedyBaselineAgent, PotentialPointsAgent, evaluate_state_potential
-from wingspan_ai.agents.potential_points import _pink_trigger_rate, _played_power_value
+from wingspan_ai.agents.potential_points import (
+    _pink_trigger_rate,
+    _played_power_value,
+    _remaining_teal_triggers,
+)
 from wingspan_ai.content import make_sample_catalog
 from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH, load_base_game_content_catalog
 from wingspan_ai.content.schemas import (
@@ -224,9 +228,7 @@ class PinkPowerValuationTests(TestCase):
         cls.predator = next(bird for bird in cls.catalog.birds if bird.predator)
 
     def _state_with(self, pink_card_name: str, opponent_predators: int = 0):
-        state = setup_base_game(
-            self.catalog, player_ids=["player_1", "player_2"], random_seed=1
-        )
+        state = setup_base_game(self.catalog, player_ids=["player_1", "player_2"], random_seed=1)
         me, opponent = state.players
         opponent.action_cubes_available = 8
         opponent.habitats[Habitat.FOREST] = [
@@ -256,9 +258,7 @@ class PinkPowerValuationTests(TestCase):
         state, me, slot = self._state_with("Eastern Kingbird", opponent_predators=0)
         with_room = _pink_trigger_rate(state, me, slot, 8)
 
-        state.players[1].habitats[Habitat.FOREST] = [
-            BirdSlot(card=self.predator) for _ in range(5)
-        ]
+        state.players[1].habitats[Habitat.FOREST] = [BirdSlot(card=self.predator) for _ in range(5)]
         when_full = _pink_trigger_rate(state, me, slot, 8)
 
         self.assertGreater(with_room, 0.0)
@@ -274,9 +274,7 @@ class PinkPowerValuationTests(TestCase):
         bowl_bird = next(
             bird
             for bird in self.catalog.birds
-            if bird.nest_type is not None
-            and bird.nest_type.value == "bowl"
-            and bird.egg_limit > 0
+            if bird.nest_type is not None and bird.nest_type.value == "bowl" and bird.egg_limit > 0
         )
         state, me, slot = self._state_with("Bronzed Cowbird")
         state.players[1].habitats[Habitat.FOREST] = [BirdSlot(card=bowl_bird)]
@@ -285,11 +283,11 @@ class PinkPowerValuationTests(TestCase):
         triggers = _pink_trigger_rate(state, me, slot, 8)
         demand = Counter({FoodType.INVERTEBRATE: 1})
         without_targets = _played_power_value(
-            slot, demand, 3.0, 8, pink_triggers=triggers, player=me
+            slot, demand, 3.0, 8, state.round_state.round_number, pink_triggers=triggers, player=me
         )
         me.habitats[Habitat.GRASSLAND] = [BirdSlot(card=bowl_bird) for _ in range(2)]
         with_targets = _played_power_value(
-            slot, demand, 3.0, 8, pink_triggers=triggers, player=me
+            slot, demand, 3.0, 8, state.round_state.round_number, pink_triggers=triggers, player=me
         )
 
         self.assertEqual(without_targets, 0.0)
@@ -318,9 +316,7 @@ class HabitatYieldValuationTests(TestCase):
         )
 
     def _total_with_forest_birds(self, count: int) -> float:
-        state = setup_base_game(
-            self.catalog, player_ids=["player_1", "player_2"], random_seed=1
-        )
+        state = setup_base_game(self.catalog, player_ids=["player_1", "player_2"], random_seed=1)
         state.players[0].habitats[Habitat.FOREST] = [
             BirdSlot(card=self.plain) for _ in range(count)
         ]
@@ -328,7 +324,7 @@ class HabitatYieldValuationTests(TestCase):
 
     def test_crossing_a_yield_threshold_is_worth_more_than_not_crossing(self) -> None:
         totals = [self._total_with_forest_birds(n) for n in range(5)]
-        crossing = totals[2] - totals[1]   # 1 -> 2 birds unlocks 2 food per action
+        crossing = totals[2] - totals[1]  # 1 -> 2 birds unlocks 2 food per action
         not_crossing = totals[3] - totals[2]  # 2 -> 3 unlocks nothing
 
         self.assertGreater(crossing, not_crossing)
@@ -343,22 +339,14 @@ class HabitatYieldValuationTests(TestCase):
                 self.catalog, player_ids=["player_1", "player_2"], random_seed=1
             )
             player = state.players[0]
-            player.habitats[Habitat.GRASSLAND] = [
-                BirdSlot(card=self.plain) for _ in range(count)
-            ]
-            self.assertEqual(
-                _egg_rate(player), habitat_action_yield(Habitat.GRASSLAND, count)
-            )
+            player.habitats[Habitat.GRASSLAND] = [BirdSlot(card=self.plain) for _ in range(count)]
+            self.assertEqual(_egg_rate(player), habitat_action_yield(Habitat.GRASSLAND, count))
 
     def test_ablation_switch_removes_the_component(self) -> None:
         from wingspan_ai.agents import potential_points as module
 
-        state = setup_base_game(
-            self.catalog, player_ids=["player_1", "player_2"], random_seed=1
-        )
-        state.players[0].habitats[Habitat.FOREST] = [
-            BirdSlot(card=self.plain) for _ in range(4)
-        ]
+        state = setup_base_game(self.catalog, player_ids=["player_1", "player_2"], random_seed=1)
+        state.players[0].habitats[Habitat.FOREST] = [BirdSlot(card=self.plain) for _ in range(4)]
         with_feature = evaluate_state_potential(state, "player_1").habitat_yield_potential
         module.VALUE_HABITAT_YIELD = False
         try:
@@ -368,3 +356,21 @@ class HabitatYieldValuationTests(TestCase):
 
         self.assertGreater(with_feature, 0.0)
         self.assertEqual(without, 0.0)
+
+
+class TealTriggerCountTests(TestCase):
+    """Teal powers fire once per remaining round.
+
+    This was inferred from turns remaining via ceil(turns / 6), but turns per
+    round are 8/7/6/5. It returned 2 in round 1 where the answer is 4, halving
+    the value of teal birds exactly when playing them is most valuable.
+    """
+
+    def test_triggers_count_remaining_rounds(self) -> None:
+        self.assertEqual([_remaining_teal_triggers(r) for r in (1, 2, 3, 4)], [4, 3, 2, 1])
+
+    def test_a_teal_bird_is_worth_more_early_than_late(self) -> None:
+        self.assertGreater(_remaining_teal_triggers(1), _remaining_teal_triggers(4))
+
+    def test_no_triggers_past_the_final_round(self) -> None:
+        self.assertEqual(_remaining_teal_triggers(5), 0)

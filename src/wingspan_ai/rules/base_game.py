@@ -38,6 +38,11 @@ from wingspan_ai.rules.power_registry import (
     MAX_CHAINED_POWER_DEPTH,
     classify_power_handler_key,
 )
+from wingspan_ai.rules.resource_spending import (
+    discard_priority,
+    egg_spend_order,
+    flexible_food_spend_order,
+)
 from wingspan_ai.state.models import (
     BirdfeederState,
     BirdSlot,
@@ -76,6 +81,10 @@ BASE_ACTION_CUBES_BY_ROUND: dict[int, int] = {
     3: 6,
     4: 5,
 }
+
+#: A game is four rounds. Named because turns per round are 8/7/6/5, so round
+#: count cannot be inferred from turns remaining.
+TOTAL_ROUNDS = max(BASE_ACTION_CUBES_BY_ROUND)
 ROUND_GOAL_GREEN_SCORES: dict[int, tuple[int, ...]] = {
     1: (4, 1, 0, 0, 0),
     2: (5, 2, 1, 0, 0),
@@ -646,7 +655,7 @@ def _legal_gain_food_actions(player: PlayerState, state: GameState) -> list[Lega
             )
 
     if _can_spend_card_for_extra_food(player) and actions:
-        discard_card_name = _choose_discard_card_for_food(player)
+        discard_card_name = _choose_discard_card_for_food(player, state)
         extra_actions = []
         for reroll_birdfeeder, dice in _available_birdfeeder_rolls(state, food_count + 1):
             for food_types in _food_choice_tuples(dice, food_count + 1):
@@ -735,7 +744,7 @@ def _apply_play_bird(player: PlayerState, action: LegalAction, state: GameState)
         if card.common_name == action.bird_common_name
     )
     _spend_food_cost(player, card.food_cost)
-    _spend_eggs(player, egg_cost_for_slot(len(player.habitats[action.habitat])))
+    _spend_eggs(player, egg_cost_for_slot(len(player.habitats[action.habitat])), state)
     player.hand.pop(hand_index)
     played_slot = BirdSlot(card=card)
     player.habitats[action.habitat].append(played_slot)
@@ -1010,7 +1019,7 @@ def _resolve_tuck_card_power(
 ) -> None:
     if not player.hand:
         return
-    _discard_card_for_action(player, _choose_discard_card_for_food(player))
+    _discard_card_for_action(player, _choose_discard_card_for_food(player, state))
     slot.tucked_cards += 1
     lowered = power_text.lower()
     if "draw 1 [card]" in lowered:
@@ -1068,7 +1077,7 @@ def _resolve_draw_cards_then_discard_power(
 ) -> None:
     _draw_cards_from_deck(player, state, _draw_count_from_power_text(power_text))
     if player.hand:
-        _discard_card_for_action(player, _choose_discard_card_for_food(player))
+        _discard_card_for_action(player, _choose_discard_card_for_food(player, state))
 
 
 def _resolve_discard_to_tuck_power(
@@ -1403,7 +1412,7 @@ def resolve_opponent_reaction_powers(
                     if f"gain 1 [{_food_power_token(food_type)}]" in lowered:
                         player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
                 if "tuck 1 [card]" in lowered and player.hand:
-                    _discard_card_for_action(player, _choose_discard_card_for_food(player))
+                    _discard_card_for_action(player, _choose_discard_card_for_food(player, state))
                     slot.tucked_cards += 1
 
 
@@ -1541,8 +1550,15 @@ def _roll_birdfeeder_for_state(
     return result
 
 
-def _choose_discard_card_for_food(player: PlayerState) -> str:
-    card = min(player.hand, key=lambda card: (card.victory_points, -card.food_cost.minimum_total))
+def _choose_discard_card_for_food(player: PlayerState, state: GameState | None = None) -> str:
+    """Pick the least useful card in hand.
+
+    Shared by every discard path: paying a card for food, draw-then-discard
+    powers, and discard-to-tuck. Ranking on printed points alone would throw away
+    a cheap bonus-card completion to keep an unaffordable high-point bird.
+    """
+
+    card = min(player.hand, key=lambda card: discard_priority(card, player, state))
     return card.common_name
 
 
@@ -1734,22 +1750,31 @@ def _spend_food_cost(player: PlayerState, food_cost: FoodCost) -> None:
     for food_type, count in food_cost.fixed.items():
         player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) - count
 
+    # Wild and choice costs used to be paid by walking BASE_FOOD_TYPES in
+    # declaration order, so invertebrate was always spent first regardless of
+    # what the player still needed.
     remaining_any_cost = food_cost.wild_food_count + food_cost.choice_food_count
-    for food_type in BASE_FOOD_TYPES:
+    for food_type in flexible_food_spend_order(player, food_cost):
         while remaining_any_cost > 0 and player.food_tokens.get(food_type, 0) > 0:
             player.food_tokens[food_type] -= 1
             remaining_any_cost -= 1
 
 
-def _spend_eggs(player: PlayerState, egg_count: int) -> None:
+def _spend_eggs(player: PlayerState, egg_count: int, state: GameState | None = None) -> None:
+    """Remove eggs, taking the least costly first.
+
+    Traversal used to be habitat-by-habitat in enum order, which could spend the
+    very egg an active round goal was counting.
+    """
+
     remaining = egg_count
-    for habitat in Habitat:
-        for slot in player.habitats[habitat]:
-            if remaining <= 0:
-                return
-            spent = min(slot.eggs, remaining)
-            slot.eggs -= spent
-            remaining -= spent
+    for habitat, slot_index in egg_spend_order(player, state):
+        if remaining <= 0:
+            return
+        slot = player.habitats[habitat][slot_index]
+        spent = min(slot.eggs, remaining)
+        slot.eggs -= spent
+        remaining -= spent
 
 
 def egg_cost_for_slot(slot_index: int) -> int:

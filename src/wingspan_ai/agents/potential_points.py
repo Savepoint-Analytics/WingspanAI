@@ -37,6 +37,7 @@ from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, FoodCost, FoodType, Habitat, PowerColor
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import (
+    TOTAL_ROUNDS,
     apply_action,
     egg_cost_for_slot,
     habitat_action_yield,
@@ -309,7 +310,11 @@ def _playable_bird_potential(
         best_action_cost = _estimated_actions_to_play(state, player, card)
         if best_action_cost > turns_remaining:
             continue
-        candidates.append(_projected_bird_value(card, player, turns_remaining, best_action_cost))
+        candidates.append(
+            _projected_bird_value(
+                card, player, turns_remaining, state.round_state.round_number, best_action_cost
+            )
+        )
 
     candidates.sort(reverse=True)
     max_birds_to_play = max(turns_remaining - 1, 0)
@@ -514,6 +519,7 @@ def _engine_power_potential(
                 demand,
                 expected_triggers,
                 turns_remaining,
+                state.round_state.round_number,
                 pink_triggers=_pink_trigger_rate(state, player, slot, turns_remaining),
                 player=player,
             )
@@ -525,6 +531,7 @@ def _played_power_value(
     demand: Counter[FoodType],
     expected_triggers: float,
     turns_remaining: int,
+    round_number: int,
     pink_triggers: float | None = None,
     player=None,
 ) -> float:
@@ -545,7 +552,7 @@ def _played_power_value(
             handler_key, lowered, demand, slot, player
         )
     if power.color == PowerColor.TEAL:
-        remaining_triggers = _remaining_teal_triggers(turns_remaining)
+        remaining_triggers = _remaining_teal_triggers(round_number)
         return remaining_triggers * _per_trigger_power_value(handler_key, lowered, demand, slot)
     if power.color == PowerColor.YELLOW:
         return _yellow_end_game_power_value(handler_key, lowered, demand, slot, turns_remaining)
@@ -769,15 +776,21 @@ def _projected_bird_value(
     card: BirdCard,
     player: PlayerState,
     turns_remaining: int,
+    round_number: int,
     action_cost: int,
 ) -> float:
     time_weight = max((turns_remaining - action_cost + 1) / max(turns_remaining, 1), 0.0)
-    power_value = _unplayed_power_value(card, player, turns_remaining)
+    power_value = _unplayed_power_value(card, player, turns_remaining, round_number)
     egg_capacity_value = min(card.egg_limit, max(turns_remaining - action_cost, 0) * 0.5) * 0.35
     return (card.victory_points + power_value + egg_capacity_value) * time_weight
 
 
-def _unplayed_power_value(card: BirdCard, player: PlayerState, turns_remaining: int) -> float:
+def _unplayed_power_value(
+    card: BirdCard,
+    player: PlayerState,
+    turns_remaining: int,
+    round_number: int,
+) -> float:
     power = card.power
     if power.color == PowerColor.NONE or (not power.text and not power.handler_key):
         return 0.0
@@ -795,7 +808,7 @@ def _unplayed_power_value(card: BirdCard, player: PlayerState, turns_remaining: 
             turns_remaining,
         )
     if power.color == PowerColor.TEAL:
-        return _remaining_teal_triggers(turns_remaining) * _per_trigger_power_value(
+        return _remaining_teal_triggers(round_number) * _per_trigger_power_value(
             handler_key,
             lowered,
             demand,
@@ -899,10 +912,18 @@ def _expected_habitat_activations(
     return min(float(turns_remaining), turns_remaining * share)
 
 
-def _remaining_teal_triggers(turns_remaining: int) -> int:
-    if turns_remaining <= 0:
-        return 0
-    return min(4, max(1, ceil(turns_remaining / 6)))
+def _remaining_teal_triggers(round_number: int) -> int:
+    """Teal powers fire once at the end of each remaining round.
+
+    This previously inferred rounds from turns remaining via `ceil(turns / 6)`,
+    but turns per round are 8/7/6/5, not 6. It returned 2 in round 1 where the
+    answer is 4, and 2 in round 2 where it is 3 — undervaluing teal powers about
+    twofold in rounds 1-3, which is exactly when playing them is most valuable.
+    The error shrank as the bird became less worth playing, so it systematically
+    discouraged the correct play.
+    """
+
+    return max(0, TOTAL_ROUNDS - round_number + 1)
 
 
 def _round_goal_count(goal_name: str, player: PlayerState) -> int:

@@ -727,6 +727,7 @@ def _opponent_card_value(
                 turns_remaining,
             ),
             turns_remaining,
+            public_state.round_state.round_number,
         )
         for habitat in playable_habitats
     )
