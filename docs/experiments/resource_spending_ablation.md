@@ -41,6 +41,19 @@ paired contrast puts it at -0.100 with p=0.199 — not significant. Recording th
 prediction ahead of the data is what makes that readable as noise rather than as
 a result.
 
+**Correction (2026-09-05).** The p-values in the table above came from an
+unpaired test. Re-running the contrast paired by (lineup, rotation, seed) with
+`analysis/arm_contrast.py` gives `net_value_response` win share -0.100 with
+**p=0.038** and score -1.31 with p=0.270. The score effect is still not
+significant and the per-opponent breakdown is mixed (-4.0 vs
+`archetype_bonus_card_focus`, p=0.07; +1.6 vs `greedy_immediate`), so the
+reading stays "no reliable effect" — but the win-share drop is not the clean
+noise the paragraph above describes. One agent at p=0.04 in a five-agent table
+is also within what multiple comparisons produce. Note that the discovery of a
+dead search parameter in `potential_points`
+([search_depth_experiment.md](search_depth_experiment.md)) does not touch
+`net_value_response`, whose spending logic is separate.
+
 ## The pattern is now the finding
 
 Three faithful modelling improvements, three nulls:

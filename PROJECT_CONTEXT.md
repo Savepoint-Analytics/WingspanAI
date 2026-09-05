@@ -1988,3 +1988,60 @@ The `net_value_response` on-arm win rate looked alarming against the previous ru
 finished. The paired contrast put it at -0.100, p=0.199. Registering the
 prediction ahead of the data is what made it readable as noise instead of as a
 finding.
+
+## Update: 2026-09-05 - First positive result: lookahead depth and coverage
+
+### What changed
+The search-depth experiment ran as planned — `potential_points` at
+`search_depth` 1/2/3/4 and `final_search_turns` 5 (historic) vs 8 (every
+turn), same 200-game counterbalanced design, paired by lineup, rotation and
+seed. Full write-up in `docs/experiments/search_depth_experiment.md`.
+
+Two defects had to be fixed first (commit `5830657`):
+- `search_depth` was a dead parameter. The search returned the leaf value
+  whenever the active player changed, which happens after every action in a
+  multiplayer game, so it was one ply deep regardless of the setting. It now
+  plays opponent turns with the greedy baseline and descends to the next own
+  turn, beam 4.
+- `GameState` copies cloned the whole 180-card deck (47 ms per copy). Content
+  models are now frozen and shared across copies (0.53 ms). The depth-1 arm is
+  bit-identical to the pre-change run in all 200 games.
+
+### Results (paired, n=80 `potential_points` games per arm)
+Depth 1 (historic) 68.28. Depth 2 **+7.06**, depth 3 +7.39, depth 4 +9.81, all
+p<0.001. Searching on every turn instead of the last five cubes of a round:
+depth 2 **+10.54**, depth 3 **+13.55** (win rate 0.738 → 0.925). Every
+opponent loses ground. Depth 2→3 is flat on the last-five trigger (+0.33,
+p=0.74) but +3.0 (p=0.005) on every turn, and depth 3→4 is +2.4 (p=0.018), so
+depth is not saturated; the gain depends on where the trigger places the leaves.
+
+Points come from bird points and round goals with depth, and from eggs,
+cached food, tucked cards and bonus cards with coverage. Draw share falls from
+29% to 24.5% as search grows.
+
+### Why it matters
+After three valuation-fidelity nulls, this is the first intervention that moves
+these agents, and it moves them by more than the whole spread between the
+historic agents. The three nulls were measured on an agent whose search was
+one ply; whether valuation fidelity matters *given* real search is reopened,
+not settled.
+
+### Decision
+- Agent defaults unchanged (`search_depth=3`, `final_search_turns=5`) until the
+  determinization test runs; manifests now record the search configuration.
+- The result is an **upper bound** on the planning benefit: the search applies
+  real actions to the full state, so it sees the true next deck card and the
+  opponent's actual hidden hand. Draws falling with search is evidence against
+  the deck-peek explanation, but not proof.
+- Per-game timings are not reported; arms shared the machine unevenly.
+
+### Follow-up tasks
+1. Determinized search (shuffle unseen deck, re-sample opponent hand per
+   branch, seeded from the state hash); re-run depth 3 every turn. Success
+   criterion: gain vs depth 1 survives at p<0.05, or the leak is quantified.
+2. Game-horizon evaluator ablation (`_turns_remaining_for_player` returns the
+   round's remaining cubes, not the game's).
+3. Re-run the feeder-odds ablation on the searching agent.
+4. Resource-spending doc corrected: `net_value_response` win-share drop is
+   p=0.038 paired (the table's p=0.199 was unpaired); score p=0.27; reading
+   unchanged.
