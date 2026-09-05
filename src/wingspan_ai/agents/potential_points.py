@@ -28,6 +28,7 @@ from dataclasses import asdict, dataclass, field
 from math import ceil
 
 from wingspan_ai.agents.feeder_odds import food_power_availability_multiplier
+from wingspan_ai.agents.greedy import GreedyBaselineAgent
 from wingspan_ai.agents.setup import PotentialPointsSetupPolicy, SetupPolicyMixin
 from wingspan_ai.content.birdfeeder import (
     BIRDFEEDER_DICE_COUNT,
@@ -39,6 +40,7 @@ from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import (
     TOTAL_ROUNDS,
     apply_action,
+    apply_action_in_place,
     egg_cost_for_slot,
     habitat_action_yield,
     legal_actions_for_current_player,
@@ -107,6 +109,22 @@ class ActionPotentialEvaluation:
         }
 
 
+#: Own-turn branches kept per ply below the root of the endgame search.
+DEFAULT_SEARCH_BEAM_WIDTH: int | None = 4
+
+
+@dataclass(frozen=True)
+class PotentialPointsSearchConfig:
+    """Endgame-search settings, threaded through batch flows and manifests."""
+
+    search_depth: int = 3
+    final_search_turns: int = 5
+    search_beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH
+
+    def as_manifest_payload(self) -> dict:
+        return asdict(self)
+
+
 @dataclass
 class PotentialPointsAgent(SetupPolicyMixin):
     """Choose actions by estimated final-score potential instead of current points only."""
@@ -118,6 +136,9 @@ class PotentialPointsAgent(SetupPolicyMixin):
     agent_id: str = "potential_points"
     final_search_turns: int = 5
     search_depth: int = 3
+    #: Own-turn branches kept at each ply below the root. The root is never
+    #: pruned. ``None`` searches every branch.
+    search_beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH
     top_alternatives: int = 5
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
@@ -205,13 +226,15 @@ class PotentialPointsAgent(SetupPolicyMixin):
         legal_actions: list[LegalAction],
     ) -> LegalAction:
         player_id = state.active_player.player_id
+        depth = min(self.search_depth, _turns_remaining_for_player(state, player_id))
         scored_actions = [
             (
                 _search_action_value(
                     state,
                     action,
                     player_id,
-                    depth=min(self.search_depth, _turns_remaining_for_player(state, player_id)),
+                    depth=depth,
+                    beam_width=self.search_beam_width,
                 ),
                 action,
             )
@@ -267,25 +290,75 @@ def evaluate_state_potential(state: GameState, player_id: str) -> PotentialValue
     )
 
 
+#: Opponent turns inside the search are played by the greedy baseline. It is
+#: deterministic, needs no RNG stream, and sits mid-roster in strength, so the
+#: search sees the tray and feeder contention it exists to plan around. A
+#: pass-through opponent would be cheaper but blind to that contention.
+_SEARCH_OPPONENT_MODEL = GreedyBaselineAgent(agent_id="search_opponent_model")
+
+
 def _search_action_value(
     state: GameState,
     action: LegalAction,
     player_id: str,
     depth: int,
+    beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH,
 ) -> float:
+    """Best planning value reachable from ``action`` within ``depth`` own turns.
+
+    Until 2026-09-04 this returned the leaf value whenever the active player
+    changed. ``apply_action`` always advances the turn, so in every multiplayer
+    game the recursion stopped after one ply and ``search_depth`` had no effect.
+    Opponent turns are now played out with ``_SEARCH_OPPONENT_MODEL`` on the
+    owned branch before descending to the next own turn.
+    """
+
     next_state = apply_action(state, action)
-    if depth <= 1 or next_state.round_state.game_over:
-        return _terminal_planning_value(next_state, player_id)
-    player = _get_player(next_state, player_id)
-    if next_state.active_player.player_id != player_id or player.action_cubes_available <= 0:
-        return _terminal_planning_value(next_state, player_id)
-    legal_actions = legal_actions_for_current_player(next_state)
+    return _search_value_from_branch(next_state, player_id, depth, beam_width)
+
+
+def _search_value_from_branch(
+    branch: GameState,
+    player_id: str,
+    depth: int,
+    beam_width: int | None,
+) -> float:
+    if depth <= 1 or branch.round_state.game_over:
+        return _terminal_planning_value(branch, player_id)
+    _play_opponent_turns_in_place(branch, player_id)
+    player = _get_player(branch, player_id)
+    if (
+        branch.round_state.game_over
+        or branch.active_player.player_id != player_id
+        or player.action_cubes_available <= 0
+    ):
+        return _terminal_planning_value(branch, player_id)
+    legal_actions = legal_actions_for_current_player(branch)
     if not legal_actions:
-        return _terminal_planning_value(next_state, player_id)
+        return _terminal_planning_value(branch, player_id)
+
+    children = [apply_action(branch, next_action) for next_action in legal_actions]
+    leaf_values = [_terminal_planning_value(child, player_id) for child in children]
+    if depth - 1 <= 1:
+        return max(leaf_values)
+    ranked = sorted(zip(leaf_values, children, strict=True), key=lambda item: item[0], reverse=True)
+    if beam_width is not None:
+        ranked = ranked[:beam_width]
     return max(
-        _search_action_value(next_state, next_action, player_id, depth - 1)
-        for next_action in legal_actions
+        _search_value_from_branch(child, player_id, depth - 1, beam_width)
+        for _leaf_value, child in ranked
     )
+
+
+def _play_opponent_turns_in_place(branch: GameState, player_id: str) -> None:
+    """Advance an owned branch through opponent turns until ``player_id`` acts."""
+
+    while not branch.round_state.game_over and branch.active_player.player_id != player_id:
+        legal_actions = legal_actions_for_current_player(branch)
+        if not legal_actions:
+            return
+        chosen = _SEARCH_OPPONENT_MODEL.select_action(branch, legal_actions)
+        apply_action_in_place(branch, chosen)
 
 
 def _terminal_planning_value(state: GameState, player_id: str) -> float:
@@ -402,8 +475,7 @@ def _pink_trigger_rate(
     if "[predator]" in text and "succeed" in text:
         # Pays out only when an opponent's played predator hunts and hits.
         predators = sum(
-            1 for opponent in opponents for played in opponent.played_birds
-            if played.card.predator
+            1 for opponent in opponents for played in opponent.played_birds if played.card.predator
         )
         if predators == 0:
             return 0.0
@@ -545,12 +617,8 @@ def _played_power_value(
         return expected_triggers * _per_trigger_power_value(handler_key, lowered, demand, slot)
     if power.color == PowerColor.PINK:
         # Callers without opponent context fall back to the old flat proxy.
-        triggers = (
-            pink_triggers if pink_triggers is not None else turns_remaining * 0.35
-        )
-        return triggers * _per_trigger_power_value(
-            handler_key, lowered, demand, slot, player
-        )
+        triggers = pink_triggers if pink_triggers is not None else turns_remaining * 0.35
+        return triggers * _per_trigger_power_value(handler_key, lowered, demand, slot, player)
     if power.color == PowerColor.TEAL:
         remaining_triggers = _remaining_teal_triggers(round_number)
         return remaining_triggers * _per_trigger_power_value(handler_key, lowered, demand, slot)
@@ -613,9 +681,7 @@ def _per_trigger_power_value(
     if "draw" in lowered_power_text and "[card]" in lowered_power_text:
         value += 0.55
     if "lay" in lowered_power_text and "[egg]" in lowered_power_text:
-        targets_other_birds = (
-            "another bird" in lowered_power_text or "nest" in lowered_power_text
-        )
+        targets_other_birds = "another bird" in lowered_power_text or "nest" in lowered_power_text
         if targets_other_birds and player is not None:
             capacity = _board_egg_capacity(player, lowered_power_text)
         else:
@@ -815,18 +881,26 @@ def _unplayed_power_value(
             BirdSlot(card=card),
         )
     if power.color == PowerColor.BROWN:
-        return min(turns_remaining, 4) * 0.35 * _per_trigger_power_value(
-            handler_key,
-            lowered,
-            demand,
-            BirdSlot(card=card),
+        return (
+            min(turns_remaining, 4)
+            * 0.35
+            * _per_trigger_power_value(
+                handler_key,
+                lowered,
+                demand,
+                BirdSlot(card=card),
+            )
         )
     if power.color == PowerColor.PINK:
-        return turns_remaining * 0.15 * _per_trigger_power_value(
-            handler_key,
-            lowered,
-            demand,
-            BirdSlot(card=card),
+        return (
+            turns_remaining
+            * 0.15
+            * _per_trigger_power_value(
+                handler_key,
+                lowered,
+                demand,
+                BirdSlot(card=card),
+            )
         )
     return 0.0
 
@@ -842,9 +916,7 @@ def _power_handler_key(
 def _estimated_actions_to_play(state: GameState, player: PlayerState, card: BirdCard) -> int:
     food_actions = ceil(_food_deficit(player, card.food_cost) / max(_forest_food_rate(player), 1))
     open_habitats = [
-        habitat
-        for habitat in ordered_habitats(card.habitats)
-        if len(player.habitats[habitat]) < 5
+        habitat for habitat in ordered_habitats(card.habitats) if len(player.habitats[habitat]) < 5
     ]
     if not open_habitats:
         return 999
@@ -887,9 +959,7 @@ def _forest_food_rate(player: PlayerState) -> int:
 def _egg_rate(player: PlayerState) -> int:
     # Reads the rule rather than duplicating the curve, so a rules change
     # cannot silently leave the agent valuing a stale yield table.
-    return habitat_action_yield(
-        Habitat.GRASSLAND, len(player.habitats[Habitat.GRASSLAND])
-    )
+    return habitat_action_yield(Habitat.GRASSLAND, len(player.habitats[Habitat.GRASSLAND]))
 
 
 def _expected_habitat_activations(

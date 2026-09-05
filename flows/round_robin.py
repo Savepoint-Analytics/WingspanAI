@@ -57,6 +57,7 @@ from flows.simulation_batch import (
     flow,
     run_simulation_batch,
 )
+from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
 from wingspan_ai.config import load_dotenv
 from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH
 from wingspan_ai.provenance import code_provenance
@@ -416,6 +417,7 @@ def run_round_robin(
     net_value_max_candidate_actions: int | None = 5,
     net_value_max_opponent_response_actions: int | None = 3,
     net_value_response_mode: str = "expected",
+    potential_points_search: PotentialPointsSearchConfig | None = None,
 ) -> dict[str, Any]:
     """Run every agent lineup in every seat rotation across the setup factor.
 
@@ -465,6 +467,7 @@ def run_round_robin(
                 net_value_max_candidate_actions=net_value_max_candidate_actions,
                 net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
                 net_value_response_mode=net_value_response_mode,
+                potential_points_search=potential_points_search,
             )
         )
 
@@ -484,6 +487,11 @@ def run_round_robin(
             "seat_counterbalanced": True,
             "power_status_filter": power_status_filter,
             "excluded_power_handler_keys": excluded_power_handler_keys,
+            "potential_points_search": (
+                potential_points_search.as_manifest_payload()
+                if potential_points_search is not None
+                else None
+            ),
             "setup_policy_effect": summarize_setup_policy_effect(summary),
         }
     )

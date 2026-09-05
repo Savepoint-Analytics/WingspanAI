@@ -57,3 +57,40 @@ class ContentSchemaTests(TestCase):
                 automa_enabled=True,
             )
 
+
+def _sample_bird_card() -> BirdCard:
+    return BirdCard(
+        common_name="American Robin",
+        scientific_name="Turdus migratorius",
+        content_pack=ContentPack.CORE,
+        habitats={Habitat.WETLAND, Habitat.FOREST, Habitat.GRASSLAND},
+        food_cost=FoodCost(fixed={FoodType.INVERTEBRATE: 1, FoodType.FRUIT: 1}),
+        victory_points=1,
+        nest_type=NestType.BOWL,
+        egg_limit=4,
+        wingspan_cm=31,
+        bonus_card_tags={"Photographer", "Anatomist", "Historian"},
+        power=Power(color=PowerColor.BROWN, text="Example brown power."),
+    )
+
+
+class ImmutableContentTests(TestCase):
+    """Content is frozen and shared across state copies, never cloned."""
+
+    def test_bird_card_is_frozen(self) -> None:
+        card = _sample_bird_card()
+        with self.assertRaises(ValidationError):
+            card.victory_points = 99  # type: ignore[misc]
+
+    def test_deep_copy_returns_the_same_object(self) -> None:
+        import copy
+
+        card = _sample_bird_card()
+        self.assertIs(copy.deepcopy(card), card)
+        self.assertIs(copy.deepcopy([card])[0], card)
+
+    def test_set_fields_serialize_sorted(self) -> None:
+        card = _sample_bird_card()
+        payload = card.model_dump(mode="json")
+        self.assertEqual(payload["bonus_card_tags"], sorted(card.bonus_card_tags))
+        self.assertEqual(payload["habitats"], sorted(h.value for h in card.habitats))

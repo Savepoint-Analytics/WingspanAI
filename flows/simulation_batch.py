@@ -21,6 +21,7 @@ from wingspan_ai.agents import (
     StrategyArchetypeAgent,
     load_guardrail_config,
 )
+from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
 from wingspan_ai.agents.setup import (
     ArchetypeSetupPolicy,
     DefaultSetupPolicy,
@@ -132,6 +133,7 @@ def run_seeded_game(
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
     net_value_response_mode: str = "expected",
+    potential_points_search: PotentialPointsSearchConfig | None = None,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch."""
 
@@ -181,6 +183,7 @@ def run_seeded_game(
             net_value_max_candidate_actions=net_value_max_candidate_actions,
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
             net_value_response_mode=net_value_response_mode,
+            potential_points_search=potential_points_search,
         )
         if guardrail_config is None or seat not in guardrail_seats:
             return base_agent
@@ -258,6 +261,7 @@ def run_seeded_game(
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "net_value_response_mode": net_value_response_mode,
+        "potential_points_search": _search_payload(potential_points_search),
         "replay_validation": replay_validation_payload,
         "rule_audits": rule_audits,
     }
@@ -397,6 +401,12 @@ def _apply_setup_policy(agent, agent_kind: PlayerTwoAgentKind, setup_policy_kind
     return agent
 
 
+def _search_payload(config: PotentialPointsSearchConfig | None) -> dict | None:
+    """Manifest form of the potential-points search settings; None means agent defaults."""
+
+    return config.as_manifest_payload() if config is not None else None
+
+
 def _make_agent(
     agent_kind: PlayerTwoAgentKind,
     *,
@@ -410,6 +420,7 @@ def _make_agent(
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
     net_value_response_mode: str = "expected",
+    potential_points_search: PotentialPointsSearchConfig | None = None,
     guardrail_config_path: str | None = None,
 ):
     # A "guardrailed:" prefix wraps the base agent in its own guardrail layer,
@@ -435,7 +446,13 @@ def _make_agent(
     if agent_kind == "random_legal":
         agent = RandomLegalAgent(agent_id=f"random_legal_{seat}", random_seed=agent_random_seed)
     elif agent_kind == "potential_points":
-        agent = PotentialPointsAgent(agent_id=f"potential_points_{seat}")
+        search = potential_points_search or PotentialPointsSearchConfig()
+        agent = PotentialPointsAgent(
+            agent_id=f"potential_points_{seat}",
+            search_depth=search.search_depth,
+            final_search_turns=search.final_search_turns,
+            search_beam_width=search.search_beam_width,
+        )
     elif agent_kind == "net_value_response":
         agent = NetValueOpponentResponseAgent(
             agent_id=f"net_value_response_{seat}",
@@ -558,6 +575,7 @@ def _write_batch_manifest(
     monte_carlo_max_candidate_actions: int | None,
     net_value_max_candidate_actions: int | None,
     net_value_max_opponent_response_actions: int | None,
+    potential_points_search: PotentialPointsSearchConfig | None = None,
 ) -> Path:
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -585,6 +603,7 @@ def _write_batch_manifest(
         "monte_carlo_max_candidate_actions": monte_carlo_max_candidate_actions,
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
+        "potential_points_search": _search_payload(potential_points_search),
         "guardrail_config_names": sorted(
             {
                 result["guardrail_config_name"]
@@ -673,6 +692,7 @@ def run_simulation_batch(
     net_value_max_candidate_actions: int | None = 12,
     net_value_max_opponent_response_actions: int | None = 8,
     net_value_response_mode: str = "expected",
+    potential_points_search: PotentialPointsSearchConfig | None = None,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -709,6 +729,7 @@ def run_simulation_batch(
             net_value_max_candidate_actions=net_value_max_candidate_actions,
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
             net_value_response_mode=net_value_response_mode,
+            potential_points_search=potential_points_search,
         )
         for seed in resolved_seeds
     ]
@@ -740,6 +761,7 @@ def run_simulation_batch(
             monte_carlo_max_candidate_actions=monte_carlo_max_candidate_actions,
             net_value_max_candidate_actions=net_value_max_candidate_actions,
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
+            potential_points_search=potential_points_search,
         )
         storage_config = object_storage_config_from_env()
         should_upload_manifest = (

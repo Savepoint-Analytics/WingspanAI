@@ -374,3 +374,107 @@ class TealTriggerCountTests(TestCase):
 
     def test_no_triggers_past_the_final_round(self) -> None:
         self.assertEqual(_remaining_teal_triggers(5), 0)
+
+
+class EndgameSearchDepthTests(TestCase):
+    """The endgame search must actually descend through opponent turns.
+
+    Until 2026-09-04 the recursion stopped whenever the active player changed,
+    which is after every action in a multiplayer game, so `search_depth` was a
+    dead parameter. These tests pin the repaired behaviour.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = make_sample_catalog()
+
+    def _two_player_state(self):
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=7)
+        return state, state.active_player.player_id
+
+    def test_depth_two_descends_into_a_second_own_turn(self) -> None:
+        from unittest.mock import patch
+
+        import wingspan_ai.agents.potential_points as module
+
+        state, player_id = self._two_player_state()
+        action = legal_actions_for_current_player(state)[0]
+        depths_seen: list[int] = []
+        original = module._search_value_from_branch
+
+        def recording(branch, pid, depth, beam_width):
+            depths_seen.append(depth)
+            return original(branch, pid, depth, beam_width)
+
+        with patch.object(module, "_search_value_from_branch", recording):
+            module._search_action_value(state, action, player_id, depth=3, beam_width=2)
+
+        self.assertIn(2, depths_seen, "search never reached a second own turn")
+
+    def test_opponent_turns_are_played_before_the_next_own_turn(self) -> None:
+        from wingspan_ai.agents.potential_points import _play_opponent_turns_in_place
+        from wingspan_ai.rules.base_game import apply_action
+
+        state, player_id = self._two_player_state()
+        branch = apply_action(state, legal_actions_for_current_player(state)[0])
+        self.assertNotEqual(branch.active_player.player_id, player_id)
+        opponent_cubes_before = branch.active_player.action_cubes_available
+
+        _play_opponent_turns_in_place(branch, player_id)
+
+        self.assertEqual(branch.active_player.player_id, player_id)
+        opponent = next(p for p in branch.players if p.player_id != player_id)
+        self.assertEqual(opponent.action_cubes_available, opponent_cubes_before - 1)
+
+    def test_depth_one_matches_the_one_ply_evaluator(self) -> None:
+        from wingspan_ai.agents.potential_points import (
+            _search_action_value,
+            _terminal_planning_value,
+        )
+        from wingspan_ai.rules.base_game import apply_action
+
+        state, player_id = self._two_player_state()
+        for action in legal_actions_for_current_player(state)[:5]:
+            expected = _terminal_planning_value(apply_action(state, action), player_id)
+            self.assertEqual(_search_action_value(state, action, player_id, depth=1), expected)
+
+    def test_deeper_search_is_never_worse_than_its_own_beam_leaf_bound(self) -> None:
+        """A depth-2 value is a max over real continuations, so it cannot fall
+        below the leaf value of any own-turn continuation kept in the beam."""
+
+        from wingspan_ai.agents.potential_points import (
+            _play_opponent_turns_in_place,
+            _search_action_value,
+            _terminal_planning_value,
+        )
+        from wingspan_ai.rules.base_game import apply_action
+
+        state, player_id = self._two_player_state()
+        action = legal_actions_for_current_player(state)[0]
+        deep_value = _search_action_value(state, action, player_id, depth=2, beam_width=None)
+
+        branch = apply_action(state, action)
+        _play_opponent_turns_in_place(branch, player_id)
+        leaf_values = [
+            _terminal_planning_value(apply_action(branch, follow_up), player_id)
+            for follow_up in legal_actions_for_current_player(branch)
+        ]
+        self.assertEqual(deep_value, max(leaf_values))
+
+    def test_search_config_round_trips_through_the_agent(self) -> None:
+        from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
+
+        config = PotentialPointsSearchConfig(
+            search_depth=2, final_search_turns=8, search_beam_width=3
+        )
+        agent = PotentialPointsAgent(
+            search_depth=config.search_depth,
+            final_search_turns=config.final_search_turns,
+            search_beam_width=config.search_beam_width,
+        )
+        self.assertEqual(agent.search_depth, 2)
+        self.assertEqual(agent.search_beam_width, 3)
+        self.assertEqual(
+            config.as_manifest_payload(),
+            {"search_depth": 2, "final_search_turns": 8, "search_beam_width": 3},
+        )

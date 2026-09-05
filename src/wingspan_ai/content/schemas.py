@@ -7,7 +7,14 @@ workbook column names and parsing rules belong in loader/audit modules.
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_serializer,
+    field_validator,
+    model_validator,
+)
 
 NonEmptyString = Annotated[str, Field(min_length=1)]
 
@@ -105,10 +112,28 @@ class PowerImplementationStatus(StrEnum):
     MUST_IMPLEMENT_BEFORE_EXPERIMENT = "must_implement_before_experiment"
 
 
-class FoodCost(BaseModel):
-    """Normalized food cost for playing a bird."""
+class ImmutableContent(BaseModel):
+    """Base for game content that never changes after loading.
 
-    model_config = ConfigDict(extra="forbid")
+    Content is shared, not copied: the state deep-copies on every transition,
+    and cloning the 180-card deck each time dominated transition cost. Frozen
+    models make the sharing safe; ``__deepcopy__`` returning ``self`` makes it
+    happen. Set-valued fields serialize sorted so canonical state JSON is stable
+    across copies.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    def __deepcopy__(self, memo: dict | None = None) -> "ImmutableContent":
+        return self
+
+
+def _sorted_values(value: object) -> object:
+    return sorted(value) if isinstance(value, set | frozenset) else value
+
+
+class FoodCost(ImmutableContent):
+    """Normalized food cost for playing a bird."""
 
     fixed: dict[FoodType, int] = Field(default_factory=dict)
     wild_food_count: int = Field(default=0, ge=0)
@@ -131,10 +156,8 @@ class FoodCost(BaseModel):
         return sum(self.fixed.values()) + self.wild_food_count + self.choice_food_count
 
 
-class Power(BaseModel):
+class Power(ImmutableContent):
     """Bird power text plus implementation metadata."""
-
-    model_config = ConfigDict(extra="forbid")
 
     color: PowerColor
     text: str | None = None
@@ -150,10 +173,8 @@ class Power(BaseModel):
         return self
 
 
-class BirdCard(BaseModel):
+class BirdCard(ImmutableContent):
     """Normalized bird card content needed by the simulator."""
-
-    model_config = ConfigDict(extra="forbid")
 
     common_name: NonEmptyString
     scientific_name: NonEmptyString
@@ -176,6 +197,10 @@ class BirdCard(BaseModel):
     bonus_card_tags: set[str] = Field(default_factory=set)
     source_row: int | None = Field(default=None, ge=1)
 
+    @field_serializer("habitats", "geography", "bonus_card_tags")
+    def _serialize_sorted(self, value: object) -> object:
+        return _sorted_values(value)
+
     @field_validator("habitats")
     @classmethod
     def require_at_least_one_habitat(cls, value: set[Habitat]) -> set[Habitat]:
@@ -190,10 +215,8 @@ class BirdCard(BaseModel):
         return self
 
 
-class BonusCard(BaseModel):
+class BonusCard(ImmutableContent):
     """Normalized bonus-card scoring definition."""
-
-    model_config = ConfigDict(extra="forbid")
 
     name: NonEmptyString
     content_packs: set[ContentPack]
@@ -206,6 +229,10 @@ class BonusCard(BaseModel):
     handler_key: str | None = None
     source_row: int | None = Field(default=None, ge=1)
 
+    @field_serializer("content_packs")
+    def _serialize_sorted(self, value: object) -> object:
+        return _sorted_values(value)
+
     @field_validator("content_packs")
     @classmethod
     def require_content_pack(cls, value: set[ContentPack]) -> set[ContentPack]:
@@ -214,10 +241,8 @@ class BonusCard(BaseModel):
         return value
 
 
-class RoundGoal(BaseModel):
+class RoundGoal(ImmutableContent):
     """End-of-round or map-style goal definition."""
-
-    model_config = ConfigDict(extra="forbid")
 
     name: NonEmptyString
     content_pack: ContentPack
