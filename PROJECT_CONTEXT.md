@@ -1952,3 +1952,39 @@ distribution change without edits; four significant seat findings that were all
 artifacts. That is an engineering and methods case study, not a research
 contribution, and should be labelled as such. Publishing anything using Wingspan
 card data needs legal review first.
+
+---
+
+## Update: 2026-09-04 - Third null, and the pattern becomes the finding
+
+`VALUE_RESOURCE_SPENDING` on versus off, 200 games per arm: pooled average score
+59.39 vs 59.22, **delta +0.17 (p=0.886)**. No agent moves significantly. Full
+write-up in `docs/experiments/resource_spending_ablation.md`.
+
+Three faithful modelling improvements have now measured null in a row —
+mat-scaling valuation, feeder odds with the corrected six-face die, and
+resource-spending selection. Each closed a real gap. One of them fixed an
+outright scoring defect: eggs were spent in `Habitat` enum order and could take
+the exact egg an active round goal was counting. Even that did not move play.
+
+**Standing conclusion:** these heuristic agents are not limited by the fidelity
+of their resource valuation. "Add more domain knowledge to the evaluation
+function" is no longer a defensible default. Further fidelity work should be
+justified on correctness grounds alone, and any future valuation term should be
+built behind an ablation switch with the explicit prior that it lands null.
+
+The alternative hypothesis is untested: strength may live in search depth,
+opponent modelling, or the structure of action selection. That is the next
+experiment.
+
+Bounds worth keeping attached to the claim: at 200 paired units the detection
+limit is about 1.9 points, so this bounds the effect as small rather than proving
+it zero; and all three ablations used the same five-agent roster at two players,
+so a term mattering only at higher player counts would not have shown up.
+
+### Method note that worked
+The `net_value_response` on-arm win rate looked alarming against the previous run
+(0.362 vs 0.463) and was flagged as probably noise **before** the off-arm
+finished. The paired contrast put it at -0.100, p=0.199. Registering the
+prediction ahead of the data is what made it readable as noise instead of as a
+finding.

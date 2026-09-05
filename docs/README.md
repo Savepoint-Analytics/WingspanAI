@@ -37,6 +37,7 @@ Key rules docs:
 - `experiments/round_robin_v2.md`: agent-vs-agent ranking on the corrected simulator (200 games).
 - `experiments/round_robin_v1.md`: (superseded) first seat-swapped agent-vs-agent round robin (200 games).
 - `experiments/bonus_card_selection_study_plan.md`: which bonus cards to keep at setup, and when.
+- `experiments/resource_spending_ablation.md`: the third null, and why the pattern is the finding.
 - `experiments/round_robin_v5_feeder_odds.md`: corrected dice, and the feeder-odds ablation (null).
 - `experiments/seat_effect_power_analysis.md`: how big a seat effect this design can detect, computed from measured variance.
 - `experiments/seat_order_four_player_test.md`: the four-player test, and why seat claims need a stability check.
