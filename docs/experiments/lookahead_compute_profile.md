@@ -1,10 +1,37 @@
 # Lookahead Compute Profile
 
-Status: second profiling pass, 2026-08-29
+Status: third profiling pass, 2026-09-04
 
 ## Purpose
 
 Lookahead-heavy agents repeatedly call `apply_action`, so their scaling depends on transition cost. This profile was added before attempting any 50-100 seed matrix.
+
+## Content Sharing (2026-09-04)
+
+Re-measured before the search-depth experiment, a single `GameState` deep copy
+took **47 ms** on a representative mid-game state, six times the figure below.
+The cause was the deck: `DeckState.bird_deck` holds 180 full `BirdCard` models
+and every copy cloned all of them.
+
+Content never changes after loading, so `BirdCard`, `BonusCard`, `RoundGoal`,
+`FoodCost` and `Power` are now frozen and return `self` from `__deepcopy__`.
+Copies share cards instead of cloning them.
+
+| Copy strategy | Before | After |
+|---|---:|---:|
+| `model_copy(deep=True)` | 47.02 ms | **0.53 ms** |
+| `copy.deepcopy` | 48.40 ms | 0.44 ms |
+| pickle round-trip | 25.84 ms | 32.45 ms |
+| `model_validate(model_dump())` | 32.52 ms | 35.95 ms |
+
+A depth-1 `potential_points` game against `greedy_immediate` (seed 1) went from
+63 s to 8 s with an identical outcome. The same measurement also exposed that
+`canonical_state_json` was not canonical: set-valued card fields serialized in
+iteration order, which differs between a set and its copy. Those fields now
+serialize sorted.
+
+The earlier figures below are kept for the record; every absolute number in
+them is now roughly 90x smaller.
 
 ## Apply Action Profile
 
