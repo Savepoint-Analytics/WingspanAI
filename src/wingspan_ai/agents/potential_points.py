@@ -27,6 +27,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass, field
 from math import ceil
 
+from wingspan_ai.agents.determinization import determinize_state
 from wingspan_ai.agents.feeder_odds import food_power_availability_multiplier
 from wingspan_ai.agents.greedy import GreedyBaselineAgent
 from wingspan_ai.agents.setup import PotentialPointsSetupPolicy, SetupPolicyMixin
@@ -120,6 +121,9 @@ class PotentialPointsSearchConfig:
     search_depth: int = 3
     final_search_turns: int = 5
     search_beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH
+    #: Hidden-information samples averaged per decision. ``0`` evaluates the
+    #: true state, which lets the search read the deck and opponents' hands.
+    determinization_samples: int = 0
 
     def as_manifest_payload(self) -> dict:
         return asdict(self)
@@ -139,28 +143,69 @@ class PotentialPointsAgent(SetupPolicyMixin):
     #: Own-turn branches kept at each ply below the root. The root is never
     #: pruned. ``None`` searches every branch.
     search_beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH
+    #: Hidden-information samples averaged per decision (see
+    #: ``wingspan_ai.agents.determinization``). ``0`` scores the true state.
+    determinization_samples: int = 0
     top_alternatives: int = 5
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
         if not legal_actions:
             raise ValueError("PotentialPointsAgent cannot select from an empty action list")
 
-        turns_remaining = _turns_remaining_for_player(
-            state,
-            state.active_player.player_id,
-        )
-        if turns_remaining <= self.final_search_turns:
-            return self._select_with_endgame_search(state, legal_actions)
-
-        evaluations = self.evaluate_actions(state, legal_actions)
+        player_id = state.active_player.player_id
+        if self.determinization_samples > 0:
+            samples = [
+                determinize_state(state, player_id, sample_index)
+                for sample_index in range(self.determinization_samples)
+            ]
+            per_sample = [self._score_actions(sample, legal_actions) for sample in samples]
+            scores = [
+                (
+                    sum(sample_scores[index][0] for sample_scores in per_sample) / len(samples),
+                    sum(sample_scores[index][1] for sample_scores in per_sample) / len(samples),
+                )
+                for index in range(len(legal_actions))
+            ]
+        else:
+            scores = self._score_actions(state, legal_actions)
         return max(
-            evaluations,
-            key=lambda item: (
-                item.value_delta,
-                item.realized_delta,
-                _action_priority(item.action),
-            ),
-        ).action
+            zip(scores, legal_actions, strict=True),
+            key=lambda item: (item[0][0], item[0][1], _action_priority(item[1])),
+        )[1]
+
+    def _score_actions(
+        self,
+        state: GameState,
+        legal_actions: list[LegalAction],
+    ) -> list[tuple[float, float]]:
+        """Score each action as ``(primary, tie_break)`` on one fully specified state.
+
+        Inside the endgame-search window the primary value is the search value
+        and the tie-break the immediate score delta; outside it, the potential
+        delta and the realized-score delta. The same scores drive both the
+        true-state and the determinized paths.
+        """
+
+        player_id = state.active_player.player_id
+        if _turns_remaining_for_player(state, player_id) <= self.final_search_turns:
+            depth = min(self.search_depth, _turns_remaining_for_player(state, player_id))
+            return [
+                (
+                    _search_action_value(
+                        state,
+                        action,
+                        player_id,
+                        depth=depth,
+                        beam_width=self.search_beam_width,
+                    ),
+                    _immediate_score_delta(state, action, player_id),
+                )
+                for action in legal_actions
+            ]
+        return [
+            (evaluation.value_delta, evaluation.realized_delta)
+            for evaluation in self.evaluate_actions(state, legal_actions)
+        ]
 
     def choose_action(self, state: GameState) -> LegalAction:
         return self.select_action(state, legal_actions_for_current_player(state))
@@ -218,36 +263,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
                 state.active_player.player_id,
             )
             <= self.final_search_turns,
+            "determinization_samples": self.determinization_samples,
         }
-
-    def _select_with_endgame_search(
-        self,
-        state: GameState,
-        legal_actions: list[LegalAction],
-    ) -> LegalAction:
-        player_id = state.active_player.player_id
-        depth = min(self.search_depth, _turns_remaining_for_player(state, player_id))
-        scored_actions = [
-            (
-                _search_action_value(
-                    state,
-                    action,
-                    player_id,
-                    depth=depth,
-                    beam_width=self.search_beam_width,
-                ),
-                action,
-            )
-            for action in legal_actions
-        ]
-        return max(
-            scored_actions,
-            key=lambda item: (
-                item[0],
-                _immediate_score_delta(state, item[1], player_id),
-                _action_priority(item[1]),
-            ),
-        )[1]
 
 
 def evaluate_state_potential(state: GameState, player_id: str) -> PotentialValueBreakdown:

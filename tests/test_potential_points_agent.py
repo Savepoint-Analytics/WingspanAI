@@ -476,5 +476,10 @@ class EndgameSearchDepthTests(TestCase):
         self.assertEqual(agent.search_beam_width, 3)
         self.assertEqual(
             config.as_manifest_payload(),
-            {"search_depth": 2, "final_search_turns": 8, "search_beam_width": 3},
+            {
+                "search_depth": 2,
+                "final_search_turns": 8,
+                "search_beam_width": 3,
+                "determinization_samples": 0,
+            },
         )
