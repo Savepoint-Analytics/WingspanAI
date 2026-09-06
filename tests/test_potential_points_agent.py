@@ -480,6 +480,6 @@ class EndgameSearchDepthTests(TestCase):
                 "search_depth": 2,
                 "final_search_turns": 8,
                 "search_beam_width": 3,
-                "determinization_samples": 0,
+                "determinization_samples": 4,
             },
         )

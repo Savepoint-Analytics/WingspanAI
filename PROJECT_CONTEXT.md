@@ -2070,7 +2070,7 @@ number to quote is +10.4, not +13.5.
 
 ### Decision
 - Recommended new default: `search_depth=3, final_search_turns=8,
-  determinization_samples=4`. Not yet applied; awaiting Alex's call.
+  determinization_samples=4`. Applied 2026-09-06 (Alex's call).
 - Feeder rolls remain visible to every agent: legal-action generation bakes
   the reroll outcome into gain-food actions. This is a rules-fidelity defect
   and should be fixed in the engine (reroll as a chance node in

@@ -171,4 +171,8 @@ class DeterminizedSelectionTests(TestCase):
     def test_config_round_trip(self) -> None:
         config = PotentialPointsSearchConfig(determinization_samples=4)
         self.assertEqual(config.as_manifest_payload()["determinization_samples"], 4)
-        self.assertEqual(PotentialPointsSearchConfig().determinization_samples, 0)
+        default = PotentialPointsSearchConfig()
+        self.assertEqual(
+            (default.search_depth, default.final_search_turns, default.determinization_samples),
+            (3, 8, 4),
+        )

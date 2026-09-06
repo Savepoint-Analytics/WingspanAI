@@ -112,18 +112,26 @@ class ActionPotentialEvaluation:
 
 #: Own-turn branches kept per ply below the root of the endgame search.
 DEFAULT_SEARCH_BEAM_WIDTH: int | None = 4
+#: Defaults set 2026-09-06 from the determinized search test: depth 3 on every
+#: turn (8 cubes) over 4 hidden-information samples scored +10.4 points over
+#: the previous default (depth 3, last 5 cubes, true state) with no leak.
+#: ``PotentialPointsSearchConfig(search_depth=3, final_search_turns=5,
+#: determinization_samples=0)`` reproduces the historic agent.
+DEFAULT_SEARCH_DEPTH = 3
+DEFAULT_FINAL_SEARCH_TURNS = 8
+DEFAULT_DETERMINIZATION_SAMPLES = 4
 
 
 @dataclass(frozen=True)
 class PotentialPointsSearchConfig:
     """Endgame-search settings, threaded through batch flows and manifests."""
 
-    search_depth: int = 3
-    final_search_turns: int = 5
+    search_depth: int = DEFAULT_SEARCH_DEPTH
+    final_search_turns: int = DEFAULT_FINAL_SEARCH_TURNS
     search_beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH
     #: Hidden-information samples averaged per decision. ``0`` evaluates the
     #: true state, which lets the search read the deck and opponents' hands.
-    determinization_samples: int = 0
+    determinization_samples: int = DEFAULT_DETERMINIZATION_SAMPLES
 
     def as_manifest_payload(self) -> dict:
         return asdict(self)
@@ -138,14 +146,14 @@ class PotentialPointsAgent(SetupPolicyMixin):
         kw_only=True,
     )
     agent_id: str = "potential_points"
-    final_search_turns: int = 5
-    search_depth: int = 3
+    final_search_turns: int = DEFAULT_FINAL_SEARCH_TURNS
+    search_depth: int = DEFAULT_SEARCH_DEPTH
     #: Own-turn branches kept at each ply below the root. The root is never
     #: pruned. ``None`` searches every branch.
     search_beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH
     #: Hidden-information samples averaged per decision (see
     #: ``wingspan_ai.agents.determinization``). ``0`` scores the true state.
-    determinization_samples: int = 0
+    determinization_samples: int = DEFAULT_DETERMINIZATION_SAMPLES
     top_alternatives: int = 5
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:

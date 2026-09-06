@@ -164,9 +164,11 @@ ablation candidate; fixing it may change how much search is worth.
 
 ## What changes
 
-- `PotentialPointsAgent` defaults stay at `search_depth=3`,
-  `final_search_turns=5` for now so existing comparisons remain reproducible;
-  a default change should follow the determinization test, not precede it.
+- `PotentialPointsAgent` defaults were changed on 2026-09-06 to
+  `search_depth=3, final_search_turns=8, determinization_samples=4` after the
+  determinized test; `PotentialPointsSearchConfig(search_depth=3,
+  final_search_turns=5, determinization_samples=0)` reproduces the historic
+  agent.
 - Every future `potential_points` result must state its search configuration;
   manifests now record it under `potential_points_search`.
 - The three valuation nulls are reinterpreted: they were measured on an agent

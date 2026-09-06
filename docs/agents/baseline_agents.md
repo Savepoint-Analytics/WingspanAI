@@ -8,7 +8,7 @@ Status: initial draft, 2026-05-04
 |---|---|---|
 | `RandomLegalAgent` | `src/wingspan_ai/agents/random_legal.py` | Uniformly samples legal actions with seeded randomness. |
 | `GreedyBaselineAgent` | `src/wingspan_ai/agents/greedy.py` | Picks the action with the largest immediate implemented score gain, with food-choice tiebreaks based on visible hand deficits. |
-| `PotentialPointsAgent` | `src/wingspan_ai/agents/potential_points.py` | Picks the action that creates the best estimated final-score potential, including resource conversion, playable hand value, power timing, bonus-card progress, round-goal pressure, and endgame conversion. |
+| `PotentialPointsAgent` | `src/wingspan_ai/agents/potential_points.py` | Picks the action that creates the best estimated final-score potential, including resource conversion, playable hand value, power timing, bonus-card progress, round-goal pressure, and endgame conversion. Since 2026-09-06 it searches three own turns ahead on every turn over four determinized samples of the hidden deck and opponent hands (`PotentialPointsSearchConfig`). |
 | `NetValueOpponentResponseAgent` | `src/wingspan_ai/agents/net_value.py` | Estimates score-margin impact after the next opponent response using public observations plus a first belief heuristic for shared-resource denial. |
 | `StrategyArchetypeAgent` | `src/wingspan_ai/agents/archetypes.py` | Produces interpretable behavioural signatures for early strategy analysis, including resource-biased food choices. |
 | `MonteCarloRolloutAgent` | `src/wingspan_ai/agents/monte_carlo.py` | Estimates action value through sampled random legal continuations, with optional decision-time and rollout-count budget controls. |

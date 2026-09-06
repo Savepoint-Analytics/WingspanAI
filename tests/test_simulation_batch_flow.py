@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
+from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
 from wingspan_ai.simulation import ReplayValidationResult
 
 FLOW_PATH = Path(__file__).parents[1] / "flows" / "simulation_batch.py"
@@ -64,13 +65,9 @@ class SimulationBatchFlowTests(TestCase):
                 {"enabled": False, "uploaded": None},
             )
 
-
     def test_simulation_batch_can_wrap_greedy_with_guardrails(self) -> None:
         guardrail_path = (
-            Path(__file__).parents[1]
-            / "configs"
-            / "guardrails"
-            / "base_heuristic.yaml"
+            Path(__file__).parents[1] / "configs" / "guardrails" / "base_heuristic.yaml"
         )
         with TemporaryDirectory() as tmp_dir:
             results = simulation_batch.run_simulation_batch(
@@ -95,7 +92,6 @@ class SimulationBatchFlowTests(TestCase):
                 "base_heuristic_guardrails",
             )
 
-
     def test_simulation_batch_can_use_potential_points_agent(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             results = simulation_batch.run_simulation_batch(
@@ -108,12 +104,26 @@ class SimulationBatchFlowTests(TestCase):
                 batch_label="potential_points_trial",
                 batch_id="potential_points_batch",
                 player_two_agent_kind="potential_points",
+                # Plumbing test: the default search (depth 3, every turn, 4
+                # samples) takes minutes per game on the sample catalog.
+                potential_points_search=PotentialPointsSearchConfig(
+                    search_depth=1, final_search_turns=0, determinization_samples=0
+                ),
             )
 
             manifest_path = Path(results[0]["batch_manifest"]["path"])
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
             self.assertEqual(results[0]["player_two_agent_kind"], "potential_points")
+            self.assertEqual(
+                manifest["potential_points_search"],
+                {
+                    "search_depth": 1,
+                    "final_search_turns": 0,
+                    "search_beam_width": 4,
+                    "determinization_samples": 0,
+                },
+            )
             self.assertEqual(results[0]["player_two_agent_id"], "potential_points_p2")
             self.assertEqual(manifest["player_two_agent_kinds"], ["potential_points"])
             self.assertEqual(
@@ -226,12 +236,7 @@ class SimulationBatchFlowTests(TestCase):
                     )
 
             self.assertFalse(
-                (
-                    Path(tmp_dir)
-                    / "experiment"
-                    / "policy_trial"
-                    / "invalid_replay_batch"
-                ).exists()
+                (Path(tmp_dir) / "experiment" / "policy_trial" / "invalid_replay_batch").exists()
             )
 
     def test_object_prefix_separates_workload_kinds(self) -> None:
@@ -246,12 +251,8 @@ class SimulationBatchFlowTests(TestCase):
             prefixes,
             {
                 "smoke": "board-games/wingspan/smoke/core_random_vs_greedy/batch_123",
-                "experiment": (
-                    "board-games/wingspan/experiment/core_random_vs_greedy/batch_123"
-                ),
-                "production": (
-                    "board-games/wingspan/production/core_random_vs_greedy/batch_123"
-                ),
+                "experiment": ("board-games/wingspan/experiment/core_random_vs_greedy/batch_123"),
+                "production": ("board-games/wingspan/production/core_random_vs_greedy/batch_123"),
             },
         )
 
