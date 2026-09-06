@@ -2045,3 +2045,41 @@ not settled.
 4. Resource-spending doc corrected: `net_value_response` win-share drop is
    p=0.038 paired (the table's p=0.199 was unpaired); score p=0.27; reading
    unchanged.
+
+## Update: 2026-09-06 - Determinized search: the gain is planning, not peeking
+
+### What changed
+`PotentialPointsAgent` gained `determinization_samples` (module
+`wingspan_ai.agents.determinization`): per decision, the bird deck is pooled
+with opponents' hands and redealt, likewise bonus cards, and action scores are
+averaged over K samples. `K=0` reproduces archived outcomes exactly. Two arms
+at K=4, same 200-game paired design. Write-up in
+`docs/experiments/determinized_search_test.md`.
+
+### Results
+Depth 3 every turn, determinized: **79.40, +10.43 over determinized depth 1
+(p<0.001), win 0.90**. The perfect-information version scored 81.83, so the
+leak was worth −2.42 (p=0.008), concentrated in bonus-card points (−1.0) and
+cached food (−0.7). Determinizing the historic depth-1 agent changed nothing
+(+0.70, p=0.47): its one-card draw peek was worthless, so the three valuation
+nulls were measured on a clean baseline.
+
+### Why it matters
+The first positive result holds up under the player's real information. The
+number to quote is +10.4, not +13.5.
+
+### Decision
+- Recommended new default: `search_depth=3, final_search_turns=8,
+  determinization_samples=4`. Not yet applied; awaiting Alex's call.
+- Feeder rolls remain visible to every agent: legal-action generation bakes
+  the reroll outcome into gain-food actions. This is a rules-fidelity defect
+  and should be fixed in the engine (reroll as a chance node in
+  `apply_action`) before any further search work relies on gain-food values.
+
+### Follow-up tasks
+1. Apply the new default and update docs that quote the 68-point agent.
+2. Fix reroll resolution in the rules engine; re-run the default on 200 games
+   to measure what the reroll knowledge was worth. Replays must still verify.
+3. Game-horizon evaluator ablation.
+4. Feeder-odds ablation re-run on the searching agent.
+5. Merge `rules-fidelity-and-artifact-durability` into `main`.

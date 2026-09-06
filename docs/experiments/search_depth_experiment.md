@@ -142,6 +142,11 @@ but that is circumstantial. The definitive test is a determinized search that
 shuffles the unseen deck and re-samples the opponent's hand inside each
 branch. Until that runs, "+13.55" is an upper bound on the planning benefit.
 
+**Resolved 2026-09-06:** the determinized test
+([determinized_search_test.md](determinized_search_test.md)) puts the
+leak-free gain at **+10.43** (p<0.001) and the leak at −2.42 (p=0.008). The
+depth-1 peek was worth +0.70 (n.s.). Quote +10.4, not +13.5.
+
 **The opponent model is exact against one opponent.** The search models the
 opponent as `greedy_immediate`. Against the real `greedy_immediate` that model
 is perfect. At depth 3 the gain was larger against `greedy_immediate` and
@@ -170,10 +175,7 @@ ablation candidate; fixing it may change how much search is worth.
 
 ## Next
 
-1. **Determinized search.** Shuffle the unseen deck and re-sample the opponent's
-   hand per branch, seeded from the state hash for reproducibility. Re-run the
-   depth-3-every-turn arm. If the gain survives, it is a search result; if it
-   collapses, the agent was reading the deck.
+1. ~~**Determinized search.**~~ Done; see above.
 2. **Game horizon.** Replace the round horizon with remaining game turns and
    ablate.
 3. **Re-run one valuation ablation** (feeder odds is cheapest) on the searching
