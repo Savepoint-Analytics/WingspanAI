@@ -39,6 +39,7 @@ from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, FoodCost, FoodType, Habitat, PowerColor
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import (
+    BASE_ACTION_CUBES_BY_ROUND,
     TOTAL_ROUNDS,
     apply_action,
     apply_action_in_place,
@@ -120,6 +121,12 @@ DEFAULT_SEARCH_BEAM_WIDTH: int | None = 4
 DEFAULT_SEARCH_DEPTH = 3
 DEFAULT_FINAL_SEARCH_TURNS = 8
 DEFAULT_DETERMINIZATION_SAMPLES = 4
+#: How far ahead the evaluator counts turns. ``"round"`` is the historic
+#: horizon: the player's remaining action cubes this round, which discounts all
+#: potential to nothing at a round's last cube. ``"game"`` counts the cubes in
+#: every remaining round as well.
+DEFAULT_PLANNING_HORIZON = "round"
+PLANNING_HORIZONS = ("round", "game")
 
 
 @dataclass(frozen=True)
@@ -132,6 +139,8 @@ class PotentialPointsSearchConfig:
     #: Hidden-information samples averaged per decision. ``0`` evaluates the
     #: true state, which lets the search read the deck and opponents' hands.
     determinization_samples: int = DEFAULT_DETERMINIZATION_SAMPLES
+    #: ``"round"`` or ``"game"``; see ``DEFAULT_PLANNING_HORIZON``.
+    planning_horizon: str = DEFAULT_PLANNING_HORIZON
 
     def as_manifest_payload(self) -> dict:
         return asdict(self)
@@ -154,6 +163,9 @@ class PotentialPointsAgent(SetupPolicyMixin):
     #: Hidden-information samples averaged per decision (see
     #: ``wingspan_ai.agents.determinization``). ``0`` scores the true state.
     determinization_samples: int = DEFAULT_DETERMINIZATION_SAMPLES
+    #: ``"round"`` or ``"game"``; see ``DEFAULT_PLANNING_HORIZON``. The search
+    #: trigger (``final_search_turns``) always counts cubes in the round.
+    planning_horizon: str = DEFAULT_PLANNING_HORIZON
     top_alternatives: int = 5
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
@@ -195,8 +207,11 @@ class PotentialPointsAgent(SetupPolicyMixin):
         """
 
         player_id = state.active_player.player_id
-        if _turns_remaining_for_player(state, player_id) <= self.final_search_turns:
-            depth = min(self.search_depth, _turns_remaining_for_player(state, player_id))
+        if _get_player(state, player_id).action_cubes_available <= self.final_search_turns:
+            depth = min(
+                self.search_depth,
+                _turns_remaining_for_player(state, player_id, self.planning_horizon),
+            )
             return [
                 (
                     _search_action_value(
@@ -205,6 +220,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
                         player_id,
                         depth=depth,
                         beam_width=self.search_beam_width,
+                        horizon=self.planning_horizon,
                     ),
                     _immediate_score_delta(state, action, player_id),
                 )
@@ -224,11 +240,11 @@ class PotentialPointsAgent(SetupPolicyMixin):
         legal_actions: list[LegalAction],
     ) -> list[ActionPotentialEvaluation]:
         player_id = state.active_player.player_id
-        before = evaluate_state_potential(state, player_id)
+        before = evaluate_state_potential(state, player_id, self.planning_horizon)
         evaluations: list[ActionPotentialEvaluation] = []
         for action in legal_actions:
             next_state = apply_action(state, action)
-            after = evaluate_state_potential(next_state, player_id)
+            after = evaluate_state_potential(next_state, player_id, self.planning_horizon)
             evaluations.append(
                 ActionPotentialEvaluation(
                     action=action,
@@ -266,21 +282,23 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "top_alternatives": [
                 evaluation.telemetry_payload() for evaluation in ranked[: self.top_alternatives]
             ],
-            "endgame_search_used": _turns_remaining_for_player(
-                state,
-                state.active_player.player_id,
-            )
+            "endgame_search_used": state.active_player.action_cubes_available
             <= self.final_search_turns,
             "determinization_samples": self.determinization_samples,
+            "planning_horizon": self.planning_horizon,
         }
 
 
-def evaluate_state_potential(state: GameState, player_id: str) -> PotentialValueBreakdown:
+def evaluate_state_potential(
+    state: GameState,
+    player_id: str,
+    horizon: str = DEFAULT_PLANNING_HORIZON,
+) -> PotentialValueBreakdown:
     """Estimate current final-score potential for one player."""
 
     player = _get_player(state, player_id)
     realized_score = float(score_player(state, player_id).total)
-    turns_remaining = _turns_remaining_for_player(state, player_id)
+    turns_remaining = _turns_remaining_for_player(state, player_id, horizon)
     if state.round_state.game_over or turns_remaining <= 0:
         return PotentialValueBreakdown(
             realized_score=realized_score,
@@ -328,6 +346,7 @@ def _search_action_value(
     player_id: str,
     depth: int,
     beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH,
+    horizon: str = DEFAULT_PLANNING_HORIZON,
 ) -> float:
     """Best planning value reachable from ``action`` within ``depth`` own turns.
 
@@ -339,7 +358,7 @@ def _search_action_value(
     """
 
     next_state = apply_action(state, action)
-    return _search_value_from_branch(next_state, player_id, depth, beam_width)
+    return _search_value_from_branch(next_state, player_id, depth, beam_width, horizon)
 
 
 def _search_value_from_branch(
@@ -347,9 +366,10 @@ def _search_value_from_branch(
     player_id: str,
     depth: int,
     beam_width: int | None,
+    horizon: str = DEFAULT_PLANNING_HORIZON,
 ) -> float:
     if depth <= 1 or branch.round_state.game_over:
-        return _terminal_planning_value(branch, player_id)
+        return _terminal_planning_value(branch, player_id, horizon)
     _play_opponent_turns_in_place(branch, player_id)
     player = _get_player(branch, player_id)
     if (
@@ -357,20 +377,20 @@ def _search_value_from_branch(
         or branch.active_player.player_id != player_id
         or player.action_cubes_available <= 0
     ):
-        return _terminal_planning_value(branch, player_id)
+        return _terminal_planning_value(branch, player_id, horizon)
     legal_actions = legal_actions_for_current_player(branch)
     if not legal_actions:
-        return _terminal_planning_value(branch, player_id)
+        return _terminal_planning_value(branch, player_id, horizon)
 
     children = [apply_action(branch, next_action) for next_action in legal_actions]
-    leaf_values = [_terminal_planning_value(child, player_id) for child in children]
+    leaf_values = [_terminal_planning_value(child, player_id, horizon) for child in children]
     if depth - 1 <= 1:
         return max(leaf_values)
     ranked = sorted(zip(leaf_values, children, strict=True), key=lambda item: item[0], reverse=True)
     if beam_width is not None:
         ranked = ranked[:beam_width]
     return max(
-        _search_value_from_branch(child, player_id, depth - 1, beam_width)
+        _search_value_from_branch(child, player_id, depth - 1, beam_width, horizon)
         for _leaf_value, child in ranked
     )
 
@@ -386,10 +406,14 @@ def _play_opponent_turns_in_place(branch: GameState, player_id: str) -> None:
         apply_action_in_place(branch, chosen)
 
 
-def _terminal_planning_value(state: GameState, player_id: str) -> float:
-    potential = evaluate_state_potential(state, player_id)
+def _terminal_planning_value(
+    state: GameState,
+    player_id: str,
+    horizon: str = DEFAULT_PLANNING_HORIZON,
+) -> float:
+    potential = evaluate_state_potential(state, player_id, horizon)
     player = _get_player(state, player_id)
-    turns_remaining = _turns_remaining_for_player(state, player_id)
+    turns_remaining = _turns_remaining_for_player(state, player_id, horizon)
     if turns_remaining <= 1:
         return float(score_player(state, player_id).total) - _dead_resource_penalty(
             player,
@@ -1082,9 +1106,24 @@ def _immediate_score_delta(state: GameState, action: LegalAction, player_id: str
     return float(after_score - before_score)
 
 
-def _turns_remaining_for_player(state: GameState, player_id: str) -> int:
+def _turns_remaining_for_player(
+    state: GameState,
+    player_id: str,
+    horizon: str = DEFAULT_PLANNING_HORIZON,
+) -> int:
     player = _get_player(state, player_id)
-    return player.action_cubes_available
+    if horizon == "round":
+        return player.action_cubes_available
+    if horizon == "game":
+        if state.round_state.game_over:
+            return 0
+        later_rounds = sum(
+            cubes
+            for round_number, cubes in BASE_ACTION_CUBES_BY_ROUND.items()
+            if round_number > state.round_state.round_number
+        )
+        return player.action_cubes_available + later_rounds
+    raise ValueError(f"unknown planning horizon: {horizon!r}; expected one of {PLANNING_HORIZONS}")
 
 
 def _action_priority(action: LegalAction) -> int:

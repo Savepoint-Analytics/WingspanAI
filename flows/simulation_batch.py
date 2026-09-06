@@ -453,6 +453,7 @@ def _make_agent(
             final_search_turns=search.final_search_turns,
             search_beam_width=search.search_beam_width,
             determinization_samples=search.determinization_samples,
+            planning_horizon=search.planning_horizon,
         )
     elif agent_kind == "net_value_response":
         agent = NetValueOpponentResponseAgent(

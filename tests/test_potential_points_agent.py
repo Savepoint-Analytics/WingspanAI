@@ -402,9 +402,9 @@ class EndgameSearchDepthTests(TestCase):
         depths_seen: list[int] = []
         original = module._search_value_from_branch
 
-        def recording(branch, pid, depth, beam_width):
+        def recording(branch, pid, depth, beam_width, horizon="round"):
             depths_seen.append(depth)
-            return original(branch, pid, depth, beam_width)
+            return original(branch, pid, depth, beam_width, horizon)
 
         with patch.object(module, "_search_value_from_branch", recording):
             module._search_action_value(state, action, player_id, depth=3, beam_width=2)
@@ -481,5 +481,52 @@ class EndgameSearchDepthTests(TestCase):
                 "final_search_turns": 8,
                 "search_beam_width": 3,
                 "determinization_samples": 4,
+                "planning_horizon": "round",
             },
         )
+
+
+class PlanningHorizonTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = make_sample_catalog()
+
+    def test_game_horizon_counts_cubes_in_later_rounds(self) -> None:
+        from wingspan_ai.agents.potential_points import _turns_remaining_for_player
+
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=5)
+        player_id = state.active_player.player_id
+        self.assertEqual(_turns_remaining_for_player(state, player_id, "round"), 8)
+        self.assertEqual(_turns_remaining_for_player(state, player_id, "game"), 8 + 7 + 6 + 5)
+        state.round_state.round_number = 4
+        state.active_player.action_cubes_available = 2
+        self.assertEqual(_turns_remaining_for_player(state, player_id, "round"), 2)
+        self.assertEqual(_turns_remaining_for_player(state, player_id, "game"), 2)
+        state.round_state.game_over = True
+        self.assertEqual(_turns_remaining_for_player(state, player_id, "game"), 0)
+        with self.assertRaises(ValueError):
+            _turns_remaining_for_player(state, player_id, "season")
+
+    def test_round_horizon_is_the_default_and_matches_the_historic_evaluator(self) -> None:
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=5)
+        player_id = state.active_player.player_id
+        state.active_player.action_cubes_available = 1
+        default = evaluate_state_potential(state, player_id)
+        round_scoped = evaluate_state_potential(state, player_id, "round")
+        game_scoped = evaluate_state_potential(state, player_id, "game")
+        self.assertEqual(default, round_scoped)
+        self.assertNotEqual(round_scoped.total, game_scoped.total)
+
+    def test_search_trigger_counts_round_cubes_under_the_game_horizon(self) -> None:
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=5)
+        state.active_player.action_cubes_available = 3
+        agent = PotentialPointsAgent(
+            planning_horizon="game", final_search_turns=2, determinization_samples=0
+        )
+        legal_actions = legal_actions_for_current_player(state)
+        summary = agent.summarize_decision(state, legal_actions, legal_actions[0])
+        self.assertFalse(summary["endgame_search_used"])
+        self.assertEqual(summary["planning_horizon"], "game")
+        state.active_player.action_cubes_available = 2
+        summary = agent.summarize_decision(state, legal_actions, legal_actions[0])
+        self.assertTrue(summary["endgame_search_used"])
