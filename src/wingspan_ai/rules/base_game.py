@@ -5,8 +5,9 @@ from __future__ import annotations
 import random
 import re
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from functools import cache
 from itertools import combinations_with_replacement
 
 from wingspan_ai.content.birdfeeder import (
@@ -14,6 +15,7 @@ from wingspan_ai.content.birdfeeder import (
     BirdfeederFace,
     all_faces_match,
     all_supplies,
+    die_probability,
     face_foods,
     obtainable_foods,
     roll_dice,
@@ -641,37 +643,41 @@ def _legal_play_bird_actions(player: PlayerState) -> list[LegalAction]:
 
 def _legal_gain_food_actions(player: PlayerState, state: GameState) -> list[LegalAction]:
     food_count = _forest_food_count(len(player.habitats[Habitat.FOREST]))
-    actions: list[LegalAction] = []
-    for reroll_birdfeeder, dice in _available_birdfeeder_rolls(state, food_count):
-        for food_types in _food_choice_tuples(dice, food_count):
-            actions.append(
-                LegalAction(
-                    action_type=ActionType.GAIN_FOOD,
-                    player_id=player.player_id,
-                    food_type=food_types[0] if len(food_types) == 1 else None,
-                    food_types=food_types,
-                    reroll_birdfeeder=reroll_birdfeeder,
-                )
-            )
-
+    actions = _gain_food_actions(player, state, food_count)
     if _can_spend_card_for_extra_food(player) and actions:
         discard_card_name = _choose_discard_card_for_food(player, state)
-        extra_actions = []
-        for reroll_birdfeeder, dice in _available_birdfeeder_rolls(state, food_count + 1):
-            for food_types in _food_choice_tuples(dice, food_count + 1):
-                extra_actions.append(
-                    LegalAction(
-                        action_type=ActionType.GAIN_FOOD,
-                        player_id=player.player_id,
-                        food_type=food_types[0] if len(food_types) == 1 else None,
-                        food_types=food_types,
-                        reroll_birdfeeder=reroll_birdfeeder,
-                        discard_card_common_name=discard_card_name,
-                        spend_card_for_extra_food=True,
-                    )
-                )
-        actions.extend(extra_actions)
+        actions.extend(
+            _gain_food_actions(
+                player,
+                state,
+                food_count + 1,
+                discard_card_common_name=discard_card_name,
+                spend_card_for_extra_food=True,
+            )
+        )
     return actions
+
+
+def _gain_food_actions(
+    player: PlayerState,
+    state: GameState,
+    food_count: int,
+    *,
+    discard_card_common_name: str | None = None,
+    spend_card_for_extra_food: bool = False,
+) -> list[LegalAction]:
+    return [
+        LegalAction(
+            action_type=ActionType.GAIN_FOOD,
+            player_id=player.player_id,
+            food_type=food_types[0] if len(food_types) == 1 else None,
+            food_types=food_types,
+            reroll_birdfeeder=reroll_birdfeeder,
+            discard_card_common_name=discard_card_common_name,
+            spend_card_for_extra_food=spend_card_for_extra_food,
+        )
+        for reroll_birdfeeder, food_types in _gain_food_choices(state, food_count)
+    ]
 
 
 def _legal_lay_eggs_actions(player: PlayerState) -> list[LegalAction]:
@@ -752,36 +758,104 @@ def _apply_play_bird(player: PlayerState, action: LegalAction, state: GameState)
 
 
 def _apply_gain_food(player: PlayerState, state: GameState, action: LegalAction) -> None:
-    food_types = _action_food_types(action)
-    if not food_types:
+    """Take food from the feeder, rolling dice as the action resolves.
+
+    ``food_types`` is an exact choice when the feeder already shows those dice
+    and a *preference* whenever a roll stands between the player and the food:
+    a reroll before taking, or the feeder running dry mid-action. The roll is
+    made here, not when the action was generated, so neither the player nor a
+    search over their options can see it in advance. Each taken die satisfies
+    the first preferred food still obtainable; if none is and the feeder can be
+    rerolled it is, and if none is after that the player takes what the feeder
+    has, in hand-deficit order.
+    """
+
+    wanted = list(_action_food_types(action))
+    if not wanted:
         raise ValueError("gain food action requires at least one food choice")
     if action.spend_card_for_extra_food:
         _discard_card_for_action(player, action.discard_card_common_name)
+    # The salts predate resolving rolls here; they are kept so archived games
+    # still replay to the same hashes.
     if action.reroll_birdfeeder or not state.birdfeeder.dice:
         state.birdfeeder.dice = _roll_birdfeeder_for_state(
             state,
-            f"legal_{len(food_types)}",
+            f"legal_{len(wanted)}",
             player_id=player.player_id,
             action_type=action.action_type.value,
             record=True,
         )
-    for food_type in food_types:
-        if food_type not in obtainable_foods(state.birdfeeder.dice) and _can_reroll_birdfeeder(
-            state.birdfeeder
-        ):
+    for _ in range(len(wanted)):
+        food_type = _first_obtainable_food(wanted, state.birdfeeder.dice)
+        if food_type is None and _can_reroll_birdfeeder(state.birdfeeder):
             state.birdfeeder.dice = _roll_birdfeeder_for_state(
                 state,
-                f"gain_food_action_{food_type}",
+                f"gain_food_action_{wanted[0]}",
                 player_id=player.player_id,
                 action_type=action.action_type.value,
                 record=True,
             )
-        die_index = supplying_die_index(state.birdfeeder.dice, food_type)
-        if die_index is None:
-            raise ValueError(f"selected food is not available in the birdfeeder: {food_type}")
-        state.birdfeeder.dice.pop(die_index)
-        player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
+            food_type = _first_obtainable_food(wanted, state.birdfeeder.dice)
+        if food_type is None:
+            food_type = _first_obtainable_food(
+                _preferred_food_for_hand(player), state.birdfeeder.dice
+            )
+        if food_type is None:
+            raise ValueError("birdfeeder cannot supply any food")
+        if food_type in wanted:
+            wanted.remove(food_type)
+        _gain_food_from_birdfeeder(player, state, food_type)
     resolve_habitat_powers(player, Habitat.FOREST, state)
+
+
+def expected_gain_food(state: GameState, action: LegalAction) -> dict[FoodType, float]:
+    """Expected food a gain-food action delivers, by type, before any die is rolled.
+
+    Foods the feeder already shows count in full, taken in the action's
+    preference order. Foods that would have to come from a fresh roll are
+    credited at the chance that a five-die roll supplies that many of them.
+    Food taken as a fallback when nothing preferred shows is not credited, so
+    the total is a lower bound on the tokens actually gained.
+    """
+
+    wanted = list(_action_food_types(action))
+    dice = [] if action.reroll_birdfeeder else list(state.birdfeeder.dice)
+    expected: dict[FoodType, float] = {}
+    from_roll: Counter[FoodType] = Counter()
+    for food_type in wanted:
+        die_index = supplying_die_index(dice, food_type)
+        if die_index is None:
+            from_roll[food_type] += 1
+            continue
+        dice.pop(die_index)
+        expected[food_type] = expected.get(food_type, 0.0) + 1.0
+    for food_type, count in from_roll.items():
+        chance = die_probability(food_type)
+        for copies in range(1, count + 1):
+            expected[food_type] = expected.get(food_type, 0.0) + _at_least_of_five(copies, chance)
+    return expected
+
+
+def _at_least_of_five(copies: int, chance: float) -> float:
+    """P(at least `copies` of five dice succeed), each with probability `chance`."""
+
+    from math import comb
+
+    n = BIRDFEEDER_DICE_COUNT
+    return sum(
+        comb(n, k) * chance**k * (1.0 - chance) ** (n - k) for k in range(copies, n + 1)
+    )
+
+
+def _first_obtainable_food(
+    preferences: Sequence[FoodType],
+    dice: Sequence[BirdfeederFace],
+) -> FoodType | None:
+    obtainable = obtainable_foods(dice)
+    for food_type in preferences:
+        if food_type in obtainable:
+            return food_type
+    return None
 
 
 def _apply_lay_eggs(player: PlayerState, state: GameState, action: LegalAction) -> None:
@@ -1462,22 +1536,30 @@ def _can_spend_egg_for_extra_card(player: PlayerState) -> bool:
     return wetland_count in {1, 3} and player.total_eggs > 0
 
 
-def _available_birdfeeder_rolls(
+def _gain_food_choices(
     state: GameState,
     food_count: int,
-) -> list[tuple[bool, list[FoodType]]]:
+) -> list[tuple[bool, tuple[FoodType, ...]]]:
+    """Every (reroll, food_types) pair a player may choose for `food_count` dice.
+
+    Exact choices come from the dice showing. Whenever a roll will happen
+    while the action resolves — the player rerolls first, or the feeder runs
+    dry — the choice is a preference over every multiset of base foods, and the
+    roll itself is resolved by ``_apply_gain_food``. Nothing here rolls dice.
+    """
+
     if food_count <= 0:
         return []
-    options: list[tuple[bool, list[FoodType]]] = []
-    if state.birdfeeder.dice:
-        options.append((False, list(state.birdfeeder.dice)))
-    if (
-        not state.birdfeeder.dice
-        or _can_reroll_birdfeeder(state.birdfeeder)
-        or len(state.birdfeeder.dice) < food_count
-    ):
-        options.append((True, _roll_birdfeeder_for_state(state, f"legal_{food_count}")))
-    return options
+    dice = state.birdfeeder.dice
+    choices: list[tuple[bool, tuple[FoodType, ...]]] = []
+    if dice:
+        if len(dice) >= food_count:
+            choices.extend((False, foods) for foods in _food_choice_tuples(dice, food_count))
+        else:
+            choices.extend((False, foods) for foods in _food_preference_tuples(food_count))
+    if not dice or _can_reroll_birdfeeder(state.birdfeeder):
+        choices.extend((True, foods) for foods in _food_preference_tuples(food_count))
+    return choices
 
 
 def _food_choice_tuples(
@@ -1485,6 +1567,11 @@ def _food_choice_tuples(
     food_count: int,
 ) -> list[tuple[FoodType, ...]]:
     return all_supplies(dice, food_count, BASE_FOOD_TYPES)
+
+
+@cache
+def _food_preference_tuples(food_count: int) -> tuple[tuple[FoodType, ...], ...]:
+    return tuple(combinations_with_replacement(BASE_FOOD_TYPES, food_count))
 
 
 def _card_draw_choices(state: GameState, draw_count: int) -> list[tuple[tuple[int, ...], int]]:

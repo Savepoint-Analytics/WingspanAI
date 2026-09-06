@@ -19,6 +19,7 @@ from wingspan_ai.content.schemas import BirdCard, FoodType, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import (
     apply_action,
+    expected_gain_food,
     legal_actions_for_current_player,
     ordered_habitats,
 )
@@ -795,8 +796,8 @@ def _food_denial_value(
     opponent_ids: list[str],
     belief_model: PublicOpponentBeliefModel,
 ) -> float:
-    selected_foods = action.food_types or ((action.food_type,) if action.food_type else ())
-    if not selected_foods:
+    expected_foods = expected_gain_food(state, action)
+    if not expected_foods:
         return 0.0
     opponent_demand: Counter[FoodType] = Counter()
     for opponent_id in opponent_ids:
@@ -813,10 +814,10 @@ def _food_denial_value(
             }
         )
     value = 0.0
-    for food_type in selected_foods:
+    for food_type, weight in expected_foods.items():
         if food_type in state.birdfeeder.dice:
-            value += 0.25
-        value += min(opponent_demand.get(food_type, 0.0), 1.5) * 0.35
+            value += 0.25 * weight
+        value += min(opponent_demand.get(food_type, 0.0), 1.5) * 0.35 * weight
     return value
 
 

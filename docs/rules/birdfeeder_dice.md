@@ -1,6 +1,6 @@
 # Birdfeeder Dice
 
-_Encoded 2026-09-03. Source: WS_Core_Rulebook.pdf, "Gain food" / birdfeeder._
+_Encoded 2026-09-03; roll resolution moved into `apply_action` 2026-09-06. Source: WS_Core_Rulebook.pdf, "Gain food" / birdfeeder._
 
 ## The die
 
@@ -54,6 +54,27 @@ Together these make a depleted feeder far less punishing than it looks. With one
 unwanted die showing and three food to take, the player is effectively drawing
 against a fresh roll of five, so a specific needed food arrives
 `1 - (5/6)^5 = 0.598` of the time rather than never.
+
+## When the dice are rolled
+
+A gain-food `LegalAction` names its `food_types`. When the feeder already shows
+those dice the choice is exact. When a roll stands between the player and the
+food — a reroll taken before drawing, or the feeder running dry mid-action —
+the action is a **preference**: one of every multiset of `food_count` base
+foods (5, 15, 35 or 70 options), and the roll is resolved inside
+`_apply_gain_food`, never during legal-action generation. Each die taken
+satisfies the first preferred food still obtainable; if none is and the feeder
+may be rerolled, it is; if none is after that, the player takes what the feeder
+shows in hand-deficit order (`_preferred_food_for_hand`).
+
+Until 2026-09-06 the legal-action generator rolled the dice itself and offered
+exact choices from the peeked result, so every agent chose "reroll" already
+knowing what it would get. That was a rules defect and an information leak;
+`docs/experiments/reroll_chance_node.md` measures what it was worth.
+
+`expected_gain_food(state, action)` gives agents the expected tokens by type
+for any gain-food action: on-table foods in full, rolled foods at the chance a
+five-die roll supplies that many copies.
 
 ## Implementation
 

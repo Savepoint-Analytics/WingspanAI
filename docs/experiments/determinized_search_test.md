@@ -38,7 +38,9 @@ outcome into each gain-food action. Resampling the seed made the true state's
 actions illegal on the sample, so the seed is left alone and future rolls stay
 visible to the search. Every agent in the roster chooses "reroll" already
 knowing the result; that is a rules-engine fidelity defect with its own
-follow-up, and it is constant across all arms here.
+follow-up, and it is constant across all arms here. *Closed 2026-09-06:* the engine now
+resolves rolls in `apply_action` and samples resample the seed; see
+[reroll_chance_node.md](reroll_chance_node.md).
 
 Two arms, K=4, same 200-game counterbalanced design, paired by lineup,
 rotation and seed:
@@ -118,9 +120,8 @@ but at n=20 per cell it is a hint, not a finding.
 
 ## Caveats that remain
 
-- Feeder rolls are still visible (above). Closing that requires the rules
-  engine to resolve rerolls as a chance node in `apply_action` rather than in
-  legal-action generation.
+- ~~Feeder rolls are still visible.~~ Closed; see
+  [reroll_chance_node.md](reroll_chance_node.md).
 - The opponent model is the greedy baseline, played from a resampled hand.
 - The evaluator's planning horizon is still the current round.
 - K=4 was chosen for compute, not tuned. More samples would reduce decision

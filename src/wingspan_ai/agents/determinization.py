@@ -17,11 +17,11 @@ What is resampled:
 - The bird deck order, pooled with opponents' hands and redealt.
 - The bonus deck order, pooled with opponents' bonus cards and redealt.
 
-What is *not* resampled: birdfeeder rolls. They are seeded from
-``random_seed`` and the turn number, and the legal-action generator already
-bakes the reroll outcome into each gain-food action, so a sample with different
-dice would make the true state's actions illegal. Future rolls therefore stay
-visible to a search over these samples; that is a known residual leak.
+- ``random_seed``, from which every future birdfeeder roll (rerolls, refills,
+  predator hunts, pink reactions) is derived. Legal actions do not depend on
+  it — a gain-food action names preferred foods and the engine resolves the
+  roll when the action is applied — so the true state's actions remain legal
+  on every sample while the rolls they lead to differ.
 
 Cards an opponent took from the tray in public are not remembered: the sample
 draws every opponent hand card from the unseen pool. That discards some
@@ -76,4 +76,6 @@ def determinize_state(state: GameState, player_id: str, sample_index: int) -> Ga
         opponent.bonus_cards = bonus_pool[:bonus_count]
         del bonus_pool[:bonus_count]
     sample.decks.bonus_deck = bonus_pool
+
+    sample.random_seed = rng.getrandbits(63)
     return sample

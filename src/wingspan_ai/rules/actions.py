@@ -56,7 +56,7 @@ def render_action(action: LegalAction) -> str:
         foods = _format_foods(selected_food)
         parts = [f"Gain {foods or 'food'}"]
         if action.reroll_birdfeeder:
-            parts.append("after rerolling the birdfeeder")
+            parts.append("if rolled, after rerolling the birdfeeder")
         if action.spend_card_for_extra_food:
             discarded = (
                 f" ({action.discard_card_common_name})"

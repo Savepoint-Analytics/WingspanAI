@@ -6,6 +6,7 @@ from wingspan_ai.agents import GreedyBaselineAgent, PotentialPointsAgent
 from wingspan_ai.agents.determinization import determinization_seed_material, determinize_state
 from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
 from wingspan_ai.content import make_sample_catalog
+from wingspan_ai.rules.actions import ActionType
 from wingspan_ai.rules.base_game import (
     apply_action,
     legal_actions_for_current_player,
@@ -83,9 +84,9 @@ class DeterminizeStateTests(TestCase):
         self.assertNotEqual(canonical_state_json(first), canonical_state_json(other))
         deck_names = [card.common_name for card in state.decks.bird_deck]
         self.assertNotEqual(deck_names, [card.common_name for card in first.decks.bird_deck])
-        # Feeder rolls are keyed on the seed; legal actions bake in reroll
-        # outcomes, so the seed must survive for true-state actions to stay legal.
-        self.assertEqual(state.random_seed, first.random_seed)
+        # Future feeder rolls derive from the seed, so it is resampled too.
+        self.assertNotEqual(state.random_seed, first.random_seed)
+        self.assertNotEqual(first.random_seed, other.random_seed)
 
     def test_seed_material_excludes_game_id(self) -> None:
         state = self._state()
@@ -108,6 +109,31 @@ class DeterminizeStateTests(TestCase):
             legal_actions_for_current_player(state),
             legal_actions_for_current_player(sample),
         )
+
+    def test_true_state_actions_are_legal_with_an_empty_feeder(self) -> None:
+        state = self._state()
+        state.birdfeeder.dice = []
+        player_id = state.active_player.player_id
+        sample = determinize_state(state, player_id, sample_index=2)
+        self.assertEqual(
+            legal_actions_for_current_player(state),
+            legal_actions_for_current_player(sample),
+        )
+
+    def test_reroll_outcomes_differ_across_samples(self) -> None:
+        state = self._state()
+        state.birdfeeder.dice = []
+        player_id = state.active_player.player_id
+        reroll = next(
+            action
+            for action in legal_actions_for_current_player(state)
+            if action.action_type == ActionType.GAIN_FOOD and action.reroll_birdfeeder
+        )
+        rolls = {
+            tuple(apply_action(determinize_state(state, player_id, index), reroll).birdfeeder.dice)
+            for index in range(8)
+        }
+        self.assertGreater(len(rolls), 1)
 
 
 class DeterminizedSelectionTests(TestCase):

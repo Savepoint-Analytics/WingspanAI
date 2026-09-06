@@ -61,7 +61,7 @@ Legal action generation should remain pure: given a `GameState` and player, it r
 Current transition rules:
 
 - Playing a bird spends food, spends required eggs, removes the bird from hand, and appends a `BirdSlot` to the selected habitat.
-- Gaining food uses habitat-scaled food counts, optional discard-card conversions, and deterministic reroll choices when the birdfeeder can be rerolled.
+- Gaining food uses habitat-scaled food counts, optional discard-card conversions, and food *preferences* when a reroll or refill is involved; the roll is resolved inside `apply_action`, so legal actions never depend on a die that has not been thrown.
 - Laying eggs uses habitat-scaled egg counts and optional spend-food conversions, then fills played birds in deterministic habitat order up to capacity.
 - Drawing cards uses habitat-scaled card counts, tray/deck choice tuples, and optional spend-egg conversions.
 - Habitat powers resolve right-to-left after the base habitat action.

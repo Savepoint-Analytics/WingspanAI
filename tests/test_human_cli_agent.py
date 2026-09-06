@@ -45,5 +45,6 @@ class HumanCliAgentTests(TestCase):
 
         self.assertEqual(
             rendered,
-            "Gain seed and fish after rerolling the birdfeeder by discarding a card (Canada Goose)",
+            "Gain seed and fish if rolled, after rerolling the birdfeeder "
+            "by discarding a card (Canada Goose)",
         )

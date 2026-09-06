@@ -1,6 +1,8 @@
 from unittest import TestCase
 
 from wingspan_ai.content import make_sample_catalog
+from wingspan_ai.content.birdfeeder import obtainable_foods
+from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import (
     BonusCard,
     ContentPack,
@@ -23,6 +25,8 @@ from wingspan_ai.rules.base_game import (
     setup_base_game,
 )
 from wingspan_ai.state.models import BirdfeederState, BirdSlot
+
+BASE_FOOD_PAIRS_OF_ONE = [(food,) for food in BASE_FOOD_TYPES]
 
 
 class BaseGameRulesTests(TestCase):
@@ -220,9 +224,9 @@ class BaseGameRulesTests(TestCase):
         self.assertEqual(score.round_goal_points, 0)
 
     def test_first_bonus_card_scoring_handler_scores_bird_feeder(self) -> None:
-        seed_birds = [
-            card for card in self.catalog.birds if FoodType.SEED in card.food_cost.fixed
-        ][:5]
+        seed_birds = [card for card in self.catalog.birds if FoodType.SEED in card.food_cost.fixed][
+            :5
+        ]
         bird_feeder = next(card for card in self.catalog.bonus_cards if card.name == "Bird Feeder")
         self.state.players[0].bonus_cards = [bird_feeder]
         self.state.round_goals = []
@@ -271,9 +275,7 @@ class BaseGameRulesTests(TestCase):
 
     def test_forest_action_scales_food_choices_with_birds_in_habitat(self) -> None:
         player = self.state.players[0]
-        forest_birds = [
-            card for card in self.catalog.birds if Habitat.FOREST in card.habitats
-        ][:2]
+        forest_birds = [card for card in self.catalog.birds if Habitat.FOREST in card.habitats][:2]
         for card in forest_birds:
             player.habitats[Habitat.FOREST].append(BirdSlot(card=card))
         self.state.birdfeeder = BirdfeederState(dice=[FoodType.SEED, FoodType.FISH])
@@ -299,6 +301,82 @@ class BaseGameRulesTests(TestCase):
                 for action in legal_actions
             )
         )
+
+    def _gain_food_actions(self, state=None) -> list[LegalAction]:
+        return [
+            action
+            for action in legal_actions_for_current_player(state or self.state)
+            if action.action_type == ActionType.GAIN_FOOD
+        ]
+
+    def test_reroll_actions_do_not_depend_on_the_seed(self) -> None:
+        self.state.birdfeeder = BirdfeederState(dice=[])
+        other_seed = self.state.model_copy(update={"random_seed": self.state.random_seed + 1})
+
+        actions = self._gain_food_actions()
+
+        self.assertTrue(all(action.reroll_birdfeeder for action in actions))
+        self.assertEqual(sorted(a.food_types for a in actions), sorted(BASE_FOOD_PAIRS_OF_ONE))
+        self.assertEqual(actions, self._gain_food_actions(other_seed))
+        self.assertEqual(self.state.rng_draw_records, [])
+
+    def test_reroll_action_resolves_the_roll_when_applied(self) -> None:
+        self.state.birdfeeder = BirdfeederState(dice=[])
+        player = self.state.players[0]
+        player.hand = []
+        before = dict(player.food_tokens)
+
+        for action in self._gain_food_actions():
+            next_state = apply_action(self.state, action)
+            rolled = next_state.rng_draw_records[-1].result
+            gained = next_state.players[0].food_tokens
+            wanted = action.food_types[0]
+            taken = next(food for food in FoodType if gained.get(food, 0) > before.get(food, 0))
+            if wanted in obtainable_foods(rolled):
+                self.assertEqual(taken, wanted)
+            else:
+                self.assertIn(taken, obtainable_foods(rolled))
+            self.assertEqual(len(next_state.birdfeeder.dice), 4)
+
+    def test_feeder_running_dry_mid_action_offers_preferences_and_refills(self) -> None:
+        player = self.state.players[0]
+        forest_birds = [card for card in self.catalog.birds if Habitat.FOREST in card.habitats][:4]
+        self.assertEqual(len(forest_birds), 4)
+        for card in forest_birds:
+            player.habitats[Habitat.FOREST].append(BirdSlot(card=card))
+        player.hand = []
+        before = dict(player.food_tokens)
+
+        # Two unmatched dice for three food: no reroll is possible before taking,
+        # so every choice is a preference resolved as the feeder refills.
+        self.state.birdfeeder = BirdfeederState(dice=[FoodType.RODENT, FoodType.FISH])
+        actions = self._gain_food_actions()
+        self.assertEqual(len(actions), 35)
+        self.assertFalse(any(action.reroll_birdfeeder for action in actions))
+
+        action = next(
+            a for a in actions if a.food_types == (FoodType.SEED, FoodType.SEED, FoodType.SEED)
+        )
+        next_state = apply_action(self.state, action)
+        gained = next_state.players[0].food_tokens
+        rolls = [r for r in next_state.rng_draw_records if r.draw_type == "birdfeeder_reroll"]
+        # Neither die shows seed and two unmatched dice cannot be rerolled, so the
+        # player takes one in hand-deficit order (fish, with an empty hand). The
+        # lone die left can be rerolled, so the engine rerolls for seed rather
+        # than settling for rodent.
+        self.assertEqual(gained[FoodType.FISH], before.get(FoodType.FISH, 0) + 1)
+        self.assertEqual(gained.get(FoodType.RODENT, 0), before.get(FoodType.RODENT, 0))
+        self.assertEqual(sum(gained.values()), sum(before.values()) + 3)
+        self.assertEqual(len(next_state.birdfeeder.dice), 3)
+        self.assertEqual(len(rolls), 1)
+        if FoodType.SEED in obtainable_foods(rolls[0].result):
+            self.assertGreater(gained[FoodType.SEED], before.get(FoodType.SEED, 0))
+
+        # A lone die may be rerolled first or taken first; both are offered.
+        self.state.birdfeeder = BirdfeederState(dice=[FoodType.RODENT])
+        actions = self._gain_food_actions()
+        self.assertEqual(len(actions), 70)
+        self.assertEqual(sum(action.reroll_birdfeeder for action in actions), 35)
 
     def test_brown_powers_resolve_right_to_left_after_habitat_action(self) -> None:
         first_card = self.catalog.birds[0].model_copy(
@@ -361,9 +439,7 @@ class BaseGameRulesTests(TestCase):
         )
         self.state.players[1].habitats[Habitat.FOREST].append(BirdSlot(card=pink_card))
         self.state.players[1].hand = [fish_card]
-        self.state.birdfeeder = BirdfeederState(
-            dice=[FoodType.SEED, FoodType.FISH, FoodType.FRUIT]
-        )
+        self.state.birdfeeder = BirdfeederState(dice=[FoodType.SEED, FoodType.FISH, FoodType.FRUIT])
 
         action = next(
             action
@@ -379,9 +455,7 @@ class BaseGameRulesTests(TestCase):
             goal for goal in self.catalog.round_goals if goal.name == "[bird] in [forest]"
         )
         self.state.round_goals = [forest_goal]
-        forest_birds = [
-            card for card in self.catalog.birds if Habitat.FOREST in card.habitats
-        ][:3]
+        forest_birds = [card for card in self.catalog.birds if Habitat.FOREST in card.habitats][:3]
         self.state.players[0].habitats[Habitat.FOREST].extend(
             [BirdSlot(card=forest_birds[0]), BirdSlot(card=forest_birds[1])]
         )
@@ -403,8 +477,7 @@ class BaseGameRulesTests(TestCase):
         player.round_goal_points = 0
         self.state.round_goals = []
         bowl_birds = [
-            card.model_copy(update={"nest_type": NestType.BOWL})
-            for card in self.catalog.birds[:4]
+            card.model_copy(update={"nest_type": NestType.BOWL}) for card in self.catalog.birds[:4]
         ]
         for card in bowl_birds:
             player.habitats[Habitat.GRASSLAND].append(BirdSlot(card=card))

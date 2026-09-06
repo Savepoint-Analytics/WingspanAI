@@ -21,6 +21,7 @@ from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import (
     InitialSelection,
     apply_action,
+    expected_gain_food,
     legal_actions_for_current_player,
     score_player,
 )
@@ -341,8 +342,12 @@ def _food_need_score(state: GameState, action: LegalAction) -> float:
     for card in player.hand:
         for food_type, count in card.food_cost.fixed.items():
             deficits[food_type] += max(count - player.food_tokens.get(food_type, 0), 0)
-    selected_foods = action.food_types or ((action.food_type,) if action.food_type else ())
-    matched = float(sum(deficits.get(food_type, 0) for food_type in selected_foods))
+    # Foods behind a reroll or refill are preferences; credit them at the odds
+    # the roll supplies them rather than as if already in hand.
+    matched = sum(
+        deficits.get(food_type, 0) * weight
+        for food_type, weight in expected_gain_food(state, action).items()
+    )
     return matched + _feeder_outlook(state, action)
 
 
