@@ -2083,3 +2083,43 @@ number to quote is +10.4, not +13.5.
 3. Game-horizon evaluator ablation.
 4. Feeder-odds ablation re-run on the searching agent.
 5. Merge `rules-fidelity-and-artifact-durability` into `main`.
+
+## Update: 2026-09-06 - Reroll resolved at apply time; knowing the roll was worth nothing
+
+### What changed
+The rules engine no longer rolls the birdfeeder while listing gain-food
+actions. When a reroll or a mid-action refill would intervene, the action
+names a food *preference* and `apply_action` resolves the roll (`b33a5e1`).
+Roll salts are unchanged, so archived games still replay to their recorded
+hashes. `determinize_state` resamples `random_seed`, so the search sees
+rerolls, predator hunts and pink reactions as chance nodes.
+`expected_gain_food` gives the non-searching agents the expected value of a
+preference. 200-game re-run at the default configuration in
+`artifacts/rr_reroll_fix`; write-up in
+`docs/experiments/reroll_chance_node.md`.
+
+### Results
+Null for every agent: `potential_points` 79.40 → 79.09 (−0.31, p=0.69), win
+0.900 → 0.906. Rerolls chosen fell by about half across the roster (PP 5.9% →
+3.7% of turns, engine builder 10.9% → 5.0%). 19 of 200 games were
+bit-identical; 181 diverged somewhere without the outcome moving.
+
+### Why it matters
+The last known hidden-information leak in the search agent is closed and the
++10.4 / 0.90 result survives it. Pre-`b33a5e1` archives overstate reroll
+frequency about 2× but their conclusions stand.
+
+### Decision
+- `artifacts/rr_reroll_fix` is the baseline for the default agent from here.
+- Cost flagged: preference actions can put 70–107 legal actions at a search
+  root (four forest birds, dry feeder); one probe decision took over five
+  minutes. Collapse near-duplicate preferences inside the search before
+  scaling to more players or deeper search.
+
+### Follow-up tasks
+1. Game-horizon evaluator ablation (running on branch `game-horizon-ablation`,
+   80 `potential_points` games paired against `rr_reroll_fix`).
+2. Feeder-odds ablation re-run on the searching agent.
+3. Collapse gain-food preference actions in the search beam; measure decision
+   time on the 107-action probe state.
+4. Merge `rules-fidelity-and-artifact-durability` into `main`.

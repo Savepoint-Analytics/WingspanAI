@@ -40,6 +40,7 @@ Key rules docs:
 - `experiments/resource_spending_ablation.md`: the third null, and why the pattern is the finding.
 - `experiments/search_depth_experiment.md`: the first positive result — lookahead depth and coverage, after fixing a dead `search_depth` knob.
 - `experiments/determinized_search_test.md`: how much of the search gain survives when the search cannot read hidden cards (+10.4 of +13.5).
+- `experiments/reroll_chance_node.md`: feeder rolls resolved at apply time so rerolls are a chance node; knowing the roll was worth nothing (−0.31, n.s.).
 - `experiments/round_robin_v5_feeder_odds.md`: corrected dice, and the feeder-odds ablation (null).
 - `experiments/seat_effect_power_analysis.md`: how big a seat effect this design can detect, computed from measured variance.
 - `experiments/seat_order_four_player_test.md`: the four-player test, and why seat claims need a stability check.
