@@ -2123,3 +2123,41 @@ frequency about 2× but their conclusions stand.
 3. Collapse gain-food preference actions in the search beam; measure decision
    time on the 107-action probe state.
 4. Merge `rules-fidelity-and-artifact-durability` into `main`.
+
+## Update: 2026-09-07 - Game-horizon ablation: −12 points; the round horizon is load-bearing
+
+### What changed
+`PotentialPointsAgent(planning_horizon="round" | "game")` on branch
+`game-horizon-ablation` (`042f2d2`); `"game"` counts the cubes in every
+remaining round, `"round"` reproduces the baseline bit-for-bit. 80 paired
+`potential_points` games (the 120 non-PP games of the full design are
+identical by construction) against `artifacts/rr_reroll_fix`. Write-up in
+`docs/experiments/game_horizon_ablation.md`. Tracked `.DS_Store` files
+untracked; Finder rewrote one mid-run and flipped 39 manifests to
+`dirty: true` with no source change.
+
+### Results
+**79.09 → 67.09 (−12.00, p<0.001), win 0.906 → 0.631**, negative against
+every opponent. Round goals −4.8, eggs −3.7; draws rose from 24% to 37% of
+turns, egg lays fell from 28% to 19%.
+
+### Why it matters
+Every potential term is linear in `turns_remaining`, and the round-end
+terminal rule (score realized points at the last cube) was the evaluator's
+only "cash in now" signal. The round horizon encodes Wingspan's per-round
+goal scoring and cube reset; the coefficients were tuned against it. A real
+game-horizon evaluator needs per-round discounting and re-tuned weights — a
+different evaluator, not a switch.
+
+### Decision
+- `planning_horizon="round"` stays the default; `"game"` is kept as a
+  documented negative.
+- The search-depth write-up's round-horizon caveat is resolved.
+
+### Follow-up tasks
+1. Collapse gain-food preference actions in the search beam (slowest baseline
+   decision: 1262 s at a 100+-action root).
+2. Feeder-odds ablation re-run on the searching agent.
+3. If a game-horizon evaluator is attempted, build it as per-round discounted
+   potential with round-goal terms per remaining round, and re-tune before
+   measuring.

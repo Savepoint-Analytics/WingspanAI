@@ -159,6 +159,9 @@ the game: `_turns_remaining_for_player` returns `action_cubes_available`. At a
 round's last cube it discounts all future potential to 0.15× and the search
 leaf scores realized points only. This is constant across arms and is the next
 ablation candidate; fixing it may change how much search is worth.
+*Resolved 2026-09-07:* counting the whole game's turns instead cost
+**−12.0 points** ([game_horizon_ablation.md](game_horizon_ablation.md)); the
+round horizon is what tells the evaluator when to realize points.
 
 **One roster, two players.** As with the three nulls.
 
@@ -178,7 +181,6 @@ ablation candidate; fixing it may change how much search is worth.
 ## Next
 
 1. ~~**Determinized search.**~~ Done; see above.
-2. **Game horizon.** Replace the round horizon with remaining game turns and
-   ablate.
+2. ~~**Game horizon.**~~ Done; −12.0, see above.
 3. **Re-run one valuation ablation** (feeder odds is cheapest) on the searching
    agent, to test whether the nulls were conditional on the dead search.
