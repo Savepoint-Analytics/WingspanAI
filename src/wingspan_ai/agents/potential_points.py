@@ -44,6 +44,7 @@ from wingspan_ai.rules.base_game import (
     apply_action,
     apply_action_in_place,
     egg_cost_for_slot,
+    expected_gain_food,
     habitat_action_yield,
     legal_actions_for_current_player,
     ordered_habitats,
@@ -127,6 +128,13 @@ DEFAULT_DETERMINIZATION_SAMPLES = 4
 #: every remaining round as well.
 DEFAULT_PLANNING_HORIZON = "round"
 PLANNING_HORIZONS = ("round", "game")
+#: Gain-food continuations the search keeps at each node below the root. A
+#: preference action names one multiset of foods for a roll that has not
+#: happened yet, so a dry feeder in front of four forest birds lists 70 of them
+#: plus rerolls, and scoring every one at every node made single decisions
+#: take minutes. The search keeps the best ``search_food_candidates`` by
+#: expected demand-weighted food and every non-food action. ``None`` keeps all.
+DEFAULT_SEARCH_FOOD_CANDIDATES: int | None = 6
 
 
 @dataclass(frozen=True)
@@ -141,6 +149,9 @@ class PotentialPointsSearchConfig:
     determinization_samples: int = DEFAULT_DETERMINIZATION_SAMPLES
     #: ``"round"`` or ``"game"``; see ``DEFAULT_PLANNING_HORIZON``.
     planning_horizon: str = DEFAULT_PLANNING_HORIZON
+    #: Gain-food continuations kept per search node below the root; see
+    #: ``DEFAULT_SEARCH_FOOD_CANDIDATES``. ``None`` keeps every one.
+    search_food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES
 
     def as_manifest_payload(self) -> dict:
         return asdict(self)
@@ -166,6 +177,9 @@ class PotentialPointsAgent(SetupPolicyMixin):
     #: ``"round"`` or ``"game"``; see ``DEFAULT_PLANNING_HORIZON``. The search
     #: trigger (``final_search_turns``) always counts cubes in the round.
     planning_horizon: str = DEFAULT_PLANNING_HORIZON
+    #: Gain-food continuations kept per search node below the root; the root
+    #: scores every legal action. ``None`` keeps every one.
+    search_food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES
     top_alternatives: int = 5
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
@@ -221,6 +235,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
                         depth=depth,
                         beam_width=self.search_beam_width,
                         horizon=self.planning_horizon,
+                        food_candidates=self.search_food_candidates,
                     ),
                     _immediate_score_delta(state, action, player_id),
                 )
@@ -286,6 +301,13 @@ class PotentialPointsAgent(SetupPolicyMixin):
             <= self.final_search_turns,
             "determinization_samples": self.determinization_samples,
             "planning_horizon": self.planning_horizon,
+            "search_food_candidates": self.search_food_candidates,
+            # Module-level ablation switches are not in the manifest, so record
+            # them where the artifacts can prove which arm a game belongs to.
+            "ablation_flags": {
+                "value_habitat_yield": VALUE_HABITAT_YIELD,
+                "value_feeder_odds": VALUE_FEEDER_ODDS,
+            },
         }
 
 
@@ -347,6 +369,7 @@ def _search_action_value(
     depth: int,
     beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH,
     horizon: str = DEFAULT_PLANNING_HORIZON,
+    food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
 ) -> float:
     """Best planning value reachable from ``action`` within ``depth`` own turns.
 
@@ -358,7 +381,9 @@ def _search_action_value(
     """
 
     next_state = apply_action(state, action)
-    return _search_value_from_branch(next_state, player_id, depth, beam_width, horizon)
+    return _search_value_from_branch(
+        next_state, player_id, depth, beam_width, horizon, food_candidates=food_candidates
+    )
 
 
 def _search_value_from_branch(
@@ -367,6 +392,7 @@ def _search_value_from_branch(
     depth: int,
     beam_width: int | None,
     horizon: str = DEFAULT_PLANNING_HORIZON,
+    food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
 ) -> float:
     if depth <= 1 or branch.round_state.game_over:
         return _terminal_planning_value(branch, player_id, horizon)
@@ -378,7 +404,9 @@ def _search_value_from_branch(
         or player.action_cubes_available <= 0
     ):
         return _terminal_planning_value(branch, player_id, horizon)
-    legal_actions = legal_actions_for_current_player(branch)
+    legal_actions = _search_candidate_actions(
+        branch, player, legal_actions_for_current_player(branch), food_candidates
+    )
     if not legal_actions:
         return _terminal_planning_value(branch, player_id, horizon)
 
@@ -390,8 +418,51 @@ def _search_value_from_branch(
     if beam_width is not None:
         ranked = ranked[:beam_width]
     return max(
-        _search_value_from_branch(child, player_id, depth - 1, beam_width, horizon)
+        _search_value_from_branch(
+            child, player_id, depth - 1, beam_width, horizon, food_candidates=food_candidates
+        )
         for _leaf_value, child in ranked
+    )
+
+
+def _search_candidate_actions(
+    state: GameState,
+    player: PlayerState,
+    legal_actions: list[LegalAction],
+    food_candidates: int | None,
+) -> list[LegalAction]:
+    """Keep every non-food action and the ``food_candidates`` best gain-food ones.
+
+    Gain-food actions are ranked by the food they are expected to deliver,
+    each unit weighted by ``1 + demand`` for that type from the player's hand,
+    so a preference that chases what the hand needs outranks one that does
+    not. Ties keep legal-action order, so the cut is deterministic.
+    """
+
+    if food_candidates is None:
+        return legal_actions
+    food_actions = [a for a in legal_actions if a.action_type == ActionType.GAIN_FOOD]
+    if len(food_actions) <= food_candidates:
+        return legal_actions
+    demand = _food_demand(player)
+    ranked = sorted(
+        range(len(food_actions)),
+        key=lambda index: -_expected_food_value(state, food_actions[index], demand),
+    )
+    kept = {food_actions[index] for index in ranked[:food_candidates]}
+    return [
+        action
+        for action in legal_actions
+        if action.action_type != ActionType.GAIN_FOOD or action in kept
+    ]
+
+
+def _expected_food_value(
+    state: GameState, action: LegalAction, demand: Counter[FoodType]
+) -> float:
+    return sum(
+        units * (1.0 + demand.get(food_type, 0))
+        for food_type, units in expected_gain_food(state, action).items()
     )
 
 
@@ -565,6 +636,10 @@ def _habitat_from_power_text(text: str) -> Habitat | None:
 #: Set False to reproduce the pre-2026-09-02 behaviour, where crossing a
 #: habitat yield threshold was worth no more than not crossing one.
 VALUE_HABITAT_YIELD = True
+#: Ablation switch for this agent's only feeder-odds term, the die-availability
+#: weight on feeder-drawing bird powers. Unlike ``feeder_odds.VALUE_FEEDER_ODDS``
+#: it leaves every other agent, including the search's opponent model, alone.
+VALUE_FEEDER_ODDS = True
 
 #: Points-equivalent of one unit produced by a habitat action. Food and cards
 #: are inputs that still need converting, so they are worth well under a point.
@@ -800,6 +875,8 @@ def _registered_food_power_value(
         token = f"[{_food_power_token(food_type)}]"
         if token in lowered_power_text:
             base = 0.85 if demand.get(food_type, 0) > 0 else 0.25
+            if not VALUE_FEEDER_ODDS:
+                return base
             return base * food_power_availability_multiplier(food_type)
     return 0.85 if sum(demand.values()) > 0 else 0.25
 

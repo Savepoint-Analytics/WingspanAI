@@ -402,9 +402,9 @@ class EndgameSearchDepthTests(TestCase):
         depths_seen: list[int] = []
         original = module._search_value_from_branch
 
-        def recording(branch, pid, depth, beam_width, horizon="round"):
+        def recording(branch, pid, depth, beam_width, horizon="round", **kwargs):
             depths_seen.append(depth)
-            return original(branch, pid, depth, beam_width, horizon)
+            return original(branch, pid, depth, beam_width, horizon, **kwargs)
 
         with patch.object(module, "_search_value_from_branch", recording):
             module._search_action_value(state, action, player_id, depth=3, beam_width=2)
@@ -482,6 +482,7 @@ class EndgameSearchDepthTests(TestCase):
                 "search_beam_width": 3,
                 "determinization_samples": 4,
                 "planning_horizon": "round",
+                "search_food_candidates": 6,
             },
         )
 
@@ -530,3 +531,119 @@ class PlanningHorizonTests(TestCase):
         state.active_player.action_cubes_available = 2
         summary = agent.summarize_decision(state, legal_actions, legal_actions[0])
         self.assertTrue(summary["endgame_search_used"])
+
+
+class SearchFoodCandidateTests(TestCase):
+    """The search keeps a bounded set of gain-food continuations per node.
+
+    With the feeder dry, a player with four forest birds is offered 70 food
+    preferences plus rerolls; scoring each at every node made a single
+    decision take minutes without changing which food the player needed.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = make_sample_catalog()
+
+    def _dry_feeder_state(self):
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=41)
+        player = state.active_player
+        plain = _bird("Forest Filler", points=1, food_cost={}, habitats={Habitat.FOREST})
+        player.habitats[Habitat.FOREST] = [BirdSlot(card=plain) for _ in range(4)]
+        state.birdfeeder.dice = []
+        return state, player
+
+    def test_keeps_every_non_food_action_and_at_most_the_limit_of_food_actions(self) -> None:
+        from wingspan_ai.agents.potential_points import _search_candidate_actions
+
+        state, player = self._dry_feeder_state()
+        legal_actions = legal_actions_for_current_player(state)
+        food = [a for a in legal_actions if a.action_type == ActionType.GAIN_FOOD]
+        other = [a for a in legal_actions if a.action_type != ActionType.GAIN_FOOD]
+        self.assertGreater(len(food), 6)
+
+        kept = _search_candidate_actions(state, player, legal_actions, 6)
+
+        self.assertEqual([a for a in kept if a.action_type != ActionType.GAIN_FOOD], other)
+        self.assertEqual(sum(a.action_type == ActionType.GAIN_FOOD for a in kept), 6)
+        self.assertEqual(kept, [a for a in legal_actions if a in set(kept)], "order preserved")
+
+    def test_prefers_the_foods_the_hand_needs(self) -> None:
+        from wingspan_ai.agents.potential_points import _search_candidate_actions
+
+        state, player = self._dry_feeder_state()
+        player.hand = [_bird("Fish Eater", points=5, food_cost={FoodType.FISH: 3})]
+        player.food_tokens = {food_type: 0 for food_type in FoodType}
+        legal_actions = legal_actions_for_current_player(state)
+
+        kept = _search_candidate_actions(state, player, legal_actions, 3)
+
+        for action in kept:
+            if action.action_type == ActionType.GAIN_FOOD:
+                self.assertIn(FoodType.FISH, action.food_types)
+
+    def test_none_and_small_sets_pass_through_unchanged(self) -> None:
+        from wingspan_ai.agents.potential_points import _search_candidate_actions
+
+        state, player = self._dry_feeder_state()
+        legal_actions = legal_actions_for_current_player(state)
+        self.assertIs(_search_candidate_actions(state, player, legal_actions, None), legal_actions)
+        self.assertIs(
+            _search_candidate_actions(state, player, legal_actions, len(legal_actions)),
+            legal_actions,
+        )
+
+    def test_root_actions_are_never_pruned(self) -> None:
+        """Every legal action gets a real score at the root, whatever the limit."""
+
+        state, _player = self._dry_feeder_state()
+        legal_actions = legal_actions_for_current_player(state)
+        agent = PotentialPointsAgent(
+            search_depth=2,
+            final_search_turns=8,
+            determinization_samples=0,
+            search_food_candidates=1,
+        )
+        scores = agent._score_actions(state, legal_actions)
+        self.assertEqual(len(scores), len(legal_actions))
+        self.assertTrue(all(score[0] > float("-inf") for score in scores))
+
+    def test_config_records_the_limit(self) -> None:
+        from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
+
+        self.assertEqual(
+            PotentialPointsSearchConfig().as_manifest_payload()["search_food_candidates"], 6
+        )
+        self.assertIsNone(
+            PotentialPointsSearchConfig(search_food_candidates=None).as_manifest_payload()[
+                "search_food_candidates"
+            ]
+        )
+
+
+class FeederOddsSwitchTests(TestCase):
+    def test_switch_removes_the_availability_weight_only(self) -> None:
+        from wingspan_ai.agents import potential_points as module
+
+        demand = Counter({FoodType.FISH: 1})
+        text = "gain 1 [fish] from the birdfeeder."
+        with_odds = module._registered_food_power_value(text, demand)
+        module.VALUE_FEEDER_ODDS = False
+        try:
+            without = module._registered_food_power_value(text, demand)
+        finally:
+            module.VALUE_FEEDER_ODDS = True
+
+        self.assertNotEqual(with_odds, without)
+        self.assertEqual(without, 0.85)
+
+    def test_decision_summary_records_the_switches(self) -> None:
+        state = setup_base_game(make_sample_catalog(), player_ids=["p1", "p2"], random_seed=3)
+        legal_actions = legal_actions_for_current_player(state)
+        agent = PotentialPointsAgent(determinization_samples=0, final_search_turns=0)
+        summary = agent.summarize_decision(
+            state, legal_actions, agent.select_action(state, legal_actions)
+        )
+        self.assertEqual(
+            summary["ablation_flags"], {"value_habitat_yield": True, "value_feeder_odds": True}
+        )
