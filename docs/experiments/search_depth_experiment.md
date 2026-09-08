@@ -182,5 +182,12 @@ round horizon is what tells the evaluator when to realize points.
 
 1. ~~**Determinized search.**~~ Done; see above.
 2. ~~**Game horizon.**~~ Done; −12.0, see above.
-3. **Re-run one valuation ablation** (feeder odds is cheapest) on the searching
-   agent, to test whether the nulls were conditional on the dead search.
+3. ~~**Re-run one valuation ablation** (feeder odds is cheapest) on the searching
+   agent, to test whether the nulls were conditional on the dead search.~~ Done
+   2026-09-07: still null, +0.49 (p=0.470) with the term deleted
+   ([feeder_odds_search_rerun.md](feeder_odds_search_rerun.md)). The feeder-odds
+   null was not an artefact of the dead search.
+4. **Cheaper search.** Bounding gain-food continuations below the root cuts the
+   worst decision from 1262 s to 491 s for about 1 point
+   ([search_food_candidates.md](search_food_candidates.md)); the remaining 40% of
+   search cost is the greedy opponent model.

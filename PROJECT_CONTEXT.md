@@ -2161,3 +2161,60 @@ different evaluator, not a switch.
 3. If a game-horizon evaluator is attempted, build it as per-round discounted
    potential with round-goal terms per remaining round, and re-tune before
    measuring.
+
+## Update: 2026-09-07 - Bounded gain-food search, and the feeder-odds null survives real search
+
+### What changed
+Two arms at `4506bdf` (clean worktree, 80 paired `potential_points` games each),
+closing follow-up tasks 1 and 2 from the game-horizon entry.
+
+1. **`search_food_candidates` (default 6).** Below the search root, keep every
+   non-gain-food action plus the best six gain-food actions ranked by expected
+   demand-weighted units (via `expected_gain_food`); the root still scores every
+   legal action. Gain-food preference multisets were the compute driver: a root
+   has a median of 4 gain-food options but a mean of 10.7 and a max of 100, and
+   every node re-listed them. Write-up:
+   `docs/experiments/search_food_candidates.md`.
+2. **`potential_points.VALUE_FEEDER_ODDS`.** A PP-local ablation switch guarding
+   the die-availability multiplier in `_registered_food_power_value`, so the
+   ablation no longer changes opponents or the search's own opponent model the
+   way the 2026-09-04 module global did. Module switches never reach the
+   manifest, so `agent_decision_summary` now records an `ablation_flags` payload;
+   all 2,080 decisions per arm carry the right value. Write-up:
+   `docs/experiments/feeder_odds_search_rerun.md`.
+
+### Results
+- **Pruning: −0.99 points (p=0.074), win 0.906 → 0.863 (p=0.048).** Negative in
+  all four opponent cells; the loss is round goals (−0.47) and cached food
+  (−0.29), not bird points, and the action mix is unchanged. Cost side: mean
+  decision 21.2 → 17.5 s, p99 234 → 161 s, **worst decision 1262 → 491 s**,
+  worst game 70 → 30 min — understated, since the pruned arm shared the machine
+  and the baseline did not (a back-to-back probe measured 33.7 → 9.4 s).
+- **Feeder odds off: +0.49 (p=0.470), win −0.013 (p=0.656).** Null again, on a
+  depth-3 determinized agent searching every turn. The 2026-09-04 null was not
+  an artefact of the dead `search_depth`.
+
+### Why it matters
+The two results point the same way. Planning changes this agent (+10.4 for
+depth/coverage, −12.0 for the wrong horizon); the coefficients inside the
+evaluator do not. Restricting the *search* costs a measurable point, while
+deleting a *valuation term* costs nothing — the constraint is what the agent
+does with a valuation, not the valuation's fidelity. Four valuation nulls now,
+one of them re-tested against the objection that killed the others' standing.
+
+### Decision
+- `search_food_candidates=6` stays the default: arms per week is the binding
+  constraint, and ~1 point of a 78-point agent buys a third off the tail. Any
+  claim about how strong `potential_points` *is* must use `None` or say it is
+  the pruned agent's number. Arm-vs-arm contrasts are unaffected when both arms
+  share the setting.
+- `VALUE_FEEDER_ODDS` stays `True` in both modules, on correctness grounds only.
+- Manifests record `potential_points_search: null` when defaults are used; the
+  per-decision payload is what identifies an arm.
+
+### Follow-up tasks
+1. Optional: N=12 pruning arm if the ~1 point matters (80 games, ~10 h).
+2. Cheap opponent model in the search — the greedy model evaluates all its own
+   legal actions and is ~40% of what remains.
+3. Untested: mat-scaling and resource-spending nulls have not been re-run on the
+   searching agent.

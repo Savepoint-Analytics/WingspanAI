@@ -38,6 +38,12 @@ game; neither changed outcomes. The consistent reading is that these heuristic
 agents are not limited by the fidelity of their food or habitat valuation, so
 sharpening it has nothing to bite on.
 
+**Re-run 2026-09-07.** This arm flipped a module global that every agent read,
+and it was measured before `search_depth` was found to be dead. Both objections
+are now answered: a `potential_points`-local switch, on the depth-3 determinized
+agent, gives **+0.49 (p=0.470)** — null again
+([feeder_odds_search_rerun.md](feeder_odds_search_rerun.md)).
+
 `VALUE_FEEDER_ODDS` stays `True`: the terms are more faithful than what they
 replaced, and they cost nothing. But they are retained on correctness grounds
 alone, and nothing downstream should treat them as an improvement.

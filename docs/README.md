@@ -43,6 +43,8 @@ Key rules docs:
 - `experiments/game_horizon_ablation.md`: counting the whole game's turns instead of the round's costs −12.0; the round horizon is load-bearing.
 - `experiments/reroll_chance_node.md`: feeder rolls resolved at apply time so rerolls are a chance node; knowing the roll was worth nothing (−0.31, n.s.).
 - `experiments/round_robin_v5_feeder_odds.md`: corrected dice, and the feeder-odds ablation (null).
+- `experiments/search_food_candidates.md`: bounding gain-food continuations in the search — a third off the decision-time tail for about 1 point.
+- `experiments/feeder_odds_search_rerun.md`: the feeder-odds ablation re-run on the searching agent (still null, +0.49).
 - `experiments/seat_effect_power_analysis.md`: how big a seat effect this design can detect, computed from measured variance.
 - `experiments/seat_order_four_player_test.md`: the four-player test, and why seat claims need a stability check.
 - `experiments/seat_order_investigation_3p.md`: why seat 3 appeared to win, and why it did not replicate.
