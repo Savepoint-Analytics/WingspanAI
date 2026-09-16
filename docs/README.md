@@ -45,6 +45,7 @@ Key rules docs:
 - `experiments/round_robin_v5_feeder_odds.md`: corrected dice, and the feeder-odds ablation (null).
 - `experiments/search_food_candidates.md`: bounding gain-food continuations in the search — a third off the decision-time tail for about 1 point.
 - `experiments/feeder_odds_search_rerun.md`: the feeder-odds ablation re-run on the searching agent (still null, +0.49).
+- `experiments/search_opponent_model_test.md`: the Bayesian opponent posterior plays the opponent seats inside the search — the cheap opponent model and the first belief-driven decision, with predictions registered before the arm.
 - `experiments/seat_effect_power_analysis.md`: how big a seat effect this design can detect, computed from measured variance.
 - `experiments/seat_order_four_player_test.md`: the four-player test, and why seat claims need a stability check.
 - `experiments/seat_order_investigation_3p.md`: why seat 3 appeared to win, and why it did not replicate.

@@ -26,10 +26,10 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from math import ceil
+from typing import TYPE_CHECKING
 
 from wingspan_ai.agents.determinization import determinize_state
 from wingspan_ai.agents.feeder_odds import food_power_availability_multiplier
-from wingspan_ai.agents.greedy import GreedyBaselineAgent
 from wingspan_ai.agents.setup import PotentialPointsSetupPolicy, SetupPolicyMixin
 from wingspan_ai.content.birdfeeder import (
     BIRDFEEDER_DICE_COUNT,
@@ -52,6 +52,9 @@ from wingspan_ai.rules.base_game import (
 )
 from wingspan_ai.rules.power_registry import classify_power_handler_key
 from wingspan_ai.state.models import BirdSlot, GameState, PlayerState
+
+if TYPE_CHECKING:
+    from wingspan_ai.agents.search_opponent import SearchOpponentModel
 
 
 @dataclass(frozen=True)
@@ -135,6 +138,13 @@ PLANNING_HORIZONS = ("round", "game")
 #: take minutes. The search keeps the best ``search_food_candidates`` by
 #: expected demand-weighted food and every non-food action. ``None`` keeps all.
 DEFAULT_SEARCH_FOOD_CANDIDATES: int | None = 6
+#: Who plays the opponent seats inside the search. ``"greedy"`` is the historic
+#: model (every legal action priced through ``apply_action``, ~16 ms a turn);
+#: ``"belief"`` plays the action family the Bayesian opponent posterior finds
+#: most likely and picks within it without applying anything (~0.2 ms). See
+#: ``wingspan_ai.agents.search_opponent``.
+DEFAULT_SEARCH_OPPONENT_MODEL = "greedy"
+SEARCH_OPPONENT_MODELS = ("greedy", "belief")
 
 
 @dataclass(frozen=True)
@@ -152,6 +162,8 @@ class PotentialPointsSearchConfig:
     #: Gain-food continuations kept per search node below the root; see
     #: ``DEFAULT_SEARCH_FOOD_CANDIDATES``. ``None`` keeps every one.
     search_food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES
+    #: ``"greedy"`` or ``"belief"``; see ``DEFAULT_SEARCH_OPPONENT_MODEL``.
+    search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
 
     def as_manifest_payload(self) -> dict:
         return asdict(self)
@@ -180,7 +192,43 @@ class PotentialPointsAgent(SetupPolicyMixin):
     #: Gain-food continuations kept per search node below the root; the root
     #: scores every legal action. ``None`` keeps every one.
     search_food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES
+    #: ``"greedy"`` or ``"belief"``; see ``DEFAULT_SEARCH_OPPONENT_MODEL``.
+    search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
     top_alternatives: int = 5
+    _opponent_model: SearchOpponentModel = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        # Loaded here rather than at module scope: the belief model depends on
+        # ``net_value``, which imports this module.
+        from wingspan_ai.agents.search_opponent import build_search_opponent_model
+
+        if self.search_opponent_model not in SEARCH_OPPONENT_MODELS:
+            raise ValueError(
+                f"unknown search opponent model: {self.search_opponent_model!r}; "
+                f"expected one of {SEARCH_OPPONENT_MODELS}"
+            )
+        self._opponent_model = build_search_opponent_model(
+            self.search_opponent_model, owner_agent_id=self.agent_id
+        )
+
+    @property
+    def opponent_model(self) -> SearchOpponentModel:
+        return self._opponent_model
+
+    def observe_action(
+        self,
+        state_before: GameState,
+        action: LegalAction,
+        acting_player_id: str,
+    ) -> None:
+        """Let the search's opponent model learn from a resolved real action.
+
+        Called by the runner after every action. A no-op for the greedy
+        model; the belief model Bayes-updates its posterior over the acting
+        opponent's type from public information only.
+        """
+
+        self._opponent_model.observe_action(state_before, action, acting_player_id)
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
         if not legal_actions:
@@ -236,6 +284,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
                         beam_width=self.search_beam_width,
                         horizon=self.planning_horizon,
                         food_candidates=self.search_food_candidates,
+                        opponent_model=self._opponent_model,
                     ),
                     _immediate_score_delta(state, action, player_id),
                 )
@@ -302,6 +351,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "determinization_samples": self.determinization_samples,
             "planning_horizon": self.planning_horizon,
             "search_food_candidates": self.search_food_candidates,
+            "search_opponent_model": self.search_opponent_model,
+            "opponent_model": self._opponent_model.telemetry_payload(),
             # Module-level ablation switches are not in the manifest, so record
             # them where the artifacts can prove which arm a game belongs to.
             "ablation_flags": {
@@ -355,11 +406,12 @@ def evaluate_state_potential(
     )
 
 
-#: Opponent turns inside the search are played by the greedy baseline. It is
-#: deterministic, needs no RNG stream, and sits mid-roster in strength, so the
-#: search sees the tray and feeder contention it exists to plan around. A
-#: pass-through opponent would be cheaper but blind to that contention.
-_SEARCH_OPPONENT_MODEL = GreedyBaselineAgent(agent_id="search_opponent_model")
+def _default_search_opponent_model() -> SearchOpponentModel:
+    """The greedy model, for callers that do not pass one (direct search calls, tests)."""
+
+    from wingspan_ai.agents.search_opponent import GreedySearchOpponentModel
+
+    return GreedySearchOpponentModel()
 
 
 def _search_action_value(
@@ -370,19 +422,28 @@ def _search_action_value(
     beam_width: int | None = DEFAULT_SEARCH_BEAM_WIDTH,
     horizon: str = DEFAULT_PLANNING_HORIZON,
     food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
+    opponent_model: SearchOpponentModel | None = None,
 ) -> float:
     """Best planning value reachable from ``action`` within ``depth`` own turns.
 
     Until 2026-09-04 this returned the leaf value whenever the active player
     changed. ``apply_action`` always advances the turn, so in every multiplayer
     game the recursion stopped after one ply and ``search_depth`` had no effect.
-    Opponent turns are now played out with ``_SEARCH_OPPONENT_MODEL`` on the
-    owned branch before descending to the next own turn.
+    Opponent turns are now played out with ``opponent_model`` on the owned
+    branch before descending to the next own turn.
     """
 
+    if opponent_model is None:
+        opponent_model = _default_search_opponent_model()
     next_state = apply_action(state, action)
     return _search_value_from_branch(
-        next_state, player_id, depth, beam_width, horizon, food_candidates=food_candidates
+        next_state,
+        player_id,
+        depth,
+        beam_width,
+        horizon,
+        food_candidates=food_candidates,
+        opponent_model=opponent_model,
     )
 
 
@@ -393,10 +454,13 @@ def _search_value_from_branch(
     beam_width: int | None,
     horizon: str = DEFAULT_PLANNING_HORIZON,
     food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
+    opponent_model: SearchOpponentModel | None = None,
 ) -> float:
+    if opponent_model is None:
+        opponent_model = _default_search_opponent_model()
     if depth <= 1 or branch.round_state.game_over:
         return _terminal_planning_value(branch, player_id, horizon)
-    _play_opponent_turns_in_place(branch, player_id)
+    _play_opponent_turns_in_place(branch, player_id, opponent_model)
     player = _get_player(branch, player_id)
     if (
         branch.round_state.game_over
@@ -419,7 +483,13 @@ def _search_value_from_branch(
         ranked = ranked[:beam_width]
     return max(
         _search_value_from_branch(
-            child, player_id, depth - 1, beam_width, horizon, food_candidates=food_candidates
+            child,
+            player_id,
+            depth - 1,
+            beam_width,
+            horizon,
+            food_candidates=food_candidates,
+            opponent_model=opponent_model,
         )
         for _leaf_value, child in ranked
     )
@@ -466,14 +536,20 @@ def _expected_food_value(
     )
 
 
-def _play_opponent_turns_in_place(branch: GameState, player_id: str) -> None:
+def _play_opponent_turns_in_place(
+    branch: GameState,
+    player_id: str,
+    opponent_model: SearchOpponentModel | None = None,
+) -> None:
     """Advance an owned branch through opponent turns until ``player_id`` acts."""
 
+    if opponent_model is None:
+        opponent_model = _default_search_opponent_model()
     while not branch.round_state.game_over and branch.active_player.player_id != player_id:
         legal_actions = legal_actions_for_current_player(branch)
         if not legal_actions:
             return
-        chosen = _SEARCH_OPPONENT_MODEL.select_action(branch, legal_actions)
+        chosen = opponent_model.select_action(branch, legal_actions)
         apply_action_in_place(branch, chosen)
 
 

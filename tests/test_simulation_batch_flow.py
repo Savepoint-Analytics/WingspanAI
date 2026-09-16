@@ -124,6 +124,7 @@ class SimulationBatchFlowTests(TestCase):
                     "determinization_samples": 0,
                     "planning_horizon": "round",
                     "search_food_candidates": 6,
+                    "search_opponent_model": "greedy",
                 },
             )
             self.assertEqual(results[0]["player_two_agent_id"], "potential_points_p2")

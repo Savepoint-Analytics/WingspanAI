@@ -2218,3 +2218,57 @@ one of them re-tested against the objection that killed the others' standing.
    legal actions and is ~40% of what remains.
 3. Untested: mat-scaling and resource-spending nulls have not been re-run on the
    searching agent.
+
+## Update: 2026-09-16 - Belief posterior as the search's opponent model (built, arm not run)
+
+### What changed
+`src/wingspan_ai/agents/search_opponent.py` and
+`PotentialPointsAgent(search_opponent_model="greedy" | "belief")`. The greedy
+model is unchanged and stays the default, pinned to `GreedyBaselineAgent` by a
+regression test. The belief model plays each opponent turn inside the search as
+the action family the `OpponentBeliefState` posterior finds most likely (from
+public candidate values only, ~0.2 ms) and picks within the family by a proxy
+that never applies an action. `PotentialPointsAgent` now implements
+`observe_action`, so the runner's hook Bayes-updates the posterior from real
+actions; search branches read it and never write it. Threaded through
+`PotentialPointsSearchConfig`, the manifest, `_make_agent`, and decision
+telemetry, which records the posterior per opponent. 15 tests in
+`tests/test_search_opponent.py`; suite at 361 passing.
+
+Plan and registered predictions in
+`docs/experiments/search_opponent_model_test.md`. Probe tool:
+`analysis/search_opponent_profile.py`.
+
+### Compute probe
+Back-to-back on 26 real decisions (seed 1 vs `archetype_engine_builder`):
+**41.1% less decision time** (142.9 s → 84.2 s; worst root 32.5 → 20.5 s),
+40.8% on the heavy decisions, same action on 24 of 26. Clears the registered
+30%. Larger than the 40% profiling share because the opponent model is paid
+at every tree node, so its share grows with depth.
+
+### Why it matters
+This is the first place a belief posterior changes a `potential_points`
+decision, and it arrives as the cheap opponent model the search-cost follow-up
+asked for. Which of the two matters is what the arm will say: the registered
+score prior is null within ±1.0 points, with a non-inferiority gate of ≥ −1.0
+before the switch can become the default.
+
+### Diagnostic found
+The posterior against `archetype_engine_builder` collapsed to
+`food_acceleration` at 0.9995 after 25 observations. Behaviourally defensible
+(the archetype gains food on 36% of turns, its plurality family) but far too confident: the
+profile priors are hand-tilted and were never fitted to this roster, and each
+observation is scored as an independent draw. The 2026-08-31 follow-up to refit
+family priors from round-robin telemetry is the fix and is still open.
+
+### Follow-up tasks
+1. Commit on a clean tree, then run the 80-game belief arm against
+   `artifacts/rr_food_cand6` (three lineup groups × five two-seed chunks, as
+   before). Contrast with `analysis/arm_contrast.py`.
+2. Read the posterior in the arm's telemetry: does it concentrate, and does the
+   predicted family match the family each opponent kind actually plays?
+3. If the arm passes the gate, make `belief` the default and re-baseline; if it
+   fails, try `search_food_candidates=None` + belief against the current
+   default before deciding.
+4. Refit belief profile priors from round-robin telemetry (open since
+   2026-08-31); the collapse above is the motivation.
