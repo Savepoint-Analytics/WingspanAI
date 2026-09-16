@@ -2324,3 +2324,41 @@ documented control.
    prerequisites now met) is affordable — next experiment.
 4. The pruned-vs-unpruned question (`search_food_candidates`) could be re-asked
    at N=12 now that the other half of the search cost is gone.
+
+## Update: 2026-09-16 - Belief opponent model is the default, with a 5% standing control
+
+### Decision (Alex)
+`search_opponent_model="belief"` is the default; `artifacts/rr_belief_opp` is
+the baseline for the default agent. Alex flagged two risks with adopting on
+one null arm: a false positive at n=80, and a bias hazard once agents learn
+from past games, since everything they would learn from would have been
+searched with one opponent model. Both are handled by a holdout rather than by
+trust.
+
+### What changed
+- `PotentialPointsSearchConfig` gained `search_opponent_holdout_share` (0.05)
+  and `search_opponent_holdout_model` ("greedy"). The flow resolves the
+  effective model per game from a SHA-256 draw over
+  `(random_seed, lineup, lineup position)` — reproducible, identical across
+  seed-matched arms so pairing survives, and identical across seat rotations so
+  the control subset is counterbalanced.
+- Manifests record the effective model per `potential_points` seat in
+  `games[].search_opponent_models` with a `holdout` flag; decisions already
+  record it.
+- `analysis/holdout_guardrail.py` pools artifact roots and reports the unpaired
+  preferred-vs-held-out contrast with a detection limit, and refuses to call
+  fewer than 40 held-out games a finding.
+- 23 tests in `tests/test_search_opponent.py`; suite 368 passing.
+
+### What to expect
+The standard 80-game design holds out 6 games; seeds 1–30 hold out 8 of 240.
+The control accrues across every batch run with the default, so the guardrail
+becomes readable after roughly ten arms, not one. That is the intent: a
+long-run check, not a per-arm test. Any arm-vs-arm contrast is unaffected
+because both arms hold out the same games.
+
+### Follow-up tasks
+1. Run `analysis/holdout_guardrail.py` over all default-agent roots at each
+   experiment write-up and quote it once ≥40 held-out games exist.
+2. If a learning agent is added, key its training data on
+   `search_opponent_models` so the held-out games can be excluded or weighted.

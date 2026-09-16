@@ -224,11 +224,33 @@ round-robin telemetry remains the fix.
 
 ## Decision
 
-Recommended: make `search_opponent_model="belief"` the default and re-baseline
-on `artifacts/rr_belief_opp`. The registered gate passes, the action mix is
-unchanged, and the arm cost falls from ~10 h to ~4.4 h, which is the binding
-constraint on everything downstream. The greedy model stays available as the
-documented control.
+**Applied 2026-09-16 (Alex's call):** `search_opponent_model="belief"` is the
+default and `artifacts/rr_belief_opp` is the baseline for the default agent
+from here. The registered gate passed, the action mix is unchanged, and the
+arm cost falls from ~10 h to ~4.4 h, which is the binding constraint on
+everything downstream.
+
+**With a standing control.** Alex's two reservations — the null could be a
+false positive at n=80, and adopting the belief model everywhere could bias
+any agent that later learns from past games toward what the belief-modelled
+search tends to see — are met by a holdout rather than by trust. A
+deterministic **5% of games keep the greedy model**
+(`PotentialPointsSearchConfig.search_opponent_holdout_share=0.05`,
+`search_opponent_holdout_model="greedy"`). Which games are held out is a
+SHA-256 draw over `(random_seed, lineup, lineup position)`, so:
+
+- seed-matched arms hold out the same games and stay paired;
+- both seat rotations of a game hold out together, so the control subset is
+  counterbalanced like everything else;
+- the manifest records the effective model per `potential_points` seat
+  (`games[].search_opponent_models`) and every decision records it too.
+
+In the standard 80-game design the draw holds out 6 games (seeds 10, 1 and 3
+in three of the four lineups); at seeds 1–30 it is 8 of 240. The control
+therefore accrues slowly by design — it is a long-run experiment, not a
+per-arm test — and `analysis/holdout_guardrail.py` pools artifact roots and
+reports the unpaired contrast with its own detection limit, refusing to read
+fewer than 40 held-out games as a finding.
 
 Two things this result does and does not say:
 

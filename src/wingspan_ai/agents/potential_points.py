@@ -24,6 +24,7 @@ Power timing valuation plan:
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from math import ceil
 from typing import TYPE_CHECKING
@@ -141,9 +142,13 @@ DEFAULT_SEARCH_FOOD_CANDIDATES: int | None = 6
 #: Who plays the opponent seats inside the search. ``"greedy"`` is the historic
 #: model (every legal action priced through ``apply_action``, ~16 ms a turn);
 #: ``"belief"`` plays the action family the Bayesian opponent posterior finds
-#: most likely and picks within it without applying anything (~0.2 ms). See
+#: most likely and picks within it without applying anything (~0.2 ms). The
+#: default became ``"belief"`` on 2026-09-16; a deterministic minority of
+#: games keeps ``"greedy"`` as a standing control. See
 #: ``wingspan_ai.agents.search_opponent``.
-DEFAULT_SEARCH_OPPONENT_MODEL = "greedy"
+DEFAULT_SEARCH_OPPONENT_MODEL = "belief"
+DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE = 0.05
+DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
 SEARCH_OPPONENT_MODELS = ("greedy", "belief")
 
 
@@ -162,11 +167,32 @@ class PotentialPointsSearchConfig:
     #: Gain-food continuations kept per search node below the root; see
     #: ``DEFAULT_SEARCH_FOOD_CANDIDATES``. ``None`` keeps every one.
     search_food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES
-    #: ``"greedy"`` or ``"belief"``; see ``DEFAULT_SEARCH_OPPONENT_MODEL``.
+    #: ``"greedy"`` or ``"belief"``; see ``DEFAULT_SEARCH_OPPONENT_MODEL``. This
+    #: is the preferred model; the flow resolves the effective one per game.
     search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
+    #: Share of games that keep ``search_opponent_holdout_model`` instead, as a
+    #: standing control. ``0`` disables the holdout.
+    search_opponent_holdout_share: float = DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE
+    search_opponent_holdout_model: str = DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL
 
     def as_manifest_payload(self) -> dict:
         return asdict(self)
+
+    def resolve_opponent_model(
+        self, *, random_seed: int, lineup: Sequence[str], lineup_position: int
+    ) -> tuple[str, bool]:
+        """Effective ``(model, is_holdout)`` for one agent in one game."""
+
+        from wingspan_ai.agents.search_opponent import resolve_search_opponent_model
+
+        return resolve_search_opponent_model(
+            self.search_opponent_model,
+            holdout_share=self.search_opponent_holdout_share,
+            holdout_model=self.search_opponent_holdout_model,
+            random_seed=random_seed,
+            lineup=lineup,
+            lineup_position=lineup_position,
+        )
 
 
 @dataclass
@@ -192,7 +218,9 @@ class PotentialPointsAgent(SetupPolicyMixin):
     #: Gain-food continuations kept per search node below the root; the root
     #: scores every legal action. ``None`` keeps every one.
     search_food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES
-    #: ``"greedy"`` or ``"belief"``; see ``DEFAULT_SEARCH_OPPONENT_MODEL``.
+    #: ``"greedy"`` or ``"belief"``; see ``DEFAULT_SEARCH_OPPONENT_MODEL``. On an
+    #: agent this is the effective model for its game; the holdout is resolved
+    #: by whoever constructs the agent (``PotentialPointsSearchConfig``).
     search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
     top_alternatives: int = 5
     _opponent_model: SearchOpponentModel = field(init=False, repr=False, compare=False)

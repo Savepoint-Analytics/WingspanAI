@@ -13,6 +13,8 @@ Analysis layer:
 
 - `analysis/sql/analysis_views.sql`: reproducible metric definitions over simulation telemetry.
 - `analysis/apply_sql_views.py`: applies and probes the analysis views.
+- `analysis/arm_contrast.py`: paired contrast of experimental arms against a baseline.
+- `analysis/holdout_guardrail.py`: the standing 5% greedy-opponent control, pooled across batches.
 
 Key rules docs:
 

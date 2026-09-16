@@ -483,7 +483,9 @@ class EndgameSearchDepthTests(TestCase):
                 "determinization_samples": 4,
                 "planning_horizon": "round",
                 "search_food_candidates": 6,
-                "search_opponent_model": "greedy",
+                "search_opponent_model": "belief",
+                "search_opponent_holdout_share": 0.05,
+                "search_opponent_holdout_model": "greedy",
             },
         )
 

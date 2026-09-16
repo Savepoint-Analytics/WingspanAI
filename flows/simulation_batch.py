@@ -184,6 +184,7 @@ def run_seeded_game(
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
             net_value_response_mode=net_value_response_mode,
             potential_points_search=potential_points_search,
+            lineup=tuple(resolved_lineup),
         )
         if guardrail_config is None or seat not in guardrail_seats:
             return base_agent
@@ -262,6 +263,11 @@ def run_seeded_game(
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "net_value_response_mode": net_value_response_mode,
         "potential_points_search": _search_payload(potential_points_search),
+        # The model each potential_points seat actually searched with, after
+        # the holdout draw; ``holdout`` marks the standing-control games.
+        "search_opponent_models": _search_opponent_models(
+            lineup_agents, potential_points_search or PotentialPointsSearchConfig()
+        ),
         "replay_validation": replay_validation_payload,
         "rule_audits": rule_audits,
     }
@@ -341,6 +347,7 @@ def run_seeded_game(
         "monte_carlo_max_candidate_actions": monte_carlo_max_candidate_actions,
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
+        "search_opponent_models": batch_metadata["search_opponent_models"],
         "ruleset_id": result.state.ruleset.ruleset_id,
         "outcome": asdict(result.outcome),
         "event_count": len(result.events),
@@ -401,6 +408,20 @@ def _apply_setup_policy(agent, agent_kind: PlayerTwoAgentKind, setup_policy_kind
     return agent
 
 
+def _search_opponent_models(agents, search: PotentialPointsSearchConfig) -> dict[str, dict]:
+    models: dict[str, dict] = {}
+    for agent in agents:
+        base = getattr(agent, "base_agent", agent)  # unwrap a guardrailed agent
+        effective = getattr(base, "search_opponent_model", None)
+        if effective is None:
+            continue
+        models[agent.agent_id] = {
+            "model": effective,
+            "holdout": effective != search.search_opponent_model,
+        }
+    return models
+
+
 def _search_payload(config: PotentialPointsSearchConfig | None) -> dict | None:
     """Manifest form of the potential-points search settings; None means agent defaults."""
 
@@ -422,6 +443,7 @@ def _make_agent(
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
     guardrail_config_path: str | None = None,
+    lineup: tuple[str, ...] | None = None,
 ):
     # A "guardrailed:" prefix wraps the base agent in its own guardrail layer,
     # so a roster can pit an agent against its guardrailed twin.
@@ -447,6 +469,13 @@ def _make_agent(
         agent = RandomLegalAgent(agent_id=f"random_legal_{seat}", random_seed=agent_random_seed)
     elif agent_kind == "potential_points":
         search = potential_points_search or PotentialPointsSearchConfig()
+        # The holdout is keyed on the game's seed and the agent's lineup
+        # position, so seed-matched arms and seat rotations agree on it.
+        opponent_model, _is_holdout = search.resolve_opponent_model(
+            random_seed=random_seed,
+            lineup=lineup or (agent_kind,),
+            lineup_position=max(seat_ordinal - 1, 0),
+        )
         agent = PotentialPointsAgent(
             agent_id=f"potential_points_{seat}",
             search_depth=search.search_depth,
@@ -455,7 +484,7 @@ def _make_agent(
             determinization_samples=search.determinization_samples,
             planning_horizon=search.planning_horizon,
             search_food_candidates=search.search_food_candidates,
-            search_opponent_model=search.search_opponent_model,
+            search_opponent_model=opponent_model,
         )
     elif agent_kind == "net_value_response":
         agent = NetValueOpponentResponseAgent(
@@ -651,6 +680,7 @@ def _write_batch_manifest(
                 "net_value_max_opponent_response_actions": result[
                     "net_value_max_opponent_response_actions"
                 ],
+                "search_opponent_models": result.get("search_opponent_models", {}),
                 "replay_validation": result["replay_validation"],
                 "artifact_dir": result["artifact_dir"],
                 "postgres": result["postgres"],

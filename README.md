@@ -200,7 +200,7 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
 - `src/wingspan_ai/agents/setup.py`: opening setup policies for kept birds, bonus cards, and starting food.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
-- `src/wingspan_ai/agents/potential_points.py`: expected-value greedy variant that estimates final-score potential from resources, playable birds, powers, bonus-card progress, round-goal pressure, and endgame conversion.
+- `src/wingspan_ai/agents/potential_points.py`: expected-value agent that estimates final-score potential from resources, playable birds, powers, bonus-card progress, round-goal pressure, and endgame conversion, then searches three own turns ahead on every turn over determinized hidden information. Opponent turns inside the search are played from the Bayesian opponent posterior (`agents/search_opponent.py`), with a deterministic 5% of games keeping the greedy opponent model as a standing control.
 - `src/wingspan_ai/agents/net_value.py`: score-margin agent scaffold that estimates next opponent response and shared-resource denial value from public observations plus a first belief heuristic.
 - `src/wingspan_ai/belief/models.py`: Bayesian opponent-type posterior and action-family response distribution.
 - `src/wingspan_ai/content/filters.py`: experiment-level catalog filtering by power implementation status or handler key.

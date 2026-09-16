@@ -31,6 +31,8 @@ within-family proxy may read it, exactly as the greedy model always has.
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -52,7 +54,55 @@ from wingspan_ai.state.models import GameState, to_public_state
 _PUBLIC_MODEL = PublicOpponentBeliefModel()
 
 SEARCH_OPPONENT_MODELS = ("greedy", "belief")
-DEFAULT_SEARCH_OPPONENT_MODEL = "greedy"
+#: Default flipped to ``"belief"`` on 2026-09-16 after the 80-game arm in
+#: ``docs/experiments/search_opponent_model_test.md``: score +0.31 (p=0.73),
+#: decision cost more than halved.
+DEFAULT_SEARCH_OPPONENT_MODEL = "belief"
+#: A minority of games keep the previous model as a standing control, so the
+#: adoption stays a long-run experiment rather than a one-shot result and a
+#: later change (an agent that learns from past games, say) cannot quietly
+#: bake the belief model's tendencies into everything it sees. Which games
+#: are held out is a deterministic function of the game key, so seed-matched
+#: arms hold out the same games and stay paired.
+DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE = 0.05
+DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
+
+
+def holdout_draw(key: str) -> float:
+    """Uniform draw in [0, 1) from a string key, stable across processes and versions."""
+
+    digest = hashlib.sha256(key.encode("utf-8")).digest()
+    return int.from_bytes(digest[:8], "big") / float(1 << 64)
+
+
+def resolve_search_opponent_model(
+    preferred: str,
+    *,
+    holdout_share: float,
+    holdout_model: str,
+    random_seed: int,
+    lineup: Sequence[str],
+    lineup_position: int,
+) -> tuple[str, bool]:
+    """Return ``(effective_model, is_holdout)`` for one agent in one game.
+
+    The key is the game's seed, the lineup, and the agent's position in it —
+    not the seat it ends up in — so the same game holds out in every seat
+    rotation and the holdout subset is counterbalanced like everything else.
+    """
+
+    if preferred not in SEARCH_OPPONENT_MODELS:
+        raise ValueError(f"unknown search opponent model: {preferred!r}")
+    if holdout_model not in SEARCH_OPPONENT_MODELS:
+        raise ValueError(f"unknown search opponent holdout model: {holdout_model!r}")
+    if not 0.0 <= holdout_share <= 1.0:
+        raise ValueError(f"holdout share must be in [0, 1], got {holdout_share}")
+    if holdout_share <= 0.0 or holdout_model == preferred:
+        return preferred, False
+    key = f"search_opponent_holdout:{random_seed}:{','.join(lineup)}:{lineup_position}"
+    if holdout_draw(key) < holdout_share:
+        return holdout_model, True
+    return preferred, False
 
 
 class SearchOpponentModel(Protocol):

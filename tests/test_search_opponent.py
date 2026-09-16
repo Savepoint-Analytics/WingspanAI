@@ -65,13 +65,19 @@ class GreedySearchOpponentModelTests(TestCase):
         )
         self.assertEqual(implicit, explicit)
 
-    def test_agent_default_is_greedy_and_observation_is_a_no_op(self) -> None:
-        agent = PotentialPointsAgent()
-        self.assertEqual(agent.search_opponent_model, "greedy")
+    def test_greedy_observation_is_a_no_op(self) -> None:
+        agent = PotentialPointsAgent(search_opponent_model="greedy")
         self.assertIsInstance(agent.opponent_model, GreedySearchOpponentModel)
         branch = _opponent_turn_state(self.catalog)
         agent.observe_action(branch, legal_actions_for_current_player(branch)[0], "p2")
         self.assertEqual(agent.opponent_model.telemetry_payload(), {"model_id": "greedy"})
+
+    def test_agent_default_is_belief(self) -> None:
+        """Default flipped 2026-09-16 after the arm in search_opponent_model_test.md."""
+
+        agent = PotentialPointsAgent()
+        self.assertEqual(agent.search_opponent_model, "belief")
+        self.assertIsInstance(agent.opponent_model, BeliefSearchOpponentModel)
 
 
 class BeliefSearchOpponentModelTests(TestCase):
@@ -215,14 +221,15 @@ class BeliefSearchOpponentModelTests(TestCase):
 
 class SearchOpponentConfigTests(TestCase):
     def test_config_and_manifest_carry_the_switch(self) -> None:
+        payload = PotentialPointsSearchConfig().as_manifest_payload()
+        self.assertEqual(payload["search_opponent_model"], "belief")
+        self.assertEqual(payload["search_opponent_holdout_share"], 0.05)
+        self.assertEqual(payload["search_opponent_holdout_model"], "greedy")
         self.assertEqual(
-            PotentialPointsSearchConfig().as_manifest_payload()["search_opponent_model"], "greedy"
-        )
-        self.assertEqual(
-            PotentialPointsSearchConfig(search_opponent_model="belief").as_manifest_payload()[
+            PotentialPointsSearchConfig(search_opponent_model="greedy").as_manifest_payload()[
                 "search_opponent_model"
             ],
-            "belief",
+            "greedy",
         )
 
     def test_decision_summary_records_the_model(self) -> None:
@@ -241,3 +248,156 @@ class SearchOpponentConfigTests(TestCase):
             PotentialPointsAgent(search_opponent_model="oracle")
         with self.assertRaises(ValueError):
             build_search_opponent_model("oracle", owner_agent_id="pp")
+
+
+class HoldoutTests(TestCase):
+    """A deterministic minority of games keeps the previous model as a control."""
+
+    def test_draw_is_stable_and_uniform_enough(self) -> None:
+        from wingspan_ai.agents.search_opponent import holdout_draw
+
+        self.assertEqual(holdout_draw("a"), holdout_draw("a"))
+        self.assertNotEqual(holdout_draw("a"), holdout_draw("b"))
+        draws = [holdout_draw(str(i)) for i in range(5000)]
+        self.assertTrue(all(0.0 <= d < 1.0 for d in draws))
+        self.assertAlmostEqual(sum(draws) / len(draws), 0.5, delta=0.03)
+
+    def test_share_is_honoured_over_many_games(self) -> None:
+        from wingspan_ai.agents.search_opponent import resolve_search_opponent_model
+
+        lineup = ("potential_points", "greedy_immediate")
+        held = sum(
+            resolve_search_opponent_model(
+                "belief",
+                holdout_share=0.05,
+                holdout_model="greedy",
+                random_seed=seed,
+                lineup=lineup,
+                lineup_position=0,
+            )[1]
+            for seed in range(1, 4001)
+        )
+        self.assertGreater(held / 4000, 0.03)
+        self.assertLess(held / 4000, 0.07)
+
+    def test_zero_share_and_same_model_never_hold_out(self) -> None:
+        from wingspan_ai.agents.search_opponent import resolve_search_opponent_model
+
+        for seed in range(1, 200):
+            self.assertEqual(
+                resolve_search_opponent_model(
+                    "belief",
+                    holdout_share=0.0,
+                    holdout_model="greedy",
+                    random_seed=seed,
+                    lineup=("a", "b"),
+                    lineup_position=0,
+                ),
+                ("belief", False),
+            )
+            self.assertEqual(
+                resolve_search_opponent_model(
+                    "belief",
+                    holdout_share=1.0,
+                    holdout_model="belief",
+                    random_seed=seed,
+                    lineup=("a", "b"),
+                    lineup_position=0,
+                ),
+                ("belief", False),
+            )
+
+    def test_holdout_is_keyed_on_seed_lineup_and_position_not_seat(self) -> None:
+        """The same game must hold out in every seat rotation, so pairing survives."""
+
+        config = PotentialPointsSearchConfig(search_opponent_holdout_share=0.5)
+        lineup = ("potential_points", "greedy_immediate")
+        for seed in range(1, 60):
+            first = config.resolve_opponent_model(
+                random_seed=seed, lineup=lineup, lineup_position=0
+            )
+            again = config.resolve_opponent_model(
+                random_seed=seed, lineup=lineup, lineup_position=0
+            )
+            self.assertEqual(first, again)
+        outcomes = {
+            config.resolve_opponent_model(random_seed=seed, lineup=lineup, lineup_position=0)
+            for seed in range(1, 60)
+        }
+        self.assertEqual(outcomes, {("belief", False), ("greedy", True)})
+
+    def test_flow_records_the_effective_model_per_seat(self) -> None:
+        from flows.simulation_batch import _make_agent
+
+        config = PotentialPointsSearchConfig(
+            search_depth=1, final_search_turns=0, search_opponent_holdout_share=1.0
+        )
+        agent = _make_agent(
+            "potential_points",
+            seat="p1",
+            random_seed=3,
+            potential_points_search=config,
+            lineup=("potential_points", "greedy_immediate"),
+        )
+        self.assertEqual(agent.search_opponent_model, "greedy")
+        agent = _make_agent(
+            "potential_points",
+            seat="p1",
+            random_seed=3,
+            potential_points_search=PotentialPointsSearchConfig(
+                search_depth=1, final_search_turns=0, search_opponent_holdout_share=0.0
+            ),
+            lineup=("potential_points", "greedy_immediate"),
+        )
+        self.assertEqual(agent.search_opponent_model, "belief")
+
+    def test_invalid_holdout_settings_are_rejected(self) -> None:
+        from wingspan_ai.agents.search_opponent import resolve_search_opponent_model
+
+        with self.assertRaises(ValueError):
+            resolve_search_opponent_model(
+                "belief",
+                holdout_share=1.5,
+                holdout_model="greedy",
+                random_seed=1,
+                lineup=("a",),
+                lineup_position=0,
+            )
+        with self.assertRaises(ValueError):
+            resolve_search_opponent_model(
+                "belief",
+                holdout_share=0.1,
+                holdout_model="oracle",
+                random_seed=1,
+                lineup=("a",),
+                lineup_position=0,
+            )
+
+    def test_guardrail_report_splits_games_by_effective_model(self) -> None:
+        import sys
+        from pathlib import Path
+
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        from analysis.holdout_guardrail import report, split_by_model
+
+        def game(seed: int, model: str, own: int, other: int) -> dict:
+            return {
+                "player_agent_kinds": ["potential_points", "greedy_immediate"],
+                "seat_rotation": 0,
+                "player_count": 2,
+                "outcome": {
+                    "random_seed": seed,
+                    "scores": {"player_1": own, "player_2": other},
+                },
+                "search_opponent_models": {
+                    "potential_points_p1": {"model": model, "holdout": model != "belief"}
+                },
+            }
+
+        games = [game(1, "belief", 80, 50), game(2, "belief", 70, 75), game(3, "greedy", 60, 40)]
+        rows = split_by_model(games)
+        self.assertEqual({m: len(r) for m, r in rows.items()}, {"belief": 2, "greedy": 1})
+        self.assertEqual([r[1] for r in rows["belief"]], [1.0, 0.0])
+        text = report(rows)
+        self.assertIn("| `belief` | 2 | 75.00 | 0.500 |", text)
+        self.assertIn("too few to read", text)

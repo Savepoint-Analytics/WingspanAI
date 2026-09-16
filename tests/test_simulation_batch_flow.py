@@ -124,11 +124,22 @@ class SimulationBatchFlowTests(TestCase):
                     "determinization_samples": 0,
                     "planning_horizon": "round",
                     "search_food_candidates": 6,
-                    "search_opponent_model": "greedy",
+                    "search_opponent_model": "belief",
+                    "search_opponent_holdout_share": 0.05,
+                    "search_opponent_holdout_model": "greedy",
                 },
             )
             self.assertEqual(results[0]["player_two_agent_id"], "potential_points_p2")
             self.assertEqual(manifest["player_two_agent_kinds"], ["potential_points"])
+            # The effective search opponent model is recorded per seat, after the
+            # holdout draw, so an arm can be told apart from its manifest alone.
+            models = manifest["games"][0]["search_opponent_models"]
+            self.assertEqual(set(models), {"potential_points_p2"})
+            self.assertIn(models["potential_points_p2"]["model"], {"belief", "greedy"})
+            self.assertEqual(
+                models["potential_points_p2"]["holdout"],
+                models["potential_points_p2"]["model"] != "belief",
+            )
             self.assertEqual(
                 manifest["games"][0]["player_two_agent_id"],
                 "potential_points_p2",
