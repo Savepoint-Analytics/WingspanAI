@@ -1,10 +1,12 @@
 # Belief-Driven Opponent Model in the Search
 
-Status: **planned, prediction registered 2026-09-16; arm not yet run.**
-Code: `src/wingspan_ai/agents/search_opponent.py`,
-`PotentialPointsAgent(search_opponent_model="greedy" | "belief")`
-Baseline: `artifacts/rr_food_cand6/` (the current default agent:
-depth 3, every turn, K=4, `search_food_candidates=6`, greedy opponent model)
+Status: complete, 2026-09-16. **Null on score (+0.31, p=0.73); decision cost more than halved.**
+Code: `b9805bc` (clean worktree; every manifest records it)
+Artifacts: `artifacts/rr_belief_opp/`, baseline `artifacts/rr_food_cand6/`
+Module: `src/wingspan_ai/agents/search_opponent.py`,
+`PotentialPointsAgent(search_opponent_model="greedy" | "belief")`.
+Baseline is the current default agent: depth 3, every turn, K=4,
+`search_food_candidates=6`, greedy opponent model.
 
 ## Why this experiment
 
@@ -148,6 +150,110 @@ the family it predicts matches the family the opponent actually plays. The
 2026-08-31 follow-up "refit belief family priors per opponent kind from
 round-robin telemetry" is the fix and is still open.
 
-## Result
+## Result: null on score, as registered (predictions 2 and 3 hold)
 
-_Not yet run._
+80 paired games at `b9805bc`, all 40 manifests `dirty: false`, all replays
+valid. `analysis/arm_contrast.py --baseline artifacts/rr_food_cand6 --arm
+artifacts/rr_belief_opp`:
+
+| Metric | greedy model | belief model | Δ | p |
+|---|---:|---:|---:|---:|
+| `potential_points` avg score | 78.10 | 78.41 | **+0.31** | 0.733 |
+| `potential_points` win rate | 0.863 | 0.875 | +0.013 | 0.740 |
+
+Identical outcomes: 3 of 80. The games diverge almost everywhere — a
+different modelled opponent changes what the search sees on most turns — and
+the outcome does not move. By opponent: `archetype_bonus_card_focus` +1.95,
+`net_value_response` +1.40, `archetype_engine_builder` −1.00,
+`greedy_immediate` −1.10; none significant at n=20, two up and two down, which
+is what a null looks like cell by cell. No opponent's own score moves
+significantly either (largest: `greedy_immediate` +3.70, p=0.21).
+
+Action mix is unchanged to within half a point: play-bird 28.3% → 28.3%,
+lay-eggs 27.3% → 26.9%, draw 23.8% → 24.3%, gain-food 20.6% → 20.5%. The
+agent plays the same game against a cheaper imagined opponent.
+
+The non-inferiority gate (Δ ≥ −1.0, win not significantly negative) passes.
+
+### What it buys
+
+`potential_points` decision cost, 2,080 decisions per arm:
+
+| | greedy model | belief model |
+|---|---:|---:|
+| mean | 17.47 s | **7.58 s** |
+| median | 6.78 s | 3.53 s |
+| p95 | 69.9 s | 28.5 s |
+| p99 | 161.3 s | 62.5 s |
+| max | 491.5 s | **178.9 s** |
+| per game | 454 s | 197 s |
+| worst game | 1788 s | 754 s |
+| arm total | 10.09 h | **4.38 h** |
+
+Load caveat as always: the baseline shared the machine with one other arm,
+this arm ran as four concurrent runners on a box already at load ~7. The
+back-to-back probe (41.1%) is the clean measurement; the arm's 57% is the
+realized bill, and both point the same way. Wall clock for the whole 80-game
+arm was 1 h 15 min with four runners (12:25 → 13:40).
+
+### The posterior identifies behaviour, not type (prediction 4, rewritten)
+
+At each game's final `potential_points` decision, the belief about the
+opponent had concentrated (mean mass on the top profile 0.73–0.88, never
+below 0.46), and the top profile matched the family the opponent actually
+played most:
+
+| Opponent | Its plurality family (share) | Top profile at game end (of 20) |
+|---|---|---|
+| `archetype_bonus_card_focus` | draw_cards 36% | card_draw 9, food_acceleration 4, random_legal 3, … |
+| `archetype_engine_builder` | gain_food 35% | food_acceleration 11, card_draw 5, … |
+| `greedy_immediate` | gain_food 45%, lay_eggs 22% | food_acceleration 11, egg_focus 6, value_maximizing 2 |
+| `net_value_response` | draw_cards 42% | card_draw 15, random_legal 4, egg_focus 1 |
+
+So the model works as a classifier of *action-family mix* and is consistent
+about it. What it is not is a classifier of opponent *type*: greedy is the
+roster's purest value-maximizer and the `value_maximizing` profile wins only
+2 of 20 games against it, because that profile's likelihood is a low-
+temperature softmax over the *public candidate values* — and those values
+rank families differently from greedy's real immediate-score ranking, so a
+food-tilted prior explains greedy's turns better than "rational" does. The
+posterior is also overconfident, as the probe suggested: observations are
+scored as independent draws from hand-tilted priors that were never fitted
+to this roster. The 2026-08-31 follow-up to refit profile priors from
+round-robin telemetry remains the fix.
+
+## Decision
+
+Recommended: make `search_opponent_model="belief"` the default and re-baseline
+on `artifacts/rr_belief_opp`. The registered gate passes, the action mix is
+unchanged, and the arm cost falls from ~10 h to ~4.4 h, which is the binding
+constraint on everything downstream. The greedy model stays available as the
+documented control.
+
+Two things this result does and does not say:
+
+- It does not say Bayesian opponent modelling makes the agent stronger. A
+  posterior that tracks the opponent's action mix is now in the loop and the
+  score did not move — the same shape as the four valuation nulls. What is
+  new is that this term was measured *against* a real search rather than
+  inside a one-ply evaluator, and it still landed null.
+- It does say the search is robust to a much cruder opponent model. Every
+  node's imagined opponent went from a full greedy evaluation to a family
+  guess plus a proxy, and the agent lost nothing measurable. That is the
+  useful engineering fact: the opponent model is not where the search's
+  strength lives either.
+
+Revisit if: a stronger opponent enters the roster (a second searching agent),
+where the family-plus-proxy model may be too crude to anticipate real threats;
+or if refitted priors make `value_maximizing` identifiable, at which point the
+"belief vs greedy" contrast is worth re-running as a test of the thesis.
+
+## Caveats
+
+- One roster, two players, n=80; detection limit around 2–3 points at this
+  size, so this bounds the effect as small rather than zero.
+- The within-family proxy ignores points a power adds on activation. Against
+  the current roster that did not matter; against an engine-heavy opponent it
+  might.
+- `same_choice` in the probe was 92%; across the arm only 3 of 80 games were
+  identical. Divergence is expected — the point is that it is not directional.

@@ -2272,3 +2272,55 @@ family priors from round-robin telemetry is the fix and is still open.
    default before deciding.
 4. Refit belief profile priors from round-robin telemetry (open since
    2026-08-31); the collapse above is the motivation.
+
+## Update: 2026-09-16 - Belief opponent model arm: null on score, decision cost halved
+
+### Results
+80 paired games at `b9805bc` against `artifacts/rr_food_cand6`, all manifests
+clean and reproducible, all replays valid. `potential_points` **78.10 → 78.41
+(+0.31, p=0.73), win 0.863 → 0.875 (+0.013, p=0.74)**; per-opponent cells two
+up, two down, none significant; action mix unchanged to within half a point.
+Only 3 of 80 games were identical — the search sees a different imagined
+opponent almost everywhere and the outcome does not move. Both registered
+predictions held and the non-inferiority gate passed. Write-up in
+`docs/experiments/search_opponent_model_test.md`.
+
+Decision cost over the 2,080 `potential_points` decisions: mean 17.5 → 7.6 s,
+p99 161 → 63 s, worst 492 → 179 s, per game 454 → 197 s, **arm total 10.1 h →
+4.4 h** (wall clock 1 h 15 min with four runners). The back-to-back probe's
+41% is the clean number; the arm's 57% is the realized bill.
+
+### The posterior identifies behaviour, not type
+At game end the belief had concentrated (top-profile mass 0.73–0.88) and its
+top profile matched each opponent's actual plurality family: engine builder
+and greedy both read as `food_acceleration` (they gain food on 35% and 45% of
+turns), net-value as `card_draw` (42% draws), bonus-focus as `card_draw` (36%).
+`value_maximizing` won only 2 of 20 games against greedy, the roster's purest
+maximizer, because that profile's likelihood is a softmax over *public
+candidate values* that rank families differently from greedy's real scoring.
+The model is a consistent action-mix classifier and an overconfident type
+classifier. Refitting profile priors from round-robin telemetry (open since
+2026-08-31) is the fix.
+
+### Why it matters
+This is the fifth null on a modelling term, but the first measured with a
+belief in the loop of a real search: a posterior that tracks the opponent's
+action mix changed thousands of imagined opponent turns per decision and the
+score did not move. The engineering fact is the useful one — the search is
+robust to a far cruder opponent model, so the opponent model is not where its
+strength lives, and arms now cost half what they did.
+
+### Decision
+Recommended, pending Alex's call: make `search_opponent_model="belief"` the
+default and re-baseline on `artifacts/rr_belief_opp`. Greedy stays as the
+documented control.
+
+### Follow-up tasks
+1. Apply the default (if approved) and re-baseline; update the README agent
+   description.
+2. Refit belief profile priors per opponent kind from round-robin telemetry;
+   then re-test whether `value_maximizing` becomes identifiable.
+3. With arms at ~4.4 h, the bonus-card selection study (requested 2026-08-31,
+   prerequisites now met) is affordable — next experiment.
+4. The pruned-vs-unpruned question (`search_food_candidates`) could be re-asked
+   at N=12 now that the other half of the search cost is gone.
