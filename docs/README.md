@@ -15,6 +15,8 @@ Analysis layer:
 - `analysis/apply_sql_views.py`: applies and probes the analysis views.
 - `analysis/arm_contrast.py`: paired contrast of experimental arms against a baseline.
 - `analysis/holdout_guardrail.py`: the standing 5% greedy-opponent control, pooled across batches.
+- `analysis/card_structure.py`: static synergy tables — what the deck supplies each bonus card, and what each bird carries.
+- `analysis/bonus_card_seed_coverage.py` and `analysis/bonus_card_keep_contrast.py`: seed selection and the per-card paired contrast for the forced-keep study.
 
 Key rules docs:
 
@@ -38,7 +40,7 @@ Key rules docs:
 - `experiments/round_robin_v3_guardrails.md`: guardrailed agents as first-class competitors.
 - `experiments/round_robin_v2.md`: agent-vs-agent ranking on the corrected simulator (200 games).
 - `experiments/round_robin_v1.md`: (superseded) first seat-swapped agent-vs-agent round robin (200 games).
-- `experiments/bonus_card_selection_study_plan.md`: which bonus cards to keep at setup, and when.
+- `experiments/bonus_card_selection_study_plan.md`: which bonus cards to keep at setup, and when — forced-keep paired design, bonus-card synergy and the companion bird-value study.
 - `experiments/resource_spending_ablation.md`: the third null, and why the pattern is the finding.
 - `experiments/search_depth_experiment.md`: the first positive result — lookahead depth and coverage, after fixing a dead `search_depth` knob.
 - `experiments/determinized_search_test.md`: how much of the search gain survives when the search cannot read hidden cards (+10.4 of +13.5).

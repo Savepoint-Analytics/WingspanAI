@@ -25,6 +25,7 @@ from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
 from wingspan_ai.agents.setup import (
     ArchetypeSetupPolicy,
     DefaultSetupPolicy,
+    ForcedBonusCardSetupPolicy,
     NetValueSetupPolicy,
     PotentialPointsSetupPolicy,
 )
@@ -134,6 +135,7 @@ def run_seeded_game(
     net_value_max_opponent_response_actions: int | None = 8,
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
+    forced_bonus_choice: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch."""
 
@@ -185,6 +187,7 @@ def run_seeded_game(
             net_value_response_mode=net_value_response_mode,
             potential_points_search=potential_points_search,
             lineup=tuple(resolved_lineup),
+            forced_bonus_choice=forced_bonus_choice,
         )
         if guardrail_config is None or seat not in guardrail_seats:
             return base_agent
@@ -268,6 +271,7 @@ def run_seeded_game(
         "search_opponent_models": _search_opponent_models(
             lineup_agents, potential_points_search or PotentialPointsSearchConfig()
         ),
+        "forced_bonus_choice": dict(forced_bonus_choice) if forced_bonus_choice else None,
         "replay_validation": replay_validation_payload,
         "rule_audits": rule_audits,
     }
@@ -348,6 +352,7 @@ def run_seeded_game(
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "search_opponent_models": batch_metadata["search_opponent_models"],
+        "forced_bonus_choice": batch_metadata["forced_bonus_choice"],
         "ruleset_id": result.state.ruleset.ruleset_id,
         "outcome": asdict(result.outcome),
         "event_count": len(result.events),
@@ -444,6 +449,7 @@ def _make_agent(
     potential_points_search: PotentialPointsSearchConfig | None = None,
     guardrail_config_path: str | None = None,
     lineup: tuple[str, ...] | None = None,
+    forced_bonus_choice: dict[str, int] | None = None,
 ):
     # A "guardrailed:" prefix wraps the base agent in its own guardrail layer,
     # so a roster can pit an agent against its guardrailed twin.
@@ -512,6 +518,12 @@ def _make_agent(
     # delegates opening selection downward, so a policy set on the wrapper is
     # never consulted.
     agent = _apply_setup_policy(agent, agent_kind, setup_policy_kind)
+    if forced_bonus_choice and agent_kind in forced_bonus_choice:
+        # Forced-keep study: this agent keeps the dealt bonus card at the given
+        # index, choosing birds and food around it with its usual policy.
+        agent.setup_policy = ForcedBonusCardSetupPolicy(
+            agent.setup_policy, forced_bonus_choice[agent_kind]
+        )
     if not wants_guardrails:
         return agent
     config = load_guardrail_config(guardrail_config_path or DEFAULT_GUARDRAIL_CONFIG_PATH)
@@ -681,6 +693,7 @@ def _write_batch_manifest(
                     "net_value_max_opponent_response_actions"
                 ],
                 "search_opponent_models": result.get("search_opponent_models", {}),
+                "forced_bonus_choice": result.get("forced_bonus_choice"),
                 "replay_validation": result["replay_validation"],
                 "artifact_dir": result["artifact_dir"],
                 "postgres": result["postgres"],
@@ -727,6 +740,7 @@ def run_simulation_batch(
     net_value_max_opponent_response_actions: int | None = 8,
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
+    forced_bonus_choice: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -764,6 +778,7 @@ def run_simulation_batch(
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
             net_value_response_mode=net_value_response_mode,
             potential_points_search=potential_points_search,
+            forced_bonus_choice=forced_bonus_choice,
         )
         for seed in resolved_seeds
     ]

@@ -2362,3 +2362,58 @@ because both arms hold out the same games.
    experiment write-up and quote it once ≥40 held-out games exist.
 2. If a learning agent is added, key its training data on
    `search_opponent_models` so the held-out games can be excluded or weighted.
+
+## Update: 2026-09-16 - Bonus-card selection study designed and launched
+
+### What changed
+Alex's 2026-08-31 question, with two objectives added today: whether some
+bonus cards are better because of inherent synergy with the birds that qualify
+for them, and the reverse for birds — whether some are better picks because
+they work with good bonus cards and round goals or are simply overpowered for
+their cost. Plan, registered predictions and the companion bird-value study in
+`docs/experiments/bonus_card_selection_study_plan.md`.
+
+Built:
+- `ForcedBonusCardSetupPolicy(base_policy, dealt_index)`: keeps the dealt card
+  at an index and lets the agent's own policy choose birds and food around it.
+  `forced_bonus_choice={agent_kind: index}` on the batch and round-robin flows,
+  applied to the study agent only and recorded in every manifest.
+- `analysis/bonus_card_seed_coverage.py`: scans seeds cheaply (setup only) and
+  picks the fewest that deal every card at least N times to the study seat.
+  111 seeds give all 26 cards 8–11 paired units.
+- `analysis/bonus_card_keep_contrast.py`: per-card paired advantage from the
+  two forced arms, realized bonus points, completion rate, how much the choice
+  is worth in absolute terms, and the current policy's hindsight accuracy
+  computed from the deal without extra games.
+- `analysis/card_structure.py`: static synergy tables. Bonus side: qualifying
+  supply per card (count, deck share, expected qualifiers in the opening hand,
+  mean VP/cost/eggs, brown share, power score, habitat split). Bird side: VP,
+  cost, eggs, nest, habitats, power, bonus coverage, cost-efficiency, with a
+  `--card-values` weight once the study has measured the cards.
+- 6 tests in `tests/test_bonus_card_keep_study.py`.
+
+### Structural finding before any game ran
+Qualifying supply spans 43% of the deck (Bird Feeder, Backyard Birder — but
+they need 5–8 birds for 3–7 points) to 11% (Historian, Food Web Expert, at
+2 per bird). Four cards score from board state and have no qualifiers. This is
+the basis for registered prediction 3: advantage should track expected
+opening-hand qualifiers × points per qualifier.
+
+### Content caveat found
+The catalog's 26 bonus cards include `Anatomist [swift_start_asia]` and
+`Visionary Leader`, while birds carry tags for `Diet Specialist` and `Bird
+Bander`, which are not in the deck. Which 26 the physical base game ships needs
+settling before any of this is quoted as a Wingspan claim.
+
+### Launch
+222 games (111 seeds × forced index 0 / 1), `potential_points` vs
+`archetype_engine_builder`, rotation 0, agent-default setup, four runners.
+Artifacts under `artifacts/bonus_keep/force0` and `force1`.
+
+### Follow-up tasks
+1. Read the result against the five registered predictions; write §8.
+2. Replicate with `archetype_engine_builder` as the study agent (pursuit
+   confound).
+3. Bird-value study layer 2: per-bird scorecard event at game end, then the
+   observational regression over archived games.
+4. Settle the base-game bonus-card composition question.

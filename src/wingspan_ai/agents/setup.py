@@ -122,6 +122,53 @@ class ArchetypeSetupPolicy:
 
 
 @dataclass(frozen=True)
+class ForcedBonusCardSetupPolicy:
+    """Keep the dealt bonus card at ``dealt_index``; let ``base_policy`` do the rest.
+
+    The instrument for the forced-keep bonus-card study
+    (``docs/experiments/bonus_card_selection_study_plan.md``): the same seed
+    is run once per dealt card, and the paired score difference is the value
+    of the keep. Birds and food are still chosen by ``base_policy``, but
+    conditional on the forced card, so the arm measures "keep this card and
+    play around it" rather than "keep this card and ignore it".
+    """
+
+    base_policy: InitialSetupPolicy
+    dealt_index: int
+    policy_id: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if self.dealt_index < 0:
+            raise ValueError("dealt_index must be non-negative")
+        object.__setattr__(
+            self, "policy_id", f"forced_bonus_{self.dealt_index}:{self.base_policy.policy_id}"
+        )
+
+    def choose_initial_selection(
+        self,
+        player: PlayerState,
+        context: InitialSelectionContext | None = None,
+    ) -> InitialSelection:
+        if self.dealt_index >= len(player.bonus_cards):
+            raise ValueError(
+                f"player {player.player_id} was dealt {len(player.bonus_cards)} bonus cards; "
+                f"cannot force index {self.dealt_index}"
+            )
+        forced = player.bonus_cards[self.dealt_index]
+        # The base policy chooses its bonus card first and birds conditional on
+        # it, so restricting what it can see to the forced card is exactly
+        # "choose the best opening given this card".
+        restricted = player.model_copy(update={"bonus_cards": [forced]})
+        selection = self.base_policy.choose_initial_selection(restricted, context)
+        return InitialSelection(
+            player_id=player.player_id,
+            kept_bird_names=list(selection.kept_bird_names),
+            kept_bonus_card_names=[forced.name],
+            starting_food=list(selection.starting_food),
+        )
+
+
+@dataclass(frozen=True)
 class NetValueSetupPolicy:
     """Opening setup heuristic with public tray and round-goal denial priors."""
 
