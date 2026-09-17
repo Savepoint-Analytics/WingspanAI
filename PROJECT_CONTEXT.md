@@ -2532,7 +2532,7 @@ has never been measured. Added `setup_policy_overrides={agent_kind: kind}` to
 the flows so one agent can use `agent_default` while the lineup stays on
 `control`; manifests now record `setup_policy_ids` per seat.
 
-### Re-baseline arm (registered)
+### Re-baseline arm (registered; result below)
 Standard 80-game design at `rr_belief_opp`'s settings plus
 `setup_policy_overrides={"potential_points": "agent_default"}`; artifacts
 `artifacts/rr_opener_v2`. Prediction: `potential_points` **+1 to +3 points**
@@ -2540,3 +2540,17 @@ over `rr_belief_opp` — the v2 opener fixes a bonus choice worth ~0.85 and
 also keeps birds/food strategically, which `control` does not. If it lands
 null or negative, the strategic bird/food selection is suspect (its
 `_bonus_alignment_score` term is the same card-independent tag count).
+
+### Re-baseline result (2026-09-16): the v2 opener loses to the control opener
+`artifacts/rr_opener_v2` vs `rr_belief_opp`, 80 paired games at `e218d13`:
+`potential_points` **78.41 → 75.41 (−3.00, p=0.022)**, win 0.875 → 0.875;
+by opponent −7.7 (bonus_card_focus, p=0.006), −3.65, −1.05, +0.40. The
+registered prediction (+1 to +3) failed on the branch registered for it: the
+bonus choice is worth +0.85, so the opener's bird/food selection costs about
+four points. `_selection_score` keeps up to five birds and no food and weights
+the card-independent `_bonus_alignment_score` term at 1.8. Round robins run
+under `control`, so the champion's baseline is unaffected and `control` stays
+the design. **Defect to fix:** `PotentialPointsSetupPolicy` bird/food
+selection; measure against `default_setup_v1` with the same free paired-arm
+trick once a variant exists. The forced-keep study's per-card deltas were
+measured *conditional on* that bird selection and should be re-read after.
