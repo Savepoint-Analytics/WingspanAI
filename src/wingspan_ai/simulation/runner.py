@@ -9,6 +9,7 @@ from time import perf_counter
 from typing import Protocol
 from uuid import uuid4
 
+from wingspan_ai.agents.forced_play import inject_opening_cards
 from wingspan_ai.agents.setup import InitialSelectionContext
 from wingspan_ai.content.schemas import ContentCatalog, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
@@ -65,8 +66,15 @@ def run_single_game(
     game_id: str | None = None,
     simulation_run_id: str | None = None,
     max_turns: int = 200,
+    opening_hand_overrides: dict[str, list[str]] | None = None,
 ) -> SimulationResult:
-    """Run one seeded game and return final state, outcome, and telemetry."""
+    """Run one seeded game and return final state, outcome, and telemetry.
+
+    ``opening_hand_overrides`` maps a player id to birds swapped into that
+    player's dealt hand from the deck before the opening choice (the forced
+    keep-and-play instrument). They are recorded in ``game_started`` and
+    re-applied by the replay validator.
+    """
 
     if len(agents) < 1:
         raise ValueError("run_single_game requires at least one agent")
@@ -81,6 +89,11 @@ def run_single_game(
         game_id=resolved_game_id,
         apply_initial_selection=False,
     )
+    injection_missing: dict[str, list[str]] = {}
+    for player_id, bird_names in (opening_hand_overrides or {}).items():
+        missing = inject_opening_cards(state, player_id, list(bird_names))
+        if missing:
+            injection_missing[player_id] = missing
     bird_discards = []
     bonus_discards = []
     setup_selection_events: list[dict] = []
@@ -105,12 +118,8 @@ def run_single_game(
                 "kept_bird_names": list(selection.kept_bird_names),
                 "kept_bonus_card_names": list(selection.kept_bonus_card_names),
                 "starting_food": [food.value for food in selection.starting_food],
-                "discarded_bird_names": [
-                    card.common_name for card in discarded_birds_for_player
-                ],
-                "discarded_bonus_card_names": [
-                    card.name for card in discarded_bonus_for_player
-                ],
+                "discarded_bird_names": [card.common_name for card in discarded_birds_for_player],
+                "discarded_bonus_card_names": [card.name for card in discarded_bonus_for_player],
             }
         )
     state.decks.bird_discard.extend(bird_discards)
@@ -122,7 +131,13 @@ def run_single_game(
     _emit_run_started(sink, state, resolved_run_id, agents)
     for setup_payload in setup_selection_events:
         _emit_setup_selection_applied(sink, state, resolved_run_id, setup_payload)
-    _emit_game_started(sink, state, resolved_run_id)
+    _emit_game_started(
+        sink,
+        state,
+        resolved_run_id,
+        opening_hand_overrides=opening_hand_overrides,
+        injection_missing=injection_missing,
+    )
     _emit_round_started(sink, state, resolved_run_id)
 
     turns_played = 0
@@ -334,19 +349,27 @@ def _emit_run_started(
     )
 
 
-def _emit_game_started(sink: InMemoryEventSink, state: GameState, simulation_run_id: str) -> None:
+def _emit_game_started(
+    sink: InMemoryEventSink,
+    state: GameState,
+    simulation_run_id: str,
+    *,
+    opening_hand_overrides: dict[str, list[str]] | None = None,
+    injection_missing: dict[str, list[str]] | None = None,
+) -> None:
     public_state = to_public_state(state)
-    sink.emit(
-        _base_event(
-            EventName.GAME_STARTED,
-            state,
-            simulation_run_id,
-            bird_deck_count=public_state.bird_deck_count,
-            bonus_deck_count=public_state.bonus_deck_count,
-            bird_tray=[card.common_name for card in state.bird_tray],
-            round_goals=[goal.name for goal in state.round_goals],
-        )
-    )
+    payload = {
+        "bird_deck_count": public_state.bird_deck_count,
+        "bonus_deck_count": public_state.bonus_deck_count,
+        "bird_tray": [card.common_name for card in state.bird_tray],
+        "round_goals": [goal.name for goal in state.round_goals],
+    }
+    if opening_hand_overrides:
+        payload["opening_hand_overrides"] = {
+            player_id: list(names) for player_id, names in opening_hand_overrides.items()
+        }
+        payload["injection_missing"] = dict(injection_missing or {})
+    sink.emit(_base_event(EventName.GAME_STARTED, state, simulation_run_id, **payload))
 
 
 def _emit_setup_selection_applied(

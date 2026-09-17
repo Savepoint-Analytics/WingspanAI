@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from wingspan_ai.agents.forced_play import inject_opening_cards
 from wingspan_ai.content.schemas import ContentCatalog, FoodType
 from wingspan_ai.rules.actions import LegalAction
 from wingspan_ai.rules.base_game import (
@@ -79,6 +80,10 @@ def validate_simulation_replay(
         game_id=game_started.game_id or "game_1",
         apply_initial_selection=False,
     )
+    # Forced keep-and-play games swap named birds into a dealt hand before
+    # the opening choice; the same swap must precede replay.
+    for player_id, names in (game_started.payload.get("opening_hand_overrides") or {}).items():
+        inject_opening_cards(state, player_id, list(names))
     for setup_event in _events_named(events, EventName.SETUP_SELECTION_APPLIED):
         player = next(
             candidate for candidate in state.players if candidate.player_id == setup_event.player_id
