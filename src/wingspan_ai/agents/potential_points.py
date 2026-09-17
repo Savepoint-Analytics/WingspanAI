@@ -160,6 +160,11 @@ SEARCH_OPPONENT_MODELS = ("greedy", "belief")
 #: until the paired arm reads; registered prediction +1 to +3 points.
 DEFAULT_MECHANIC_SYNERGY = False
 DEFAULT_MECHANIC_SYNERGY_TABLE = "configs/synergy/mechanic_pair_effects_v2.json"
+#: Whether the term also credits hand cards' potential lift. The first arm
+#: (hand on, weight 1.0, v1 table) cost 4.5 points by paying the agent to hold
+#: combo pieces; the registered follow-up is board-only at half weight.
+DEFAULT_MECHANIC_SYNERGY_HAND = True
+DEFAULT_MECHANIC_SYNERGY_WEIGHT = 1.0
 
 
 @dataclass(frozen=True)
@@ -187,6 +192,8 @@ class PotentialPointsSearchConfig:
     #: Engine-potential term from the mechanic-pair table; see
     #: ``DEFAULT_MECHANIC_SYNERGY``.
     mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
+    mechanic_synergy_hand: bool = DEFAULT_MECHANIC_SYNERGY_HAND
+    mechanic_synergy_weight: float = DEFAULT_MECHANIC_SYNERGY_WEIGHT
 
     def as_manifest_payload(self) -> dict:
         return asdict(self)
@@ -237,6 +244,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
     search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
     #: Engine-potential term; see ``DEFAULT_MECHANIC_SYNERGY``.
     mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
+    mechanic_synergy_hand: bool = DEFAULT_MECHANIC_SYNERGY_HAND
+    mechanic_synergy_weight: float = DEFAULT_MECHANIC_SYNERGY_WEIGHT
     top_alternatives: int = 5
     _opponent_model: SearchOpponentModel = field(init=False, repr=False, compare=False)
     _synergy: MechanicSynergyTable | None = field(
@@ -249,7 +258,9 @@ class PotentialPointsAgent(SetupPolicyMixin):
         from wingspan_ai.agents.search_opponent import build_search_opponent_model
 
         if self.mechanic_synergy:
-            self._synergy = load_mechanic_synergy_table()
+            self._synergy = load_mechanic_synergy_table().configured(
+                hand=self.mechanic_synergy_hand, weight=self.mechanic_synergy_weight
+            )
 
         if self.search_opponent_model not in SEARCH_OPPONENT_MODELS:
             raise ValueError(
@@ -409,6 +420,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "opponent_model": self._opponent_model.telemetry_payload(),
             "mechanic_synergy": self.mechanic_synergy,
             "mechanic_synergy_table": self._synergy.version if self._synergy else None,
+            "mechanic_synergy_hand": self.mechanic_synergy_hand,
+            "mechanic_synergy_weight": self.mechanic_synergy_weight,
             # Module-level ablation switches are not in the manifest, so record
             # them where the artifacts can prove which arm a game belongs to.
             "ablation_flags": {
@@ -1344,6 +1357,15 @@ class MechanicSynergyTable:
 
     version: str
     effects: dict[tuple[str, str], float]
+    #: Credit hand cards' potential lift (the first arm's hand term).
+    hand: bool = True
+    #: Multiplier on the whole term.
+    weight: float = 1.0
+
+    def configured(self, *, hand: bool, weight: float) -> MechanicSynergyTable:
+        return MechanicSynergyTable(
+            version=self.version, effects=self.effects, hand=hand, weight=weight
+        )
 
     def lift(self, played_key: str, board_keys: set[str]) -> float:
         if not board_keys:
@@ -1361,11 +1383,13 @@ class MechanicSynergyTable:
             if others:
                 board_term += sum(self.effects.get((_mechanic_key(card), k), 0.0) for k in others)
         board_scale = min(turns_remaining, SYNERGY_BOARD_TURNS_FULL) / SYNERGY_BOARD_TURNS_FULL
-        hand_term = sum(
-            max(self.lift(_mechanic_key(card), board_keys), 0.0) for card in player.hand
-        )
+        hand_term = 0.0
+        if self.hand:
+            hand_term = sum(
+                max(self.lift(_mechanic_key(card), board_keys), 0.0) for card in player.hand
+            )
         hand_scale = SYNERGY_HAND_PLAY_RATE * (1.0 if turns_remaining >= 2 else 0.5)
-        return board_term * board_scale + hand_term * hand_scale
+        return self.weight * (board_term * board_scale + hand_term * hand_scale)
 
 
 def _mechanic_key(card: BirdCard) -> str:

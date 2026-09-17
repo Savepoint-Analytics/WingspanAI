@@ -128,6 +128,8 @@ class SimulationBatchFlowTests(TestCase):
                     "search_opponent_holdout_share": 0.05,
                     "search_opponent_holdout_model": "greedy",
                     "mechanic_synergy": False,
+                    "mechanic_synergy_hand": True,
+                    "mechanic_synergy_weight": 1.0,
                 },
             )
             self.assertEqual(results[0]["player_two_agent_id"], "potential_points_p2")

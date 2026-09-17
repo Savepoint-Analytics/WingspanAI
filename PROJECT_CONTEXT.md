@@ -2730,3 +2730,27 @@ surviving positive and is borderline after correction for three tests.
 2. Layer A egg synergies in a capacity-aware context (near-full boards).
 3. Layer C on a searching pursuer for P2 only (the surviving pair).
 4. K=4 is the standard for any future attribution run; note the 4× cost.
+
+## Update: 2026-09-17 - Follow-ups launched: board-only synergy term, layer C P2 on the searching pursuer
+
+### K=4 is the standard
+`play_counterfactuals.py --continuation-samples` defaults to 4; any future
+attribution run pays 4× and gets a value that does not depend on one deck
+order.
+
+### Arm A (registered): board-only synergy term
+`PotentialPointsSearchConfig(mechanic_synergy=True, mechanic_synergy_hand=False,
+mechanic_synergy_weight=0.5)` on the v2 (K=4) table, 80 games vs
+`rr_belief_opp`, `artifacts/rr_synergy_board`. Prediction: **−1 to +1** —
+removing the hand term removes the holding incentive that cost 4.5, and the
+v2 board effects are small (pair SD 1.2), so the honest prior is a null; a
+negative below −1.5 means synergy evidence belongs in card-selection
+decisions (opener, draw choice), not the evaluator.
+
+### Arm B (registered): layer C P2 with `potential_points` as pursuer
+Canvasback + Anhinga vs Black-Chinned Hummingbird / Osprey, 2×2, 60 seeds,
+`potential_points` (defaults) vs greedy, `control` setup, food bonus 2,
+`artifacts/forced_play/pp/P2`. Prediction: interaction **0 to +3**; confirmed
+if > 0 at p < 0.05. The K=4 table says the mechanic pair is ~0 for the
+searching agent's own plays; the cheap-pursuer arm said +3.5; this arm
+decides between them.

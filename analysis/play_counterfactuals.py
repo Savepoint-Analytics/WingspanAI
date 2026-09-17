@@ -277,8 +277,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--continuation-samples",
         type=int,
-        default=0,
-        help="determinized continuations per branch; 0 rolls out the true state once",
+        default=4,
+        help=(
+            "determinized continuations per branch (default 4, the project standard since "
+            "2026-09-17: single-path values were mostly noise); 0 rolls out the true state once"
+        ),
     )
     args = parser.parse_args(argv)
     catalog = load_base_game_content_catalog(args.workbook)

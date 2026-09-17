@@ -487,6 +487,8 @@ class EndgameSearchDepthTests(TestCase):
                 "search_opponent_holdout_share": 0.05,
                 "search_opponent_holdout_model": "greedy",
                 "mechanic_synergy": False,
+                "mechanic_synergy_hand": True,
+                "mechanic_synergy_weight": 1.0,
             },
         )
 
@@ -709,3 +711,31 @@ class MechanicSynergyTests(TestCase):
                 "mechanic_synergy_table"
             ]
         )
+
+    def test_board_only_variant_drops_the_hand_term_and_scales(self) -> None:
+        from wingspan_ai.agents.potential_points import load_mechanic_synergy_table
+
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=3)
+        player = state.players[0]
+        player.habitats[Habitat.FOREST] = [
+            BirdSlot(card=self.birds["Common Grackle"]),
+            BirdSlot(card=self.birds["Cooper's Hawk"]),
+        ]
+        player.hand = [self.birds["Barred Owl"]]
+        full = load_mechanic_synergy_table()
+        board_only = full.configured(hand=False, weight=0.5)
+        board_term_full = full.configured(hand=False, weight=1.0).potential(player, 6)
+        self.assertAlmostEqual(board_only.potential(player, 6), 0.5 * board_term_full)
+        hand_only_lift = full.potential(player, 6) - board_term_full
+        self.assertNotEqual(hand_only_lift, 0.0)
+        agent = PotentialPointsAgent(
+            search_depth=1,
+            final_search_turns=0,
+            mechanic_synergy=True,
+            mechanic_synergy_hand=False,
+            mechanic_synergy_weight=0.5,
+        )
+        legal_actions = legal_actions_for_current_player(state)
+        summary = agent.summarize_decision(state, legal_actions, legal_actions[0])
+        self.assertFalse(summary["mechanic_synergy_hand"])
+        self.assertEqual(summary["mechanic_synergy_weight"], 0.5)

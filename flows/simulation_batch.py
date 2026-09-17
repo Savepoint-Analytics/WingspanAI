@@ -547,6 +547,8 @@ def _make_agent(
             search_food_candidates=search.search_food_candidates,
             search_opponent_model=opponent_model,
             mechanic_synergy=search.mechanic_synergy,
+            mechanic_synergy_hand=search.mechanic_synergy_hand,
+            mechanic_synergy_weight=search.mechanic_synergy_weight,
         )
     elif agent_kind == "net_value_response":
         agent = NetValueOpponentResponseAgent(
