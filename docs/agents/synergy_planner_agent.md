@@ -1,6 +1,6 @@
 # Synergy Planner Agent
 
-Status: research programme defined and instruments built, 2026-09-16; agent not yet implemented. Layers A and B run; layer C and the agent term follow their results.
+Status: research programme defined, instruments built, layers A and B run with first results, 2026-09-16/17. Layer C (forced-play confirmation) and the agent's engine-potential term are next.
 
 ## Purpose
 
@@ -168,6 +168,65 @@ Registered prior: four resource-valuation terms have landed null, but the one
 card-choice term measured so far paid; a synergy term is a card-choice term.
 Prediction to register before the arm: +1 to +3 points, concentrated in bird
 points and eggs, with draws rising as the agent holds partial combos.
+
+## First Results (2026-09-16/17)
+
+### Layer B: 2,698 plays, 382 archived `potential_points` games
+
+| | card value | immediate | downstream | timing value |
+|---|---:|---:|---:|---:|
+| all plays | **+4.21** (SE 0.17) | +5.16 | −0.95 | **+1.42** (SE 0.15) |
+| round 1 (772) | +6.00 | +4.52 | **+1.48** | +1.16 |
+| round 2 (590) | +4.13 | +4.41 | −0.29 | +1.42 |
+| round 3 (773) | +3.25 | +5.40 | −2.15 | +1.29 |
+| round 4 (563) | +3.13 | +6.51 | **−3.38** | +1.96 |
+
+The shape is the finding: a play's printed and on-arrival value overstates
+it more the later it comes, because the alternative (laying eggs, mostly)
+was worth more; in round 1 the downstream share is positive — the engine
+is real — and the value of *when* you play (timing) is a steady 1–2 points
+throughout. Plays whose bird went on to activate three or more times
+(1,145 of 2,698) are worth +4.9 against +4.3 on arrival.
+
+Per bird, shrunken by the hierarchical model (points above the mean play):
+Brown Pelican +6.2, Turkey Vulture +5.6, Barn Swallow +5.4, Common Grackle
++5.4, Black-Billed Magpie +5.1, Golden Eagle +5.0, Black Vulture +4.8; at
+the bottom Northern Harrier −4.6 (n=36), Mourning Dove −4.8, and thin
+extreme cases (Mallard, two plays, −42 raw). Variance components: bird SD
+3.0, mechanic-pair SD 1.8, residual SD 4.7 per play.
+
+Mechanic-pair interactions (played power × power already on board, shrunken):
+`tuck_card × deck_search_tuck_by_wingspan` **+3.0** (n=51),
+`all_players_draw_cards × predator_hunt` +3.4 (n=32),
+`play_additional_bird × predator_hunt` +3.4 (n=20); and the strongest
+"first play" effects on an empty board: `deck_search_tuck_by_wingspan` +5.2,
+`lay_egg` +5.1, `gain_food_from_birdfeeder` +4.7. Tuck engines compound;
+the first engine bird is the most valuable play of the game.
+
+### Observed value is not causal value
+
+The counterfactual card value correlates at **ρ = 0.07** with the
+observational ridge coefficient (`bird_value_regression.py`) over the 106
+birds both cover. Turkey Vulture is the clearest case: −6.7 against the
+average bird observationally, **+5.6** causally — it is played in losing
+positions (a pink predator reaction is what you play when you have nothing
+better), but playing it helps. The observational layer measures who plays
+a bird and when; the counterfactual layer measures what the play does. Only
+the second belongs in an agent's evaluator.
+
+### Layer A meets layer B
+
+Bench single-bird power yield correlates ρ = 0.20 with counterfactual card
+value over 70 brown birds — right sign, weak, as expected for a one-activation
+bench against whole-game value. Card-pair context lift is too sparse to
+compare pairwise at n ≥ 10 (nine pairs); the mechanic-level table is where
+the two evidence sources meet, and `tuck_card × deck_search_tuck` is the
+first pair both the bench (tuck engines) and the data (+3.0) call out.
+
+Outputs: `artifacts/play_counterfactuals/summary.md`,
+`artifacts/play_counterfactuals/hierarchical/{bird_effects,mechanic_pair_effects}.csv`
+(`analysis/r/play_attribution_hierarchical.R`, lme4; empirical-Bayes
+shrinkage, not a full posterior).
 
 ## Telemetry
 

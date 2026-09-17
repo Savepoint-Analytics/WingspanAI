@@ -21,6 +21,7 @@ Analysis layer:
 - `analysis/bird_value_regression.py`: observational bird value — ridge on birds played with agent fixed effects, over every archived game.
 - `analysis/card_synergy_bench.py`: rules-computed pair synergy for every same-habitat brown pair (layer A of the synergy programme).
 - `analysis/play_counterfactuals.py` and `analysis/play_attribution_summary.py`: exact counterfactual rollouts per archived play — timing value, card value, context lift (layer B).
+- `analysis/r/play_attribution_hierarchical.R`: lme4 hierarchical model of play value — bird random effects and mechanic-pair interactions with shrinkage.
 
 Key rules docs:
 

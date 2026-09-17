@@ -2554,3 +2554,55 @@ the design. **Defect to fix:** `PotentialPointsSetupPolicy` bird/food
 selection; measure against `default_setup_v1` with the same free paired-arm
 trick once a variant exists. The forced-keep study's per-card deltas were
 measured *conditional on* that bird selection and should be re-read after.
+
+## Update: 2026-09-17 - Synergy programme: rules bench, counterfactual play attribution, hierarchical model
+
+### What changed (Alex's direction: play-level value and card combinations)
+Documented as a new agent, `docs/agents/synergy_planner_agent.md`. Built:
+- **Activation ledger.** Every power resolution credits its owner-level yield
+  to the bird (`BirdSlot.power_yield`, excluded from dumps like
+  `activations`); `bird_scorecard` carries it.
+- **Layer A, `analysis/card_synergy_bench.py`.** Rules-computed synergy for
+  every same-habitat brown pair in both orders, on a size-matched blank
+  baseline, over three seeds × rich/scarce contexts: 12,386 ordered pairs in
+  47 s, 2,029 interact. Gray Catbird / Northern Mockingbird (repeat a brown
+  power) are the universal partners (+2 eggs next to the "lay an egg on any
+  bird" sparrows, +1.5 next to tuck birds). Rarity is not an obstacle: every
+  pair is scored, dealt or not.
+- **Layer B, `analysis/play_counterfactuals.py`.** Every archived
+  `play_bird` decision reconstructed (the replay validator's path) and rolled
+  out three ways under cheap continuations — actual, not-now (timing value),
+  never (card value). 2,698 plays over 382 `potential_points` games in ~25
+  min on four shards. `play_attribution_summary.py` aggregates with
+  empirical-Bayes shrinkage; `analysis/r/play_attribution_hierarchical.R`
+  fits bird + mechanic-pair random effects in lme4 (rebuilt from source to
+  fix a Matrix ABI mismatch).
+
+### Findings
+- A play is worth **+4.2** to the final score on average, but **+5.2 on
+  arrival and −1.0 downstream**: printed value overstates late plays because
+  the alternative (eggs) was worth more. Round 1 downstream is **+1.5**,
+  round 4 **−3.4**. Timing is a steady +1.4.
+- Top causal card values (shrunken): Brown Pelican +6.2, Turkey Vulture +5.6,
+  Barn Swallow +5.4, Common Grackle +5.4, Black-Billed Magpie +5.1.
+- Mechanic interactions: `tuck_card × deck_search_tuck` +3.0 (n=51),
+  `all_players_draw_cards × predator_hunt` +3.4; first engine play on an empty
+  board +5 (deck-search tuck, lay-egg, feeder food).
+- **Observed ≠ causal: ρ = 0.07** between the observational ridge and the
+  counterfactual card value. Turkey Vulture: −6.7 observed, +5.6 causal. The
+  ridge measures who plays a bird and when; only the counterfactual belongs
+  in an evaluator.
+- Bench single-bird yield vs counterfactual value ρ = 0.20; card-pair lift is
+  too sparse at n ≥ 10, mechanic-level is where A and B meet.
+
+### Follow-up tasks
+1. Layer C: forced-play confirmation of the top mechanic pairs (tuck × tuck,
+   draw × predator) — needs a keep-and-play forcing instrument.
+2. Engine-potential term in `potential_points` from the mechanic-pair model,
+   behind a switch; registered prediction +1 to +3.
+3. Bench extensions: cross-habitat chains over several activations, white
+   on-play, pink reactions.
+4. Determinized continuations (several samples per branch) if per-play
+   residual SD 4.7 proves too noisy for card-pair estimates.
+5. R environment: `lme4` was reinstalled from source on 2026-09-17; `brms`
+   for a full posterior when it is worth the compute.

@@ -41,6 +41,34 @@ def se(values: list[float]) -> float:
     return stdev(values) / math.sqrt(len(values)) if len(values) > 1 else float("nan")
 
 
+def shrink(groups: dict[str, list[float]]) -> tuple[dict[str, float], float, float, float]:
+    """Empirical-Bayes shrinkage of group means toward the grand mean.
+
+    One-way random-effects model by method of moments: within-group variance
+    from the pooled residuals, between-group variance from the spread of the
+    group means net of sampling noise. Each group's estimate is
+    ``grand + (mean - grand) * n / (n + within / between)``, so thin groups
+    move most. Returns (shrunken means, grand mean, within var, between var).
+    """
+
+    all_values = [v for vs in groups.values() for v in vs]
+    grand = mean(all_values)
+    within_ss = sum((v - mean(vs)) ** 2 for vs in groups.values() for v in vs)
+    within_df = sum(len(vs) - 1 for vs in groups.values())
+    within = within_ss / within_df if within_df > 0 else 0.0
+    means = {g: mean(vs) for g, vs in groups.items()}
+    between = max(
+        mean((m - grand) ** 2 for m in means.values())
+        - mean(within / len(vs) for vs in groups.values()),
+        1e-9,
+    )
+    shrunken = {
+        g: grand + (means[g] - grand) * len(vs) / (len(vs) + within / between)
+        for g, vs in groups.items()
+    }
+    return shrunken, grand, within, between
+
+
 def mechanics(catalog) -> dict[str, str]:
     """Bird name → power handler key (``none`` for power-less birds)."""
 
@@ -87,13 +115,22 @@ def report(rows: list[dict], *, bench: dict | None, catalog, min_n: int, top: in
     for r in rows:
         per_bird[r["bird"]].append(r)
     eligible = {b: rs for b, rs in per_bird.items() if len(rs) >= min_n}
-    ranked = sorted(eligible, key=lambda b: -mean(r["card_advantage"] for r in eligible[b]))
+    shrunken, grand, within, between = shrink(
+        {b: [r["card_advantage"] for r in rs] for b, rs in per_bird.items() if len(rs) >= 2}
+    )
+    ranked = sorted(eligible, key=lambda b: -shrunken.get(b, grand))
     lines += [
         "",
         f"## Per bird (≥{min_n} plays): card value, timing value, and what it did",
         "",
-        "| Bird | n | card value | SE | immediate | timing | activations | eggs | cache | tuck |",
-        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+        f"Ranked by the empirical-Bayes shrunken card value (one-way random effects by "
+        f"moments: within-bird SD {math.sqrt(within):.1f}, between-bird SD "
+        f"{math.sqrt(between):.1f}, grand mean {grand:+.2f}); thin birds are pulled "
+        "toward the mean.",
+        "",
+        "| Bird | n | card value | shrunken | SE | immediate | timing | activations | eggs | "
+        "cache | tuck |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
 
     def bird_line(b: str) -> str:
@@ -105,14 +142,14 @@ def report(rows: list[dict], *, bench: dict | None, catalog, min_n: int, top: in
         cache = mean(x["cached_food"] for x in led) if led else float("nan")
         tuck = mean(x["tucked_cards"] for x in led) if led else float("nan")
         return (
-            f"| {b} | {len(rs)} | {mean(c):+.2f} | {se(c):.2f} | "
+            f"| {b} | {len(rs)} | {mean(c):+.2f} | {shrunken.get(b, grand):+.2f} | {se(c):.2f} | "
             f"{mean(r['immediate_delta'] for r in rs):+.2f} | "
             f"{mean(r['timing_advantage'] for r in rs):+.2f} | {act:.1f} | {eggs:.1f} | "
             f"{cache:.1f} | {tuck:.1f} |"
         )
 
     lines.extend(bird_line(b) for b in ranked[:top])
-    lines.append("| … | | | | | | | | | |")
+    lines.append("| … | | | | | | | | | | |")
     lines.extend(bird_line(b) for b in ranked[-top:])
 
     # Context lift: card value of X with partner Y on board, minus X's overall mean.
@@ -214,6 +251,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--min-n", type=int, default=8)
     parser.add_argument("--top", type=int, default=20)
     parser.add_argument("--workbook", type=Path, default=DEFAULT_WORKBOOK_PATH)
+    parser.add_argument(
+        "--write-mechanics",
+        type=Path,
+        default=None,
+        help="write bird -> power handler key JSON here (input for the R model)",
+    )
     args = parser.parse_args(argv)
     rows = load_rows(args.rows)
     if not rows:
@@ -221,6 +264,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     bench = json.loads(args.bench.read_text()) if args.bench is not None else None
     catalog = load_base_game_content_catalog(args.workbook)
+    if args.write_mechanics is not None:
+        args.write_mechanics.write_text(json.dumps(mechanics(catalog), indent=1))
     print(report(rows, bench=bench, catalog=catalog, min_n=args.min_n, top=args.top))
     return 0
 
