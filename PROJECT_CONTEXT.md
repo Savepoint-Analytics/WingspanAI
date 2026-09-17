@@ -2762,3 +2762,13 @@ egg synergy: **830 → 34**; mean egg synergy 0.94 → 0.04; the P3 pair +2.00 �
 0.00. The bench's egg synergies measured egg room, not the pair — the layer C
 reversal reproduced in three seconds. Egg synergies are now reported at both
 ends; anything fed to an agent must be weighted by how often the cap binds.
+
+### Arm A result (2026-09-17): board-only synergy term is a small unresolved positive
+`rr_synergy_board` vs `rr_belief_opp`: `potential_points` **78.41 → 79.72
+(+1.31, p=0.17)**, win +0.013; 21 of 80 games bit-identical; action mix
+unchanged; +0.6 bird points, +0.7 eggs. Inside the registered −1…+1 band at
+its upper edge. Removing the hand term removed the harm (−4.5 → +1.3); what
+remains is below the 80-game detection limit (~1.9). Decision: term stays
+off; not adopted, not moved to the opener either — the registered
+"move synergy evidence to card-selection" trigger (below −1.5) did not fire.
+Worth one 200-game arm if the pipeline is idle; otherwise parked.
