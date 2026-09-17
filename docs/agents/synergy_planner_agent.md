@@ -181,6 +181,51 @@ Pairs and controls for the first run, with registered predictions:
 
 Only combinations that survive all three layers enter the agent.
 
+### Layer C results (2026-09-17)
+
+First run (60 seeds) measured the instrument rather than the pairs: Common
+Grackle's tuck-from-hand power was tucking Cooper's Hawk out of the hand, and
+the food grant was overwritten by the opening choice, so P1 completed in 11
+of 60 seeds and read −8.25. Fixed (`d2ad2d1`): the wrapper rejects any action
+whose resolution removes a waiting forced bird from hand, steers to lay-eggs
+when the shared row needs one, and `opening_food_bonus` (2 of each, every
+arm, so it cancels) is granted after setup and replayed. Completion rose to
+88–95%.
+
+Second run, 240 seeds per pair, `archetype_engine_builder` vs greedy:
+
+| Pair | Interaction (ITT) | p | On completed seeds | Completion | Verdict |
+|---|---:|---:|---:|---:|---|
+| P1 Common Grackle + Cooper's Hawk | −1.06 | 0.41 | −0.68 (p=0.61) | 227/240 | null |
+| P2 Canvasback + Anhinga | **+3.48** | **0.021** | +2.00 (p=0.20) | 210/240 | positive |
+| P3 Baird's Sparrow + Northern Mockingbird | **−3.38** | **0.005** | −3.23 (p=0.010) | 228/240 | **negative** |
+
+Main effects came out as expected (Cooper's Hawk +3.5 over the sapsucker,
+Anhinga +5.0 over Osprey, Baird's Sparrow +10.0 over Eastern Phoebe — an egg
+engine for this agent), so the design resolves card value; it is the
+interactions that split.
+
+What the split says:
+
+- **P2 confirms layer B.** All-players-draw next to a predator, in the same
+  wetland row, is worth about +3 to a cheap pursuer — the same +3.4 the
+  counterfactual attribution measured. One of three pairs surviving all
+  three layers is the honest confirmation rate.
+- **P1 does not.** The tuck × deck-search-tuck effect measured under a
+  one-ply continuation on the searching agent's plays does not appear when
+  a non-searching agent plays the pair. Either it needs the pursuer to
+  plan around it, or layer B's +3.0 was a pursuer artefact — the same
+  pursuit confound the bonus-card study found.
+- **P3 reverses, and the reason is general.** The bench scored +2 eggs per
+  activation on an egg-empty board. In play, egg capacity binds: the sparrow
+  holds 2, the mockingbird 4, the grassland action already lays 2 a turn,
+  and the repeated "lay an egg on any bird" hits the cap while the
+  mockingbird's slot and cost displaced a bird that gains food. **A synergy
+  that spends a shared cap is worth only what the cap allows** — the
+  "partial combo" question again, from the other side. Layer A needs a
+  capacity-aware context (a full board, eggs near limit) before its egg
+  synergies mean anything.
+
 ## The Agent
 
 `SynergyPlannerAgent` = `PotentialPointsAgent(mechanic_synergy=True)`: the

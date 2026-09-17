@@ -2685,3 +2685,28 @@ residents, so nest-conditional whites are masked — needs an empty-row
 baseline with egg-cost adjustment. `pink`: the cowbird class confirmed
 (Loggerhead Shrike + either cowbird, +1 egg per opponent lay-eggs action);
 pink reactions now credited to the ledger.
+
+## Update: 2026-09-17 - Layer C at 240 seeds: one pair confirms, one is null, one reverses
+
+`artifacts/forced_play/v2`, cheap pursuer, 2,880 games, completion 88–95%:
+- **P2 Canvasback + Anhinga (all-players-draw × predator): +3.48 (p=0.021)**
+  — layer B's +3.4 confirmed.
+- P1 Common Grackle + Cooper's Hawk (tuck × deck-search-tuck): −1.06 (n.s.) —
+  layer B's +3.0 does not appear for a non-searching pursuer.
+- **P3 Baird's Sparrow + Northern Mockingbird (lay-egg-any × repeat): −3.38
+  (p=0.005)** — the bench's +2 eggs per activation reverses because egg
+  capacity binds in play; the mockingbird displaced a food bird. A synergy
+  that spends a shared cap is worth only what the cap allows.
+
+Confirmation rate across the three layers: one of three. The bench needs a
+capacity-aware context before egg synergies are read; layer B carries a
+pursuit confound that layer C exposes. `analysis/forced_play_contrast.py`;
+per-pair reports under `artifacts/forced_play/v2/P*_contrast.md`.
+
+### Determinized continuations
+On 588 matched plays, K=4 determinized rollouts leave the mean unchanged
+(+3.94 → +4.04) and cut the within-bird SD **36%** (8.28 → 5.27); per-bird
+ranks between K=0 and K=4 agree only at ρ=0.54, so a real share of the K=0
+ordering — and of the mechanic-pair table the engine-potential term used —
+was path noise. Full K=4 attribution over all 382 games in flight; the pair
+table will be rebuilt from it (`mechanic_pair_effects_v2`).
