@@ -40,7 +40,7 @@ Key rules docs:
 - `experiments/round_robin_v3_guardrails.md`: guardrailed agents as first-class competitors.
 - `experiments/round_robin_v2.md`: agent-vs-agent ranking on the corrected simulator (200 games).
 - `experiments/round_robin_v1.md`: (superseded) first seat-swapped agent-vs-agent round robin (200 games).
-- `experiments/bonus_card_selection_study_plan.md`: which bonus cards to keep at setup, and when — forced-keep paired design, bonus-card synergy and the companion bird-value study.
+- `experiments/bonus_card_selection_study_plan.md`: which bonus cards to keep — the choice is worth six points, per-bird cards win (+3.25, p=0.009), synergy is qualifier power quality not breadth, and the current policy is a coin flip.
 - `experiments/resource_spending_ablation.md`: the third null, and why the pattern is the finding.
 - `experiments/search_depth_experiment.md`: the first positive result — lookahead depth and coverage, after fixing a dead `search_depth` knob.
 - `experiments/determinized_search_test.md`: how much of the search gain survives when the search cannot read hidden cards (+10.4 of +13.5).

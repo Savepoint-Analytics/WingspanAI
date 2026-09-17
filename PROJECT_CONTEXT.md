@@ -2417,3 +2417,47 @@ Artifacts under `artifacts/bonus_keep/force0` and `force1`.
 3. Bird-value study layer 2: per-bird scorecard event at game end, then the
    observational regression over archived games.
 4. Settle the base-game bonus-card composition question.
+
+## Update: 2026-09-16 - Bonus-card keep study: the choice is worth six points, per-bird cards win, synergy is power quality not breadth
+
+### Results
+222 games at `010cf7b`, 111 forced-keep pairs, all replays valid, 3 h 06 min
+on four runners. Full write-up in
+`docs/experiments/bonus_card_selection_study_plan.md` §8.
+
+- **The keep decision is worth 6.4 points on average**; 58% of deals swing 5+
+  and the largest swing was 29. The current `PotentialPointsSetupPolicy` picks
+  the better side on **50%** of decided deals — a coin flip.
+- **Per-bird cards beat their dealt partners by +3.25 (p=0.009, 51 units)**;
+  tiered cards −0.93 (n.s.), board-state cards −1.12 (n.s.). Falconer +7.0,
+  Bird Counter +6.4, Omnivore Expert +4.4 lead; Viticulturalist −5.4,
+  Enclosure Builder −4.8, Bird Feeder −3.9, Large Bird Specialist −3.3
+  (p=0.02) trail. Per-card resolution is ±7 points; the ranking is the
+  deliverable.
+- **Registered synergy prediction reversed** (ρ = −0.40): breadth of
+  qualifying supply predicts *worse* keeps, because the broad cards are the
+  tiered ones whose thresholds a 10–12-bird board rarely reaches. Post hoc,
+  what tracks value is the payoff shape (per-bird ρ +0.49) and the qualifiers'
+  power quality (power score +0.39, brown share +0.34). Answer to Alex's
+  question 4: yes, a card is good when every qualifier pays and the qualifiers
+  are engine birds the agent plays anyway.
+- **Printed bonus points are the wrong lens**: realized bonus points when kept
+  correlate ρ = 0.15 with keep value. Visionary Leader scores the most bonus
+  points (8.44) and has negative keep value (−1.33).
+- The weighted bird table (`card_structure.py --birds --card-values
+  artifacts/bonus_keep/card_values.json`) is now a feature for the bird-value
+  study: cheap brown birds covering Falconer/Bird Counter/Omnivore lead.
+
+### Why it matters
+First strategy findings about *content* rather than agents, with a registered
+design, and they cost three hours. The setup decision is the largest single
+lever this agent misuses; a per-bird preference would already beat its policy.
+
+### Follow-up tasks
+1. Replicate with `archetype_engine_builder` as the study agent.
+2. Build a per-bird-preferring (or learned) keep policy behind a switch;
+   success criterion >60% hindsight accuracy on fresh seeds, then a paired arm.
+3. Bird-value study layer 2: per-bird scorecard event, observational
+   regression over archived games.
+4. Settle the base-game bonus-card composition (Anatomist / Visionary Leader
+   in; Diet Specialist / Bird Bander out).
