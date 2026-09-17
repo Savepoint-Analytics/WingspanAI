@@ -63,6 +63,16 @@ def inject_opening_cards(state: GameState, player_id: str, bird_names: list[str]
     return missing
 
 
+def grant_opening_food(state: GameState, player_id: str, count: int) -> None:
+    """Give a player ``count`` of every base food before the opening choice."""
+
+    from wingspan_ai.content.loader import BASE_FOOD_TYPES
+
+    player = next(p for p in state.players if p.player_id == player_id)
+    for food_type in BASE_FOOD_TYPES:
+        player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + count
+
+
 @dataclass(frozen=True)
 class KeepBirdsSetupPolicy:
     """Keep the named birds at setup; let ``base_policy`` choose the rest."""
@@ -134,9 +144,13 @@ class ForcedPlayAgent:
             if action.action_type == ActionType.PLAY_BIRD
             and action.bird_common_name in self.bird_names
         ]
+        player = state.active_player
+        # Anything that would strip a waiting forced bird out of the hand
+        # (a tuck-from-hand power on the row being activated, a discard) is
+        # off the table while the pair is incomplete.
+        legal_actions = self._keeps_forced_birds(state, legal_actions)
         if not forced:
             return self.base_agent.select_action(state, self._steer_food(state, legal_actions))
-        player = state.active_player
         # When the wrapper decides to wait, the base agent must not be able to
         # play a forced bird into the wrong row on its own.
         deferred = self._steer_food(state, [a for a in legal_actions if a not in forced])
@@ -148,7 +162,12 @@ class ForcedPlayAgent:
                 forced = in_shared
             elif row_open:
                 # The shared row exists but is not enterable yet (an egg it
-                # cannot pay, usually): wait rather than split the pair.
+                # cannot pay, usually): wait rather than split the pair, and
+                # if eggs are what is missing, go and lay some.
+                if player.total_eggs == 0:
+                    lay = [a for a in deferred if a.action_type == ActionType.LAY_EGGS]
+                    if lay:
+                        return self.base_agent.select_action(state, lay)
                 return self.base_agent.select_action(state, deferred or legal_actions)
         # A forced play must not consume food a waiting partner still needs.
         waiting = [card for card in player.hand if card.common_name in self.bird_names]
@@ -175,6 +194,24 @@ class ForcedPlayAgent:
         if not safe:
             return self.base_agent.select_action(state, deferred or legal_actions)
         return self.base_agent.select_action(state, safe)
+
+    def _keeps_forced_birds(
+        self, state: GameState, legal_actions: list[LegalAction]
+    ) -> list[LegalAction]:
+        player = state.active_player
+        waiting = {card.common_name for card in player.hand if card.common_name in self.bird_names}
+        if not waiting:
+            return legal_actions
+        kept = []
+        for action in legal_actions:
+            played = action.bird_common_name if action.action_type == ActionType.PLAY_BIRD else None
+            after = apply_action(state, action)
+            after_player = next(p for p in after.players if p.player_id == player.player_id)
+            still = {card.common_name for card in after_player.hand}
+            lost = {name for name in waiting if name not in still and name != played}
+            if not lost:
+                kept.append(action)
+        return kept or legal_actions
 
     def _steer_food(self, state: GameState, legal_actions: list[LegalAction]) -> list[LegalAction]:
         """When a forced bird waits on food, keep only the gain-food actions that supply it.

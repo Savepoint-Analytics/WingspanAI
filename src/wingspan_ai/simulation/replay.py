@@ -7,7 +7,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-from wingspan_ai.agents.forced_play import inject_opening_cards
+from wingspan_ai.agents.forced_play import grant_opening_food, inject_opening_cards
 from wingspan_ai.content.schemas import ContentCatalog, FoodType
 from wingspan_ai.rules.actions import LegalAction
 from wingspan_ai.rules.base_game import (
@@ -98,6 +98,8 @@ def validate_simulation_replay(
         discarded_birds, discarded_bonus_cards = apply_initial_selection_choice(player, selection)
         state.decks.bird_discard.extend(discarded_birds)
         state.decks.bonus_discard.extend(discarded_bonus_cards)
+    for player_id, count in (game_started.payload.get("opening_food_bonus") or {}).items():
+        grant_opening_food(state, player_id, int(count))
 
     checked = 0
     for event in _events_named(events, EventName.ACTION_RESOLVED):

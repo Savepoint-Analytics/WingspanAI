@@ -9,7 +9,7 @@ from time import perf_counter
 from typing import Protocol
 from uuid import uuid4
 
-from wingspan_ai.agents.forced_play import inject_opening_cards
+from wingspan_ai.agents.forced_play import grant_opening_food, inject_opening_cards
 from wingspan_ai.agents.setup import InitialSelectionContext
 from wingspan_ai.content.schemas import ContentCatalog, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
@@ -67,6 +67,7 @@ def run_single_game(
     simulation_run_id: str | None = None,
     max_turns: int = 200,
     opening_hand_overrides: dict[str, list[str]] | None = None,
+    opening_food_bonus: dict[str, int] | None = None,
 ) -> SimulationResult:
     """Run one seeded game and return final state, outcome, and telemetry.
 
@@ -124,6 +125,11 @@ def run_single_game(
         )
     state.decks.bird_discard.extend(bird_discards)
     state.decks.bonus_discard.extend(bonus_discards)
+    # A flat food grant (every type) after the opening choice has set the
+    # starting food, so forced pairs with awkward costs can complete; identical
+    # across a design's arms, so it cancels in contrasts.
+    for player_id, count in (opening_food_bonus or {}).items():
+        grant_opening_food(state, player_id, count)
 
     sink = InMemoryEventSink()
     public_state_snapshots: dict[str, dict] = {}
@@ -137,6 +143,7 @@ def run_single_game(
         resolved_run_id,
         opening_hand_overrides=opening_hand_overrides,
         injection_missing=injection_missing,
+        opening_food_bonus=opening_food_bonus,
     )
     _emit_round_started(sink, state, resolved_run_id)
 
@@ -356,6 +363,7 @@ def _emit_game_started(
     *,
     opening_hand_overrides: dict[str, list[str]] | None = None,
     injection_missing: dict[str, list[str]] | None = None,
+    opening_food_bonus: dict[str, int] | None = None,
 ) -> None:
     public_state = to_public_state(state)
     payload = {
@@ -369,6 +377,8 @@ def _emit_game_started(
             player_id: list(names) for player_id, names in opening_hand_overrides.items()
         }
         payload["injection_missing"] = dict(injection_missing or {})
+    if opening_food_bonus:
+        payload["opening_food_bonus"] = dict(opening_food_bonus)
     sink.emit(_base_event(EventName.GAME_STARTED, state, simulation_run_id, **payload))
 
 
