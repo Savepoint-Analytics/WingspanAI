@@ -75,18 +75,26 @@ class SetupPolicyMixin:
 
 #: How the potential-points opener ranks the two dealt bonus cards.
 #: ``"tag_overlap"`` is the historic scorer (hand keyword matches plus the
-#: card's prevalence). ``"expected_points"`` estimates the points the card
-#: will actually score from its printed formula, its printed prevalence and
-#: the qualifiers in hand; see ``expected_bonus_points``.
+#: card's prevalence; policy id ``potential_points_setup_v1``).
+#: ``"expected_points"`` estimates the points the card will actually score
+#: from its printed formula, its printed prevalence and the qualifiers in
+#: hand (``potential_points_setup_v2``); see ``expected_bonus_points``. The
+#: default moved to ``"expected_points"`` on 2026-09-16 (Alex's call) after
+#: it scored +0.85 (p=0.011) and 61% vs 52% over 322 measured deals; see
+#: ``docs/experiments/bonus_card_selection_study_plan.md``.
 BONUS_SCORING_KINDS = ("tag_overlap", "expected_points")
-DEFAULT_BONUS_SCORING = "tag_overlap"
+DEFAULT_BONUS_SCORING = "expected_points"
+_BONUS_SCORING_POLICY_IDS = {
+    "tag_overlap": "potential_points_setup_v1",
+    "expected_points": "potential_points_setup_v2",
+}
 
 
 @dataclass(frozen=True)
 class PotentialPointsSetupPolicy:
     """Opening setup heuristic for final-score potential and early tempo."""
 
-    policy_id: str = "potential_points_setup_v1"
+    policy_id: str = field(init=False)
     target_keep_count: int | None = None
     bonus_scoring: str = DEFAULT_BONUS_SCORING
 
@@ -96,8 +104,7 @@ class PotentialPointsSetupPolicy:
                 f"unknown bonus_scoring: {self.bonus_scoring!r}; expected one of "
                 f"{BONUS_SCORING_KINDS}"
             )
-        if self.bonus_scoring != DEFAULT_BONUS_SCORING and self.policy_id.endswith("_v1"):
-            object.__setattr__(self, "policy_id", f"{self.policy_id}:{self.bonus_scoring}")
+        object.__setattr__(self, "policy_id", _BONUS_SCORING_POLICY_IDS[self.bonus_scoring])
 
     def choose_initial_selection(
         self,

@@ -44,7 +44,7 @@ This remains useful as a control condition.
 
 ### `PotentialPointsSetupPolicy`
 
-Policy ID: `potential_points_setup_v1`
+Policy ID: `potential_points_setup_v2` (`bonus_scoring="expected_points"`, default since 2026-09-16); `potential_points_setup_v1` is the historic `tag_overlap` scorer, still available behind the switch
 
 Enumerates legal keep-count choices and starting-food combinations, then scores each selection for:
 
@@ -94,7 +94,7 @@ This is intentionally still conservative. It does not inspect opponent hidden ha
 | `RandomLegalAgent` | `default_setup_v1` |
 | `GreedyBaselineAgent` | `default_setup_v1` |
 | `MonteCarloRolloutAgent` | `default_setup_v1` |
-| `PotentialPointsAgent` | `potential_points_setup_v1` |
+| `PotentialPointsAgent` | `potential_points_setup_v2` |
 | `StrategyArchetypeAgent` | `archetype_<name>_setup_v1` |
 | `NetValueOpponentResponseAgent` | `net_value_setup_v1` |
 | `GuardrailedAgent` | delegates to wrapped agent setup policy |

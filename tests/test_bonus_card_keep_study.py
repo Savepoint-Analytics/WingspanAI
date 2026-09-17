@@ -180,9 +180,14 @@ class ExpectedBonusPointsTests(TestCase):
         from wingspan_ai.agents.setup import InitialSelectionContext, PotentialPointsSetupPolicy
         from wingspan_ai.rules.base_game import setup_base_game
 
-        historic = PotentialPointsSetupPolicy()
+        historic = PotentialPointsSetupPolicy(bonus_scoring="tag_overlap")
         expected = PotentialPointsSetupPolicy(bonus_scoring="expected_points")
-        self.assertEqual(expected.policy_id, "potential_points_setup_v1:expected_points")
+        self.assertEqual(expected.policy_id, "potential_points_setup_v2")
+        self.assertEqual(PotentialPointsSetupPolicy().policy_id, "potential_points_setup_v2")
+        self.assertEqual(
+            PotentialPointsSetupPolicy(bonus_scoring="tag_overlap").policy_id,
+            "potential_points_setup_v1",
+        )
         with self.assertRaises(ValueError):
             PotentialPointsSetupPolicy(bonus_scoring="oracle")
         differing = 0
@@ -199,3 +204,61 @@ class ExpectedBonusPointsTests(TestCase):
             self.assertIn(b.kept_bonus_card_names[0], [c.name for c in player.bonus_cards])
             differing += a.kept_bonus_card_names != b.kept_bonus_card_names
         self.assertGreater(differing, 0)
+
+
+class SetupPolicyOverrideTests(TestCase):
+    def test_override_applies_to_the_named_agent_only(self) -> None:
+        from flows.simulation_batch import _make_agent
+
+        overrides = {"potential_points": "agent_default"}
+        study = _make_agent(
+            "potential_points",
+            seat="p1",
+            setup_policy_kind="control",
+            setup_policy_overrides=overrides,
+            potential_points_search=CHEAP_SEARCH,
+        )
+        opponent = _make_agent(
+            "archetype_engine_builder",
+            seat="p2",
+            setup_policy_kind="control",
+            setup_policy_overrides=overrides,
+        )
+        self.assertEqual(study.setup_policy.policy_id, "potential_points_setup_v2")
+        self.assertEqual(opponent.setup_policy.policy_id, "default_setup_v1")
+        with self.assertRaises(ValueError):
+            _make_agent(
+                "potential_points",
+                seat="p1",
+                setup_policy_overrides={"potential_points": "oracle"},
+                potential_points_search=CHEAP_SEARCH,
+            )
+
+    def test_manifest_records_policy_ids_per_seat(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            results = simulation_batch.run_simulation_batch(
+                workbook_path="missing-workbook.xlsx",
+                seeds=[4],
+                artifact_root=tmp_dir,
+                persist_postgres=False,
+                upload_artifacts=False,
+                batch_kind="smoke",
+                batch_label="override",
+                batch_id="override_batch",
+                player_agent_kinds=["potential_points", "greedy_immediate"],
+                setup_policy_kind="control",
+                setup_policy_overrides={"potential_points": "agent_default"},
+                potential_points_search=CHEAP_SEARCH,
+            )
+            manifest = json.loads(
+                Path(results[0]["batch_manifest"]["path"]).read_text(encoding="utf-8")
+            )
+            game = manifest["games"][0]
+            self.assertEqual(game["setup_policy_overrides"], {"potential_points": "agent_default"})
+            self.assertEqual(
+                game["setup_policy_ids"],
+                {
+                    "potential_points_p1": "potential_points_setup_v2",
+                    "greedy_immediate_p2": "default_setup_v1",
+                },
+            )

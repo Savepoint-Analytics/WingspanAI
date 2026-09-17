@@ -2515,3 +2515,28 @@ The 26 cards dealt are the base-game deck. `docs/rules/bonus_card_composition.md
    first wave.
 4. Fix `_bonus_alignment_score`'s card-independent tag term where it also
    drives bird selection (`_selection_score` weights it 1.8).
+
+## Update: 2026-09-16 - expected_points is the opener default; re-baseline arm launched
+
+### Decision (Alex)
+`PotentialPointsSetupPolicy` defaults to `bonus_scoring="expected_points"`
+(policy id `potential_points_setup_v2`); `tag_overlap` remains as v1 behind
+the switch.
+
+### A thing worth knowing
+Every round-robin arm to date ran with `setup_policy_kinds=["control"]`, which
+puts *all* agents on `default_setup_v1`. The champion's 0.90 win rate never
+used its own strategic opener, so `rr_belief_opp` is unaffected by this
+change, and "does the searching agent's own opener beat the control opener?"
+has never been measured. Added `setup_policy_overrides={agent_kind: kind}` to
+the flows so one agent can use `agent_default` while the lineup stays on
+`control`; manifests now record `setup_policy_ids` per seat.
+
+### Re-baseline arm (registered)
+Standard 80-game design at `rr_belief_opp`'s settings plus
+`setup_policy_overrides={"potential_points": "agent_default"}`; artifacts
+`artifacts/rr_opener_v2`. Prediction: `potential_points` **+1 to +3 points**
+over `rr_belief_opp` — the v2 opener fixes a bonus choice worth ~0.85 and
+also keeps birds/food strategically, which `control` does not. If it lands
+null or negative, the strategic bird/food selection is suspect (its
+`_bonus_alignment_score` term is the same card-independent tag count).

@@ -419,6 +419,7 @@ def run_round_robin(
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
+    setup_policy_overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run every agent lineup in every seat rotation across the setup factor.
 
@@ -470,6 +471,7 @@ def run_round_robin(
                 net_value_response_mode=net_value_response_mode,
                 potential_points_search=potential_points_search,
                 forced_bonus_choice=forced_bonus_choice,
+                setup_policy_overrides=setup_policy_overrides,
             )
         )
 
@@ -490,6 +492,9 @@ def run_round_robin(
             "power_status_filter": power_status_filter,
             "excluded_power_handler_keys": excluded_power_handler_keys,
             "forced_bonus_choice": dict(forced_bonus_choice) if forced_bonus_choice else None,
+            "setup_policy_overrides": (
+                dict(setup_policy_overrides) if setup_policy_overrides else None
+            ),
             "potential_points_search": (
                 potential_points_search.as_manifest_payload()
                 if potential_points_search is not None

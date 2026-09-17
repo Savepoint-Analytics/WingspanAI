@@ -28,7 +28,7 @@ These are not intended to be strong yet. Their near-term job is to create distin
 
 ## Opening Setup
 
-Opening setup is now policy-driven. Random, greedy, and Monte Carlo use `default_setup_v1`; `PotentialPointsAgent` uses `potential_points_setup_v1`; each archetype uses `archetype_<name>_setup_v1`; and `NetValueOpponentResponseAgent` uses `net_value_setup_v1`. Guardrailed agents delegate setup to their wrapped base agent.
+Opening setup is now policy-driven. Random, greedy, and Monte Carlo use `default_setup_v1`; `PotentialPointsAgent` uses `potential_points_setup_v2` (expected bonus points; v1 was tag overlap); each archetype uses `archetype_<name>_setup_v1`; and `NetValueOpponentResponseAgent` uses `net_value_setup_v1`. Guardrailed agents delegate setup to their wrapped base agent.
 
 See `docs/agents/opening_setup_policies.md` for the exact opening dimensions and current caveats.
 

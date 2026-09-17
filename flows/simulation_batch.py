@@ -136,6 +136,7 @@ def run_seeded_game(
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
+    setup_policy_overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch."""
 
@@ -188,6 +189,7 @@ def run_seeded_game(
             potential_points_search=potential_points_search,
             lineup=tuple(resolved_lineup),
             forced_bonus_choice=forced_bonus_choice,
+            setup_policy_overrides=setup_policy_overrides,
         )
         if guardrail_config is None or seat not in guardrail_seats:
             return base_agent
@@ -272,6 +274,15 @@ def run_seeded_game(
             lineup_agents, potential_points_search or PotentialPointsSearchConfig()
         ),
         "forced_bonus_choice": dict(forced_bonus_choice) if forced_bonus_choice else None,
+        "setup_policy_overrides": dict(setup_policy_overrides) if setup_policy_overrides else None,
+        "setup_policy_ids": {
+            agent.agent_id: getattr(
+                getattr(agent, "base_agent", agent), "setup_policy", None
+            ).policy_id
+            if getattr(getattr(agent, "base_agent", agent), "setup_policy", None) is not None
+            else None
+            for agent in lineup_agents
+        },
         "replay_validation": replay_validation_payload,
         "rule_audits": rule_audits,
     }
@@ -353,6 +364,8 @@ def run_seeded_game(
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "search_opponent_models": batch_metadata["search_opponent_models"],
         "forced_bonus_choice": batch_metadata["forced_bonus_choice"],
+        "setup_policy_overrides": batch_metadata["setup_policy_overrides"],
+        "setup_policy_ids": batch_metadata["setup_policy_ids"],
         "ruleset_id": result.state.ruleset.ruleset_id,
         "outcome": asdict(result.outcome),
         "event_count": len(result.events),
@@ -450,6 +463,7 @@ def _make_agent(
     guardrail_config_path: str | None = None,
     lineup: tuple[str, ...] | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
+    setup_policy_overrides: dict[str, str] | None = None,
 ):
     # A "guardrailed:" prefix wraps the base agent in its own guardrail layer,
     # so a roster can pit an agent against its guardrailed twin.
@@ -517,7 +531,13 @@ def _make_agent(
     # Apply the setup policy to the base agent before wrapping: GuardrailedAgent
     # delegates opening selection downward, so a policy set on the wrapper is
     # never consulted.
-    agent = _apply_setup_policy(agent, agent_kind, setup_policy_kind)
+    # A per-agent override lets one agent use its own opener while the rest of
+    # the lineup stays on the batch-wide setting (e.g. the study agent on
+    # ``agent_default`` against opponents on ``control``).
+    effective_setup_kind = (setup_policy_overrides or {}).get(agent_kind, setup_policy_kind)
+    agent = _apply_setup_policy(
+        agent, agent_kind, _validate_setup_policy_kind(effective_setup_kind)
+    )
     if forced_bonus_choice and agent_kind in forced_bonus_choice:
         # Forced-keep study: this agent keeps the dealt bonus card at the given
         # index, choosing birds and food around it with its usual policy.
@@ -694,6 +714,8 @@ def _write_batch_manifest(
                 ],
                 "search_opponent_models": result.get("search_opponent_models", {}),
                 "forced_bonus_choice": result.get("forced_bonus_choice"),
+                "setup_policy_overrides": result.get("setup_policy_overrides"),
+                "setup_policy_ids": result.get("setup_policy_ids", {}),
                 "replay_validation": result["replay_validation"],
                 "artifact_dir": result["artifact_dir"],
                 "postgres": result["postgres"],
@@ -741,6 +763,7 @@ def run_simulation_batch(
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
+    setup_policy_overrides: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -779,6 +802,7 @@ def run_simulation_batch(
             net_value_response_mode=net_value_response_mode,
             potential_points_search=potential_points_search,
             forced_bonus_choice=forced_bonus_choice,
+            setup_policy_overrides=setup_policy_overrides,
         )
         for seed in resolved_seeds
     ]

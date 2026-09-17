@@ -295,7 +295,7 @@ class GuardrailedRosterTests(TestCase):
         )
 
         self.assertEqual(
-            guarded.base_agent.setup_policy.policy_id, "potential_points_setup_v1"
+            guarded.base_agent.setup_policy.policy_id, "potential_points_setup_v2"
         )
 
     def test_guardrailed_cell_labels_are_path_safe(self) -> None:
