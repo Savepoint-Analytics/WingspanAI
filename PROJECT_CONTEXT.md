@@ -2648,3 +2648,40 @@ off by default. Arm: standard 80-game design vs `rr_belief_opp`,
 concentrated in bird points and eggs, draws rising as the agent holds partial
 combos; null is the honest prior after four valuation nulls, and a card-choice
 term is the one kind that has paid.
+
+## Update: 2026-09-17 - Engine-potential term: −4.5, a clear negative; layer C v1 instrument flaw found and fixed
+
+### Engine-potential term
+`rr_synergy_term` vs `rr_belief_opp`, 80 paired games: `potential_points`
+**78.41 → 73.90 (−4.51, p=0.001)**, win 0.875 → 0.800, negative against every
+opponent. Registered +1 to +3 failed. The mechanism engaged (draws 24.3% →
+27.9%, plays and egg-lays down) and cost bird points −2.8, round goals −0.9,
+eggs −0.8, tucks −0.5. Diagnosis: the hand term pays for *holding* combo
+pieces, and the effects double count what a depth-3 search already realizes.
+Term stays off. One more arm is worth running: board-only with halved
+effects; if negative too, the synergy evidence belongs in card-selection
+decisions (opener, draw choice), not the evaluator. Fifth valuation-term
+null-or-worse; the pattern holds.
+
+### Layer C v1: the instrument was measuring itself
+Cheap pursuer, 60 seeds: P1 interaction −8.25 (p=0.01) with the pair
+completing in only 11/60 seeds — because **Common Grackle's tuck-from-hand
+power was tucking Cooper's Hawk**, and a food grant was being overwritten by
+the opening choice. P2 +0.27 (n.s., 34/60 complete), P3 +0.03 ITT but +2.40
+on the 42 completed seeds (n.s.). Fixed (`d2ad2d1`): the wrapper rejects any
+action whose resolution removes a waiting forced bird from hand, steers to
+lay-eggs when the shared row needs one, and `opening_food_bonus` is granted
+after setup and replayed. Completion 12/12, 11/12, 12/12 on smoke. Re-run at
+240 seeds per pair in flight (`artifacts/forced_play/v2`).
+
+### Bench extensions
+`cross`: 783 of 24,868 ordered cross-row pairs interact, but the dominant
+pattern is deck-order coupling (a wetland draw changes the card a deck-search
+predator then sees); real chains underneath: draw-then-tuck (Wood Duck →
+Bushtit/Common Grackle, +0.75 when the hand is empty) and cross-row egg
+capacity (Pileated Woodpecker → grassland birds with room, +2.0). `onplay`:
+no interactions detected; the blank baselines share nest types with
+residents, so nest-conditional whites are masked — needs an empty-row
+baseline with egg-cost adjustment. `pink`: the cowbird class confirmed
+(Loggerhead Shrike + either cowbird, +1 egg per opponent lay-eggs action);
+pink reactions now credited to the ledger.

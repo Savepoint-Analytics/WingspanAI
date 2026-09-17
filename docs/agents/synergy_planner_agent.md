@@ -194,6 +194,40 @@ board) at a 0.6 play rate. Threaded through the search's terminal values, the
 config and the manifest; off by default; ablated in the 80-game paired design
 against `rr_belief_opp` (`artifacts/rr_synergy_term`).
 
+### Result of the first ablation (2026-09-17): a clear negative
+
+| | baseline | with term | Δ | p |
+|---|---:|---:|---:|---:|
+| `potential_points` score | 78.41 | 73.90 | **−4.51** | **0.001** |
+| win rate | 0.875 | 0.800 | −0.075 | 0.14 |
+
+Negative against all four opponents (−6.75 vs bonus-focus, p=0.01; −4.70 vs
+net-value, p=0.03). The registered prediction (+1 to +3) failed outright.
+The mechanism engaged exactly as designed and that is what cost the points:
+draws rose from 24.3% to 27.9% of turns while plays and egg-lays fell, bird
+points −2.8, round goals −0.9, eggs −0.8 — and tucked cards −0.5, so the
+tuck engines the term was built to reward produced *fewer* tucks.
+
+Diagnosis, in order of likelihood:
+
+1. **The hand term pays for holding.** Crediting each hand card's potential
+   lift at a 0.6 play rate rewards *having* combo pieces, so the evaluator
+   prefers drawing toward a combination over laying eggs or playing the
+   bird in front of it. The search then compounds the preference.
+2. **Double counting with the search.** The mechanic-pair effects were
+   measured under a one-ply continuation; a depth-3 search already realizes
+   part of that downstream value when it looks ahead, so adding it again
+   inflates every engine-shaped line.
+3. **Effects measured on a different pursuer.** The table comes from plays
+   made by the searching agent but valued by the one-ply continuation; the
+   same pair may be worth less to an agent that already plans.
+
+Standing decision: the term stays off. The next variant worth one arm is
+**board-only** (drop the hand term entirely) with the board effects halved,
+which tests (1) and (2) at once; if that is also negative, the synergy
+evidence belongs in the opener and the draw choice (card-selection
+decisions, where card-choice terms have paid) rather than in the evaluator.
+
 Registered prior: four resource-valuation terms have landed null, but the one
 card-choice term measured so far paid; a synergy term is a card-choice term.
 Prediction to register before the arm: +1 to +3 points, concentrated in bird
