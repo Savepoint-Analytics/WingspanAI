@@ -25,6 +25,12 @@ potential agent for a ``potential_points`` seat and the archived agent kind
 for any cheap opponent, so the number is "what this play was worth to a
 competent but non-searching continuation".
 
+``--continuation-samples K`` rolls each branch out from K determinized copies
+of the state (opponents' hidden cards and the deck resampled, the acting
+player's own information unchanged) and averages, which trades K× the compute
+for a value that no longer depends on one particular deck order — the fix for
+the path-dependence noise of a single deterministic continuation.
+
     python analysis/play_counterfactuals.py artifacts/rr_belief_opp \\
         --study-agent potential_points --out artifacts/play_counterfactuals/rr_belief_opp.jsonl
 """
@@ -39,6 +45,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from wingspan_ai.agents.determinization import determinize_state  # noqa: E402
 from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig  # noqa: E402
 from wingspan_ai.content.loader import (  # noqa: E402
     DEFAULT_WORKBOOK_PATH,
@@ -137,6 +144,30 @@ def rollout(state: GameState, first_action: LegalAction, agents: dict[str, objec
     return branch
 
 
+def rollout_value(
+    state: GameState,
+    first_action: LegalAction,
+    agents: dict[str, object],
+    player_id: str,
+    samples: int,
+) -> tuple[float, GameState]:
+    """Mean final score over ``samples`` determinized continuations (0 = the true state).
+
+    Returns the mean and the last end state (for the bird ledger).
+    """
+
+    if samples <= 0:
+        end = rollout(state, first_action, agents)
+        return float(score_player(end, player_id).total), end
+    total = 0.0
+    end = state
+    for sample_index in range(samples):
+        sampled = determinize_state(state, player_id, sample_index)
+        end = rollout(sampled, first_action, agents)
+        total += score_player(end, player_id).total
+    return total / samples, end
+
+
 def bird_ledger(state: GameState, player_id: str, bird_name: str) -> dict | None:
     player = next(p for p in state.players if p.player_id == player_id)
     for habitat in Habitat:
@@ -152,7 +183,7 @@ def bird_ledger(state: GameState, player_id: str, bird_name: str) -> dict | None
     return None
 
 
-def analyse_game(catalog, events_path: Path, study_agent: str) -> list[dict]:
+def analyse_game(catalog, events_path: Path, study_agent: str, *, samples: int = 0) -> list[dict]:
     events = load_events(events_path)
     agent_ids = {
         e["payload"]["player_id"]: e["payload"]["agent_id"]
@@ -185,19 +216,24 @@ def analyse_game(catalog, events_path: Path, study_agent: str) -> list[dict]:
             continue
         alternative = agents[player_id].select_action(state, without_bird)
         before_score = score_player(state, player_id).total
-        actual_end = rollout(state, action, agents)
-        not_now_end = rollout(state, alternative, agents)
+        actual_value, actual_end = rollout_value(state, action, agents, player_id, samples)
+        not_now_value, _ = rollout_value(state, alternative, agents, player_id, samples)
         never_state = state.model_copy(deep=True)
         never_player = next(p for p in never_state.players if p.player_id == player_id)
         removed = next(c for c in never_player.hand if c.common_name == action.bird_common_name)
         never_player.hand.remove(removed)
         never_state.decks.bird_discard.append(removed)
         never_legal = legal_actions_for_current_player(never_state)
-        never_end = (
-            rollout(never_state, agents[player_id].select_action(never_state, never_legal), agents)
-            if never_legal
-            else never_state
-        )
+        if never_legal:
+            never_value, _ = rollout_value(
+                never_state,
+                agents[player_id].select_action(never_state, never_legal),
+                agents,
+                player_id,
+                samples,
+            )
+        else:
+            never_value = float(score_player(never_state, player_id).total)
         player = next(p for p in state.players if p.player_id == player_id)
         board = sorted(
             slot.card.common_name for habitat in Habitat for slot in player.habitats[habitat]
@@ -218,13 +254,12 @@ def analyse_game(catalog, events_path: Path, study_agent: str) -> list[dict]:
                 "immediate_delta": score_player(apply_action(state, action), player_id).total
                 - before_score,
                 "alternative": render_action(alternative),
-                "actual_final": score_player(actual_end, player_id).total,
-                "not_now_final": score_player(not_now_end, player_id).total,
-                "never_final": score_player(never_end, player_id).total,
-                "timing_advantage": score_player(actual_end, player_id).total
-                - score_player(not_now_end, player_id).total,
-                "card_advantage": score_player(actual_end, player_id).total
-                - score_player(never_end, player_id).total,
+                "actual_final": actual_value,
+                "not_now_final": not_now_value,
+                "never_final": never_value,
+                "timing_advantage": actual_value - not_now_value,
+                "card_advantage": actual_value - never_value,
+                "continuation_samples": samples,
                 "ledger_at_end": bird_ledger(actual_end, player_id, action.bird_common_name),
             }
         )
@@ -239,6 +274,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--workbook", type=Path, default=DEFAULT_WORKBOOK_PATH)
     parser.add_argument("--limit", type=int, default=None, help="max games")
     parser.add_argument("--shard", type=int, nargs=2, default=None, metavar=("INDEX", "COUNT"))
+    parser.add_argument(
+        "--continuation-samples",
+        type=int,
+        default=0,
+        help="determinized continuations per branch; 0 rolls out the true state once",
+    )
     args = parser.parse_args(argv)
     catalog = load_base_game_content_catalog(args.workbook)
     paths = sorted(p for root in args.roots for p in root.rglob("events.jsonl"))
@@ -251,7 +292,7 @@ def main(argv: list[str] | None = None) -> int:
     written = 0
     with args.out.open("w") as out:
         for index, path in enumerate(paths):
-            rows = analyse_game(catalog, path, args.study_agent)
+            rows = analyse_game(catalog, path, args.study_agent, samples=args.continuation_samples)
             for row in rows:
                 out.write(json.dumps(row) + "\n")
             written += len(rows)

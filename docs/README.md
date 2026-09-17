@@ -22,6 +22,7 @@ Analysis layer:
 - `analysis/card_synergy_bench.py`: rules-computed pair synergy for every same-habitat brown pair (layer A of the synergy programme).
 - `analysis/play_counterfactuals.py` and `analysis/play_attribution_summary.py`: exact counterfactual rollouts per archived play — timing value, card value, context lift (layer B).
 - `analysis/r/play_attribution_hierarchical.R`: lme4 hierarchical model of play value — bird random effects and mechanic-pair interactions with shrinkage.
+- `analysis/forced_play_contrast.py`: layer C — the 2×2 forced keep-and-play interaction contrast with matched controls.
 
 Key rules docs:
 

@@ -80,10 +80,15 @@ neighbour with egg room). Forest yields no pair interaction under one
 activation, which is right: forest chains are food-to-play chains that cross
 turns, the documented next extension.
 
-Scope of the first bench: brown powers, same-habitat pairs, one activation.
-Extensions in order: cross-habitat chains over several activations (draw in
-wetland → tuck in grassland), white on-play powers, pink reactions, triples
-seeded from the pair matrix.
+The bench has four modes (`--mode`): `same_row` (above); `cross` — A alone
+in one row and B alone in another, both rows activated once in each order,
+against the same two activations with blanks; `onplay` — a white on-play bird
+played next to A against next to a blank (board-composition effects such as
+"lay an egg on each bird with a cavity nest"); `pink` — a pink reaction bird
+on the board while the opponent lays eggs, gains food or plays a bird, alone
+and next to a same-row partner (the cowbird class needs a partner with the
+right nest). Pink reactions are now also credited to the activation ledger.
+Triples seeded from the pair matrix remain the next extension.
 
 Output: `artifacts/synergy_bench/synergy_bench.json` (full matrix) and
 `synergy_bench.md`.
@@ -148,21 +153,46 @@ card-advantage of the second card when the first is on the board and when it
 is not — both directly estimable from the same dataset — and the value of
 *completing* it is the second card's advantage conditional on the first.
 
-## Layer C — confirmation by forced play
+## Layer C — confirmation by forced play (`agents/forced_play.py`)
 
-Pairs that score high in A and B are confirmed with the forced-keep
-instrument generalized to plays: force keep-and-play of A then B against the
-agent's free choice, paired by seed. Only combinations that survive all three
-layers enter the agent.
+Pairs that score high in A and B are confirmed by making them happen.
+`inject_opening_cards` swaps named birds into a player's dealt hand from the
+deck (recorded in `game_started`, re-applied by the replay validator so
+hashes verify); `KeepBirdsSetupPolicy` keeps them, displacing the opener's
+birds rather than its food; `ForcedPlayAgent` plays them into a shared row as
+soon as legal, waits rather than split the pair when the row is not yet
+enterable, steers gain-food toward a waiting bird's fixed cost, and never lets
+a forced play consume its partner's food. Flows take `opening_hand_overrides`
+and `forced_play_birds` per agent kind.
+
+The design is a 2×2 per seed with matched non-interacting controls,
+`{A, B}, {A, B'}, {A', B}, {A', B'}`, and the interaction contrast
+`(AB − AB') − (A'B − A'B')` (`analysis/forced_play_contrast.py`) isolates
+what the combination is worth beyond each card's own value; forcing is
+identical in every arm, so it cancels. Intention-to-treat is the headline;
+the completed-pair estimate and the completion rate are reported beside it.
+Pairs and controls for the first run, with registered predictions:
+
+| Pair | Mechanics | Evidence | Controls | Prediction |
+|---|---|---|---|---|
+| P1 Common Grackle + Cooper's Hawk | tuck × deck-search-tuck | layer B +3.0 | Eastern Phoebe / Yellow-Bellied Sapsucker | +1 to +3 |
+| P2 Canvasback + Anhinga | all-players-draw × predator | layer B +3.4 | Black-Chinned Hummingbird / Osprey | 0 to +2 |
+| P3 Baird's Sparrow + Northern Mockingbird | lay-egg-any × repeat | layer A +2 eggs/activation | Eastern Phoebe / Indigo Bunting | > +2 |
+
+Only combinations that survive all three layers enter the agent.
 
 ## The Agent
 
-`SynergyPlannerAgent` = `PotentialPointsAgent` + an **engine-potential term**
-in the evaluator and the opener: the predicted downstream value of the current
-board + hand from the fitted synergy model, replacing the standalone
-`engine_power_potential` and `playable_bird_potential` where the model is
-confident. It is built behind a switch, ablated in the usual 80-game paired
-design against `rr_belief_opp`, and adopted only on a positive result.
+`SynergyPlannerAgent` = `PotentialPointsAgent(mechanic_synergy=True)`: the
+evaluator gains `mechanic_synergy_potential`, built from
+`configs/synergy/mechanic_pair_effects_v1.json` (584 shrunken
+played-power × board-power effects from the lme4 fit). For the board it sums
+the measured effect between every pair of played birds, scaled by the turns
+left in the round like every other term; for the hand it credits each card's
+positive lift against the current board (or its first-play value on an empty
+board) at a 0.6 play rate. Threaded through the search's terminal values, the
+config and the manifest; off by default; ablated in the 80-game paired design
+against `rr_belief_opp` (`artifacts/rr_synergy_term`).
 
 Registered prior: four resource-valuation terms have landed null, but the one
 card-choice term measured so far paid; a synergy term is a card-choice term.

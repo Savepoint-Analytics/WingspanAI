@@ -20,11 +20,21 @@ is measured in several seeded contexts (different feeder rolls and deck
 order) and averaged, so predator hunts and feeder
 draws are represented at their seeded odds rather than as one lucky roll.
 
-Scope of this first bench: brown (activation) powers, same-habitat pairs,
-one activation. Cross-habitat chains, white on-play powers and pink
-reactions are the documented next extensions.
+Modes (``--mode``):
+
+- ``same_row`` (default): brown pairs in one habitat, one activation.
+- ``cross``: A alone in one habitat and B alone in another, both rows
+  activated once in each order — the draw-then-tuck and food-then-cache
+  chains that cross rows. Baseline: the same two activations with blanks.
+- ``onplay``: a white (on-play) bird played into a row with A already there,
+  against playing it next to a blank — board-composition effects such as
+  "lay an egg on each bird with a cavity nest".
+- ``pink``: a pink (reaction) bird on the board while the opponent takes each
+  triggering action, alone and next to B in the same row — the
+  "lay an egg on a bird with a bowl nest" class needs a partner that has one.
 
     python analysis/card_synergy_bench.py --seeds 1 2 3 --out artifacts/synergy_bench
+    python analysis/card_synergy_bench.py --mode cross --out artifacts/synergy_bench
 """
 
 from __future__ import annotations
@@ -210,14 +220,297 @@ def run_bench(catalog, seeds: list[int], *, max_birds_per_habitat: int | None = 
     return results
 
 
+def _reactivate(state: GameState) -> GameState:
+    """Hand the turn back to the bench player after an action advanced it."""
+
+    state.round_state.active_player_index = 0
+    state.round_state.game_over = False
+    state.players[0].action_cubes_available = max(state.players[0].action_cubes_available, 3)
+    return state
+
+
+def measure_sequence(state: GameState, habitats: list[Habitat]) -> dict[str, int] | None:
+    """Owner's deltas from activating the given rows in order."""
+
+    before = snapshot(state)
+    current = state
+    for habitat in habitats:
+        action = next(
+            (
+                a
+                for a in legal_actions_for_current_player(current)
+                if a.action_type == ROW_ACTION[habitat]
+            ),
+            None,
+        )
+        if action is None:
+            return None
+        current = _reactivate(apply_action(current, action))
+    after = snapshot(current)
+    return {key: after[key] - before[key] for key in YIELD_KEYS}
+
+
+def with_rows(state: GameState, rows: dict[Habitat, list[BirdCard]]) -> GameState:
+    branch = state.model_copy(deep=True)
+    for habitat, cards in rows.items():
+        branch.players[0].habitats[habitat] = [BirdSlot(card=card) for card in cards]
+    return branch
+
+
+def run_cross_bench(catalog, seeds: list[int], *, max_birds: int | None = None) -> dict:
+    """A in one row, B in another; both rows activated once, each order."""
+
+    states = [bench_state(catalog, seed, context) for seed in seeds for context in CONTEXTS]
+    brown = [card for card in catalog.birds if card.power.color == PowerColor.BROWN]
+    blanks = {h: blank_bird(catalog, h) for h in Habitat}
+    results: dict = {"seeds": seeds, "contexts": list(CONTEXTS), "mode": "cross", "pairs": {}}
+    for h1 in Habitat:
+        for h2 in Habitat:
+            if h1 == h2:
+                continue
+            order = [h1, h2]
+            residents_1 = [c for c in brown if h1 in c.habitats][:max_birds]
+            residents_2 = [c for c in brown if h2 in c.habitats][:max_birds]
+            base = average(
+                [
+                    measure_sequence(with_rows(s, {h1: [blanks[h1]], h2: [blanks[h2]]}), order)
+                    for s in states
+                ]
+            )
+            single_1 = {
+                a.common_name: average(
+                    [
+                        measure_sequence(with_rows(s, {h1: [a], h2: [blanks[h2]]}), order)
+                        for s in states
+                    ]
+                )
+                for a in residents_1
+            }
+            single_2 = {
+                b.common_name: average(
+                    [
+                        measure_sequence(with_rows(s, {h1: [blanks[h1]], h2: [b]}), order)
+                        for s in states
+                    ]
+                )
+                for b in residents_2
+            }
+            pairs: dict[str, dict] = {}
+            started = time.time()
+            for a in residents_1:
+                for b in residents_2:
+                    if a.common_name == b.common_name:
+                        continue
+                    both = average(
+                        [measure_sequence(with_rows(s, {h1: [a], h2: [b]}), order) for s in states]
+                    )
+                    synergy = {
+                        k: both[k]
+                        - single_1[a.common_name][k]
+                        - single_2[b.common_name][k]
+                        + base[k]
+                        for k in YIELD_KEYS
+                    }
+                    pairs[f"{a.common_name} @{h1.value} | {b.common_name} @{h2.value}"] = {
+                        "left": f"{a.common_name} @{h1.value}",
+                        "right": f"{b.common_name} @{h2.value}",
+                        "pair_yield": both,
+                        "synergy": synergy,
+                        "synergy_points": composite(synergy),
+                    }
+            results["pairs"][f"{h1.value} then {h2.value}"] = pairs
+            print(
+                f"{h1.value} then {h2.value}: {len(pairs)} pairs in {time.time() - started:.0f}s",
+                file=sys.stderr,
+                flush=True,
+            )
+    return results
+
+
+def _play_state(catalog, seed: int, context: str) -> GameState:
+    state = bench_state(catalog, seed, context)
+    state.players[0].food_tokens = {food: 3 for food in BASE_FOOD_TYPES}
+    return state
+
+
+def measure_play(state: GameState, card: BirdCard, habitat: Habitat) -> dict[str, int] | None:
+    """Owner's deltas from playing ``card`` into ``habitat`` (cost and points included)."""
+
+    branch = state.model_copy(deep=True)
+    branch.players[0].hand.append(card)
+    action = next(
+        (
+            a
+            for a in legal_actions_for_current_player(branch)
+            if a.action_type == ActionType.PLAY_BIRD
+            and a.bird_common_name == card.common_name
+            and a.habitat == habitat
+        ),
+        None,
+    )
+    if action is None:
+        return None
+    before = snapshot(branch)
+    after = snapshot(apply_action(branch, action))
+    return {key: after[key] - before[key] for key in YIELD_KEYS}
+
+
+def run_onplay_bench(catalog, seeds: list[int], *, max_birds: int | None = None) -> dict:
+    """White on-play birds played next to A, against next to a blank."""
+
+    states = [_play_state(catalog, seed, context) for seed in seeds for context in CONTEXTS]
+    whites = [card for card in catalog.birds if card.power.color == PowerColor.WHITE]
+    results: dict = {"seeds": seeds, "contexts": list(CONTEXTS), "mode": "onplay", "pairs": {}}
+    for habitat in Habitat:
+        blank = blank_bird(catalog, habitat)
+        residents = [
+            c for c in catalog.birds if habitat in c.habitats and c.power.color != PowerColor.NONE
+        ][:max_birds]
+        played = [c for c in whites if habitat in c.habitats][:max_birds]
+        pairs: dict[str, dict] = {}
+        started = time.time()
+        for b in played:
+            base = average(
+                [measure_play(with_row(s, habitat, [blank]), b, habitat) for s in states]
+            )
+            for a in residents:
+                if a.common_name == b.common_name:
+                    continue
+                with_a = average(
+                    [measure_play(with_row(s, habitat, [a]), b, habitat) for s in states]
+                )
+                synergy = {k: with_a[k] - base[k] for k in YIELD_KEYS}
+                pairs[f"{a.common_name} | play {b.common_name}"] = {
+                    "left": a.common_name,
+                    "right": f"play {b.common_name}",
+                    "pair_yield": with_a,
+                    "synergy": synergy,
+                    "synergy_points": composite(synergy),
+                }
+        results["pairs"][habitat.value] = pairs
+        print(
+            f"{habitat.value}: {len(played)} whites x {len(residents)} residents in "
+            f"{time.time() - started:.0f}s",
+            file=sys.stderr,
+            flush=True,
+        )
+    return results
+
+
+PINK_TRIGGERS = {
+    "opponent lays eggs": ActionType.LAY_EGGS,
+    "opponent gains food": ActionType.GAIN_FOOD,
+    "opponent plays a bird": ActionType.PLAY_BIRD,
+}
+
+
+def measure_reaction(state: GameState, trigger: ActionType) -> dict[str, int] | None:
+    """Owner's (player 1) deltas when the opponent takes one action of ``trigger``."""
+
+    branch = state.model_copy(deep=True)
+    branch.round_state.active_player_index = 1
+    opponent = branch.players[1]
+    opponent.action_cubes_available = max(opponent.action_cubes_available, 3)
+    if trigger == ActionType.LAY_EGGS and not opponent.played_birds:
+        return None
+    if trigger == ActionType.PLAY_BIRD and not opponent.hand:
+        return None
+    action = next(
+        (a for a in legal_actions_for_current_player(branch) if a.action_type == trigger),
+        None,
+    )
+    if action is None:
+        return None
+    before = snapshot(branch)
+    after = snapshot(apply_action(branch, action))
+    return {key: after[key] - before[key] for key in YIELD_KEYS}
+
+
+def _pink_state(catalog, seed: int, context: str) -> GameState:
+    """Bench state whose opponent can lay eggs, gain food and play a bird."""
+
+    state = bench_state(catalog, seed, context)
+    opponent = state.players[1]
+    opponent.food_tokens = {food: 3 for food in BASE_FOOD_TYPES}
+    for habitat in Habitat:
+        opponent.habitats[habitat] = [BirdSlot(card=blank_bird(catalog, habitat))]
+    return state
+
+
+def run_pink_bench(catalog, seeds: list[int], *, max_birds: int | None = None) -> dict:
+    """Pink reactions per trigger, alone and next to a same-row partner."""
+
+    states = [_pink_state(catalog, seed, context) for seed in seeds for context in CONTEXTS]
+    pinks = [card for card in catalog.birds if card.power.color == PowerColor.PINK]
+    results: dict = {
+        "seeds": seeds,
+        "contexts": list(CONTEXTS),
+        "mode": "pink",
+        "singles": {},
+        "pairs": {},
+    }
+    for habitat in Habitat:
+        blank = blank_bird(catalog, habitat)
+        residents = [c for c in catalog.birds if habitat in c.habitats][:max_birds]
+        singles: dict[str, dict] = {}
+        pairs: dict[str, dict] = {}
+        started = time.time()
+        for pink in [c for c in pinks if habitat in c.habitats]:
+            for trigger_name, trigger in PINK_TRIGGERS.items():
+                base = average(
+                    [measure_reaction(with_row(s, habitat, [blank]), trigger) for s in states]
+                )
+                alone = average(
+                    [measure_reaction(with_row(s, habitat, [pink]), trigger) for s in states]
+                )
+                single = {k: alone[k] - base[k] for k in YIELD_KEYS}
+                singles[f"{pink.common_name} | {trigger_name}"] = single
+                if composite(single) == 0.0 and all(v == 0 for v in single.values()):
+                    continue
+                for partner in residents:
+                    if partner.common_name == pink.common_name:
+                        continue
+                    partner_alone = average(
+                        [measure_reaction(with_row(s, habitat, [partner]), trigger) for s in states]
+                    )
+                    together = average(
+                        [
+                            measure_reaction(with_row(s, habitat, [pink, partner]), trigger)
+                            for s in states
+                        ]
+                    )
+                    synergy = {
+                        k: together[k] - alone[k] - partner_alone[k] + base[k] for k in YIELD_KEYS
+                    }
+                    if all(abs(v) < 1e-9 for v in synergy.values()):
+                        continue
+                    pairs[f"{pink.common_name} | {partner.common_name} | {trigger_name}"] = {
+                        "left": pink.common_name,
+                        "right": f"{partner.common_name} ({trigger_name})",
+                        "pair_yield": together,
+                        "synergy": synergy,
+                        "synergy_points": composite(synergy),
+                    }
+        results["singles"][habitat.value] = singles
+        results["pairs"][habitat.value] = pairs
+        print(
+            f"{habitat.value}: pink singles {len(singles)}, interacting pairs {len(pairs)} in "
+            f"{time.time() - started:.0f}s",
+            file=sys.stderr,
+            flush=True,
+        )
+    return results
+
+
 def report(results: dict, *, top: int) -> str:
-    lines = ["# Card synergy bench (brown powers, same habitat, one activation)", ""]
+    mode = results.get("mode", "same_row")
+    lines = [f"# Card synergy bench — mode `{mode}`", ""]
     lines.append(
         f"Seeds: {results['seeds']}; contexts: {results.get('contexts', ['rich'])} (averaged). "
         f"Composite weights: {COMPOSITE_WEIGHTS}."
     )
-    for habitat, singles in results["singles"].items():
-        blank = results["row_base"][habitat]["blank"]
+    for habitat, singles in results.get("singles", {}).items():
+        blank = results.get("row_base", {}).get(habitat, {}).get("blank", "blank")
         lines += [
             "",
             f"## {habitat}: power yield per activation (single bird, beyond a row of `{blank}`)",
@@ -261,19 +554,33 @@ def report(results: dict, *, top: int) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
+    parser.add_argument(
+        "--mode", choices=("same_row", "cross", "onplay", "pink"), default="same_row"
+    )
     parser.add_argument("--top", type=int, default=25)
     parser.add_argument("--max-birds-per-habitat", type=int, default=None)
     parser.add_argument("--workbook", type=Path, default=DEFAULT_WORKBOOK_PATH)
     parser.add_argument("--out", type=Path, default=None, help="directory for JSON + report")
     args = parser.parse_args(argv)
     catalog = load_base_game_content_catalog(args.workbook)
-    results = run_bench(catalog, args.seeds, max_birds_per_habitat=args.max_birds_per_habitat)
+    runner = {
+        "same_row": lambda: run_bench(
+            catalog, args.seeds, max_birds_per_habitat=args.max_birds_per_habitat
+        ),
+        "cross": lambda: run_cross_bench(catalog, args.seeds, max_birds=args.max_birds_per_habitat),
+        "onplay": lambda: run_onplay_bench(
+            catalog, args.seeds, max_birds=args.max_birds_per_habitat
+        ),
+        "pink": lambda: run_pink_bench(catalog, args.seeds, max_birds=args.max_birds_per_habitat),
+    }[args.mode]
+    results = runner()
     text = report(results, top=args.top)
     print(text)
     if args.out is not None:
         args.out.mkdir(parents=True, exist_ok=True)
-        (args.out / "synergy_bench.json").write_text(json.dumps(results, indent=1))
-        (args.out / "synergy_bench.md").write_text(text)
+        suffix = "" if args.mode == "same_row" else f"_{args.mode}"
+        (args.out / f"synergy_bench{suffix}.json").write_text(json.dumps(results, indent=1))
+        (args.out / f"synergy_bench{suffix}.md").write_text(text)
     return 0
 
 

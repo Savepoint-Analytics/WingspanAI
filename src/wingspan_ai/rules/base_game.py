@@ -194,9 +194,7 @@ def setup_base_game(
 
     bird_tray = _draw_many(bird_deck, BIRD_TRAY_SIZE)
     ruleset = (
-        catalog.rulesets[0]
-        if catalog.rulesets
-        else _default_ruleset(len(player_ids), random_seed)
+        catalog.rulesets[0] if catalog.rulesets else _default_ruleset(len(player_ids), random_seed)
     )
 
     return GameState(
@@ -416,10 +414,7 @@ def score_player(state: GameState, player_id: str) -> FinalScoreBreakdown:
 
 
 def _score_bonus_cards(player: PlayerState) -> int:
-    return sum(
-        _score_single_bonus_card(bonus_card, player)
-        for bonus_card in player.bonus_cards
-    )
+    return sum(_score_single_bonus_card(bonus_card, player) for bonus_card in player.bonus_cards)
 
 
 def _score_single_bonus_card(bonus_card: BonusCard, player: PlayerState) -> int:
@@ -542,20 +537,14 @@ def _count_round_goal_items(goal_name: str, player: PlayerState) -> int:
                 for slot in player.played_birds
                 if slot.eggs > 0
                 and slot.card.nest_type is not None
-                and (
-                    slot.card.nest_type.value == nest_type
-                    or slot.card.nest_type.value == "wild"
-                )
+                and (slot.card.nest_type.value == nest_type or slot.card.nest_type.value == "wild")
             )
         if f"[{nest_type}]" in goal_name and "[egg]" in goal_name:
             return sum(
                 slot.eggs
                 for slot in player.played_birds
                 if slot.card.nest_type is not None
-                and (
-                    slot.card.nest_type.value == nest_type
-                    or slot.card.nest_type.value == "wild"
-                )
+                and (slot.card.nest_type.value == nest_type or slot.card.nest_type.value == "wild")
             )
     if "[egg]" in goal_name and "forest" in goal_name:
         return sum(slot.eggs for slot in player.habitats[Habitat.FOREST])
@@ -842,9 +831,7 @@ def _at_least_of_five(copies: int, chance: float) -> float:
     from math import comb
 
     n = BIRDFEEDER_DICE_COUNT
-    return sum(
-        comb(n, k) * chance**k * (1.0 - chance) ** (n - k) for k in range(copies, n + 1)
-    )
+    return sum(comb(n, k) * chance**k * (1.0 - chance) ** (n - k) for k in range(copies, n + 1))
 
 
 def _first_obtainable_food(
@@ -1082,9 +1069,7 @@ def _dispatch_power_handler(
         if token in lowered:
             if lowered.startswith("all players") and state is not None:
                 for candidate in state.players:
-                    candidate.food_tokens[food_type] = (
-                        candidate.food_tokens.get(food_type, 0) + 1
-                    )
+                    candidate.food_tokens[food_type] = candidate.food_tokens.get(food_type, 0) + 1
                 return
             if "birdfeeder" in lowered and state is not None:
                 _gain_food_from_birdfeeder(player, state, food_type)
@@ -1505,30 +1490,45 @@ def resolve_opponent_reaction_powers(
         for slot in player.played_birds:
             if slot.card.power.color.value != "pink" or not slot.card.power.text:
                 continue
-            lowered = slot.card.power.text.lower()
-            if action.action_type == ActionType.LAY_EGGS and "takes the" in lowered:
-                nest_match = re.search(r"\[(bowl|cavity|ground|platform)\] nest", lowered)
-                _place_eggs_on_player_birds(
-                    player,
-                    1,
-                    nest_type=nest_match.group(1) if nest_match else None,
-                )
-            elif action.action_type == ActionType.GAIN_FOOD:
-                if "gain 1 [die] from the birdfeeder" in lowered:
-                    _gain_preferred_food_from_birdfeeder(player, state)
-                if "[rodent]" in lowered and FoodType.RODENT in _action_food_types(action):
-                    slot.cached_food += 1
-            elif (
-                action.action_type == ActionType.PLAY_BIRD
-                and action.habitat is not None
-                and action.habitat.value in lowered
-            ):
-                for food_type in BASE_FOOD_TYPES:
-                    if f"gain 1 [{_food_power_token(food_type)}]" in lowered:
-                        player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
-                if "tuck 1 [card]" in lowered and player.hand:
-                    _discard_card_for_action(player, _choose_discard_card_for_food(player, state))
-                    slot.tucked_cards += 1
+            before = _player_yield_snapshot(player)
+            _react_pink_power(player, slot, state, action)
+            after = _player_yield_snapshot(player)
+            if after != before:
+                # Ledger: a pink reaction that changed something counts as an
+                # activation and is credited like a brown resolution.
+                slot.activations += 1
+                for key, was, now in zip(_YIELD_KEYS, before, after, strict=True):
+                    if now != was:
+                        slot.power_yield[key] = slot.power_yield.get(key, 0) + (now - was)
+
+
+def _react_pink_power(
+    player: PlayerState, slot: BirdSlot, state: GameState, action: LegalAction
+) -> None:
+    lowered = slot.card.power.text.lower()
+    if action.action_type == ActionType.LAY_EGGS and "takes the" in lowered:
+        nest_match = re.search(r"\[(bowl|cavity|ground|platform)\] nest", lowered)
+        _place_eggs_on_player_birds(
+            player,
+            1,
+            nest_type=nest_match.group(1) if nest_match else None,
+        )
+    elif action.action_type == ActionType.GAIN_FOOD:
+        if "gain 1 [die] from the birdfeeder" in lowered:
+            _gain_preferred_food_from_birdfeeder(player, state)
+        if "[rodent]" in lowered and FoodType.RODENT in _action_food_types(action):
+            slot.cached_food += 1
+    elif (
+        action.action_type == ActionType.PLAY_BIRD
+        and action.habitat is not None
+        and action.habitat.value in lowered
+    ):
+        for food_type in BASE_FOOD_TYPES:
+            if f"gain 1 [{_food_power_token(food_type)}]" in lowered:
+                player.food_tokens[food_type] = player.food_tokens.get(food_type, 0) + 1
+        if "tuck 1 [card]" in lowered and player.hand:
+            _discard_card_for_action(player, _choose_discard_card_for_food(player, state))
+            slot.tucked_cards += 1
 
 
 def habitat_action_yield(habitat: Habitat, bird_count: int) -> int:
@@ -1752,8 +1752,7 @@ def _place_eggs_on_player_birds(
         if placed >= count:
             return placed
         if nest_type is not None and (
-            slot.card.nest_type is None
-            or slot.card.nest_type.value not in {nest_type, "wild"}
+            slot.card.nest_type is None or slot.card.nest_type.value not in {nest_type, "wild"}
         ):
             continue
         if slot.available_egg_capacity <= 0:
@@ -1805,9 +1804,7 @@ def _preferred_food_for_hand(player: PlayerState) -> list[FoodType]:
             if food_type in BASE_FOOD_TYPES:
                 deficits[food_type] += max(count - player.food_tokens.get(food_type, 0), 0)
     ordered = [
-        food_type
-        for food_type, _count in deficits.most_common()
-        if food_type in BASE_FOOD_TYPES
+        food_type for food_type, _count in deficits.most_common() if food_type in BASE_FOOD_TYPES
     ]
     ordered.extend(food_type for food_type in BASE_FOOD_TYPES if food_type not in ordered)
     return ordered
