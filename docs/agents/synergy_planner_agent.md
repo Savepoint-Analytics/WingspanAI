@@ -312,6 +312,33 @@ Mechanic-pair interactions (played power × power already on board, shrunken):
 `lay_egg` +5.1, `gain_food_from_birdfeeder` +4.7. Tuck engines compound;
 the first engine bird is the most valuable play of the game.
 
+### Determinized continuations: the K=0 pair table was mostly noise (2026-09-17)
+
+Re-running the attribution with four determinized continuations per branch
+(`--continuation-samples 4`, 12 rollouts per play) leaves the aggregate
+unchanged and removes a large share of the per-play noise:
+
+| | K=0 | K=4 |
+|---|---:|---:|
+| mean card value / timing value | +4.21 / +1.42 | +4.27 / +1.62 |
+| within-bird SD (588 matched plays) | 8.28 | **5.27** |
+| lme4 residual SD | 4.69 | **3.03** |
+| bird SD / mechanic-pair SD | 3.04 / 1.82 | 2.33 / 1.16 |
+| per-bird rank agreement, K=0 vs K=4 | | ρ = 0.54 |
+| mechanic-pair rank agreement (n ≥ 10) | | **ρ = 0.31** |
+
+The round-level shape is robust (round-1 downstream +0.9, round-4 −3.2,
+timing a steady +1.5), and so is the top of the bird table (Barn Swallow,
+Turkey Vulture, Black Vulture, Black-Billed Magpie). The mechanic-pair
+effects are not: `tuck_card × deck_search_tuck` goes **+2.96 → −0.04** and
+`all_players_draw_cards × predator_hunt` **+3.39 → −0.18**. The K=0 table
+that chose two of layer C's three pairs and fed the engine-potential term was
+largely path noise. `configs/synergy/mechanic_pair_effects_v2.json` (from
+the K=4 fit) replaces v1 as the term's table; nothing has been re-measured
+with it yet. Read together with layer C: P1's null now matches the K=4
+table; P2's +3.48 (p=0.021, one of three tests) is the single surviving
+positive and is borderline once corrected for three comparisons.
+
 ### Observed value is not causal value
 
 The counterfactual card value correlates at **ρ = 0.07** with the
@@ -358,6 +385,19 @@ shrinkage, not a full posterior).
    engine-builder deals.
 4. Layer C forced-play arms for the top combinations.
 5. Agent ablation, 80 games paired, registered prediction above.
+
+## Where the programme stands (2026-09-17)
+
+Three instruments built and validated; one first-order result per layer.
+Layer A: 12,386 same-row pairs benched, plus cross-row, on-play and pink
+modes; egg synergies need a capacity-aware context (P3). Layer B: 2,698
+plays attributed, twice; the aggregate shape is robust and the per-pair
+table needed determinized continuations to mean anything. Layer C: the
+instrument works (88–95% completion after two fixes) and confirmed one of
+three pairs. The engine-potential term, built on the K=0 table with a
+hand-holding term, cost 4.5 points; its next variant (board-only, v2 table,
+halved) is a single arm away. The reusable lesson is the one the whole
+project keeps finding: measure the instrument before believing the number.
 
 ## Caveats
 

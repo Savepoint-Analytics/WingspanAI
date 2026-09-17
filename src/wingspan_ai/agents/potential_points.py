@@ -159,7 +159,7 @@ SEARCH_OPPONENT_MODELS = ("greedy", "belief")
 #: from ``configs/synergy/mechanic_pair_effects_v1.json``. Off by default
 #: until the paired arm reads; registered prediction +1 to +3 points.
 DEFAULT_MECHANIC_SYNERGY = False
-DEFAULT_MECHANIC_SYNERGY_TABLE = "configs/synergy/mechanic_pair_effects_v1.json"
+DEFAULT_MECHANIC_SYNERGY_TABLE = "configs/synergy/mechanic_pair_effects_v2.json"
 
 
 @dataclass(frozen=True)

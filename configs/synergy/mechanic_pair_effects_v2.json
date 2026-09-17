@@ -1,0 +1,2930 @@
+{
+ "version": "mechanic_pair_effects_v2",
+ "source": "analysis/r/play_attribution_hierarchical.R on 2,698 counterfactual plays with 4 determinized continuations per branch (382 archived potential_points games), 2026-09-17",
+ "unit": "final-score points, shrunken random effect of (played power handler x power handler already on board); 'empty' = empty board",
+ "residual_sd": 3.03,
+ "bird_sd": 2.33,
+ "pair_sd": 1.16,
+ "effects": {
+  "discard_egg_gain_wild_food x empty": {
+   "effect": 3.191,
+   "cond_sd": 0.785,
+   "n": 11
+  },
+  "cache_food x empty": {
+   "effect": 3.142,
+   "cond_sd": 0.981,
+   "n": 4
+  },
+  "all_players_gain_food x lay_egg": {
+   "effect": 3.026,
+   "cond_sd": 0.839,
+   "n": 21
+  },
+  "pink_reaction x empty": {
+   "effect": 2.377,
+   "cond_sd": 0.554,
+   "n": 39
+  },
+  "all_players_gain_food x move_bird_habitat": {
+   "effect": 2.344,
+   "cond_sd": 0.916,
+   "n": 7
+  },
+  "gain_food_from_birdfeeder x empty": {
+   "effect": 2.299,
+   "cond_sd": 0.843,
+   "n": 8
+  },
+  "pink_reaction x draw_cards_then_discard": {
+   "effect": 2.16,
+   "cond_sd": 0.822,
+   "n": 15
+  },
+  "each_player_gains_birdfeeder_food x empty": {
+   "effect": 1.755,
+   "cond_sd": 0.653,
+   "n": 23
+  },
+  "play_additional_bird x empty": {
+   "effect": 1.624,
+   "cond_sd": 0.9,
+   "n": 7
+  },
+  "pink_reaction x lay_egg": {
+   "effect": 1.62,
+   "cond_sd": 0.813,
+   "n": 19
+  },
+  "each_player_gains_birdfeeder_food x pink_reaction": {
+   "effect": 1.569,
+   "cond_sd": 0.997,
+   "n": 7
+  },
+  "gain_food_from_supply x empty": {
+   "effect": 1.505,
+   "cond_sd": 0.653,
+   "n": 32
+  },
+  "lay_egg x deck_search_tuck_by_wingspan": {
+   "effect": 1.498,
+   "cond_sd": 0.888,
+   "n": 17
+  },
+  "tuck_card x empty": {
+   "effect": 1.489,
+   "cond_sd": 0.437,
+   "n": 90
+  },
+  "each_player_gains_birdfeeder_food x deck_search_tuck_by_wingspan": {
+   "effect": 1.385,
+   "cond_sd": 0.855,
+   "n": 16
+  },
+  "draw_bonus_cards_keep_one x lay_egg": {
+   "effect": 1.375,
+   "cond_sd": 0.66,
+   "n": 57
+  },
+  "draw_bonus_cards_keep_one x discard_egg_gain_wild_food": {
+   "effect": 1.341,
+   "cond_sd": 0.699,
+   "n": 58
+  },
+  "all_players_lay_eggs x draw_bonus_cards_keep_one": {
+   "effect": 1.244,
+   "cond_sd": 0.982,
+   "n": 8
+  },
+  "predator_hunt x deck_search_tuck_by_wingspan": {
+   "effect": 1.241,
+   "cond_sd": 0.645,
+   "n": 53
+  },
+  "tuck_card x gain_food_from_supply": {
+   "effect": 1.239,
+   "cond_sd": 0.801,
+   "n": 20
+  },
+  "none x discard_to_tuck": {
+   "effect": 1.187,
+   "cond_sd": 1.009,
+   "n": 8
+  },
+  "all_players_gain_food x gain_food_from_supply": {
+   "effect": 1.169,
+   "cond_sd": 0.825,
+   "n": 15
+  },
+  "all_players_draw_cards x pink_reaction": {
+   "effect": 1.127,
+   "cond_sd": 0.921,
+   "n": 17
+  },
+  "deck_search_tuck_by_wingspan x lay_egg": {
+   "effect": 1.088,
+   "cond_sd": 0.88,
+   "n": 20
+  },
+  "none x gain_food_from_birdfeeder": {
+   "effect": 1.05,
+   "cond_sd": 0.754,
+   "n": 39
+  },
+  "lay_egg x empty": {
+   "effect": 0.92,
+   "cond_sd": 0.728,
+   "n": 19
+  },
+  "pink_reaction x gain_food_from_supply": {
+   "effect": 0.914,
+   "cond_sd": 0.927,
+   "n": 14
+  },
+  "deck_search_tuck_by_wingspan x gain_food_from_supply": {
+   "effect": 0.9,
+   "cond_sd": 0.827,
+   "n": 23
+  },
+  "tuck_card x draw_cards_then_discard": {
+   "effect": 0.877,
+   "cond_sd": 0.735,
+   "n": 35
+  },
+  "discard_to_tuck x deck_search_tuck_by_wingspan": {
+   "effect": 0.867,
+   "cond_sd": 1.02,
+   "n": 9
+  },
+  "draw_bonus_cards_keep_one x gain_food_from_birdfeeder": {
+   "effect": 0.863,
+   "cond_sd": 0.742,
+   "n": 51
+  },
+  "deck_search_tuck_by_wingspan x draw_cards_then_discard": {
+   "effect": 0.792,
+   "cond_sd": 1.074,
+   "n": 6
+  },
+  "deck_search_tuck_by_wingspan x pink_reaction": {
+   "effect": 0.78,
+   "cond_sd": 0.724,
+   "n": 33
+  },
+  "lay_egg x gain_food_from_birdfeeder": {
+   "effect": 0.775,
+   "cond_sd": 0.867,
+   "n": 16
+  },
+  "deck_search_tuck_by_wingspan x gain_food_from_birdfeeder": {
+   "effect": 0.739,
+   "cond_sd": 0.956,
+   "n": 17
+  },
+  "tuck_card x predator_hunt": {
+   "effect": 0.724,
+   "cond_sd": 0.632,
+   "n": 55
+  },
+  "all_players_lay_eggs x discard_egg_gain_wild_food": {
+   "effect": 0.709,
+   "cond_sd": 1.055,
+   "n": 6
+  },
+  "all_players_lay_eggs x all_players_gain_food": {
+   "effect": 0.683,
+   "cond_sd": 1.001,
+   "n": 7
+  },
+  "tuck_card x lay_egg": {
+   "effect": 0.68,
+   "cond_sd": 0.851,
+   "n": 23
+  },
+  "discard_egg_gain_wild_food x lay_egg": {
+   "effect": 0.669,
+   "cond_sd": 0.894,
+   "n": 17
+  },
+  "predator_hunt x all_players_lay_eggs": {
+   "effect": 0.662,
+   "cond_sd": 1.008,
+   "n": 9
+  },
+  "predator_hunt x pink_reaction": {
+   "effect": 0.645,
+   "cond_sd": 0.605,
+   "n": 75
+  },
+  "tuck_card x discard_egg_gain_wild_food": {
+   "effect": 0.63,
+   "cond_sd": 0.667,
+   "n": 57
+  },
+  "pink_reaction x pink_reaction": {
+   "effect": 0.619,
+   "cond_sd": 0.764,
+   "n": 30
+  },
+  "play_additional_bird x all_players_draw_cards": {
+   "effect": 0.614,
+   "cond_sd": 0.979,
+   "n": 12
+  },
+  "lay_egg x repeat_brown_power": {
+   "effect": 0.61,
+   "cond_sd": 1.077,
+   "n": 2
+  },
+  "repeat_brown_power x tuck_card": {
+   "effect": 0.602,
+   "cond_sd": 1.013,
+   "n": 8
+  },
+  "all_players_lay_eggs x all_players_draw_cards": {
+   "effect": 0.593,
+   "cond_sd": 1.077,
+   "n": 4
+  },
+  "tuck_card x each_player_gains_birdfeeder_food": {
+   "effect": 0.581,
+   "cond_sd": 0.789,
+   "n": 32
+  },
+  "draw_tray_cards x predator_hunt": {
+   "effect": 0.576,
+   "cond_sd": 1.068,
+   "n": 3
+  },
+  "none x tuck_card": {
+   "effect": 0.565,
+   "cond_sd": 0.586,
+   "n": 85
+  },
+  "deck_search_tuck_by_wingspan x tuck_card": {
+   "effect": 0.556,
+   "cond_sd": 0.68,
+   "n": 46
+  },
+  "each_player_gains_birdfeeder_food x tuck_card": {
+   "effect": 0.556,
+   "cond_sd": 0.745,
+   "n": 33
+  },
+  "pink_reaction x tuck_card": {
+   "effect": 0.548,
+   "cond_sd": 0.626,
+   "n": 54
+  },
+  "discard_egg_gain_wild_food x play_additional_bird": {
+   "effect": 0.545,
+   "cond_sd": 1.047,
+   "n": 5
+  },
+  "draw_cards_then_discard x predator_hunt": {
+   "effect": 0.538,
+   "cond_sd": 0.982,
+   "n": 12
+  },
+  "lay_egg x gain_food_from_supply": {
+   "effect": 0.532,
+   "cond_sd": 0.787,
+   "n": 23
+  },
+  "predator_hunt x each_player_gains_birdfeeder_food": {
+   "effect": 0.53,
+   "cond_sd": 0.716,
+   "n": 38
+  },
+  "all_players_draw_cards x move_bird_habitat": {
+   "effect": 0.524,
+   "cond_sd": 1.067,
+   "n": 3
+  },
+  "tuck_card x draw_bonus_cards_keep_one": {
+   "effect": 0.519,
+   "cond_sd": 0.649,
+   "n": 59
+  },
+  "all_players_gain_food x predator_hunt": {
+   "effect": 0.511,
+   "cond_sd": 0.706,
+   "n": 47
+  },
+  "none x deck_search_tuck_by_wingspan": {
+   "effect": 0.508,
+   "cond_sd": 0.846,
+   "n": 27
+  },
+  "discard_to_tuck x all_players_draw_cards": {
+   "effect": 0.506,
+   "cond_sd": 1.068,
+   "n": 7
+  },
+  "none x trade_food_with_supply": {
+   "effect": 0.505,
+   "cond_sd": 1.067,
+   "n": 4
+  },
+  "draw_cards_then_discard x pink_reaction": {
+   "effect": 0.488,
+   "cond_sd": 0.868,
+   "n": 16
+  },
+  "predator_hunt x repeat_brown_power": {
+   "effect": 0.488,
+   "cond_sd": 1.059,
+   "n": 5
+  },
+  "deck_search_tuck_by_wingspan x all_players_gain_food": {
+   "effect": 0.486,
+   "cond_sd": 0.951,
+   "n": 12
+  },
+  "move_bird_habitat x deck_search_tuck_by_wingspan": {
+   "effect": 0.48,
+   "cond_sd": 1.038,
+   "n": 7
+  },
+  "predator_hunt x play_additional_bird": {
+   "effect": 0.477,
+   "cond_sd": 0.959,
+   "n": 13
+  },
+  "tuck_card x draw_tray_cards": {
+   "effect": 0.475,
+   "cond_sd": 1.108,
+   "n": 3
+  },
+  "gain_food_from_supply x lay_egg": {
+   "effect": 0.472,
+   "cond_sd": 1.028,
+   "n": 4
+  },
+  "lay_egg x pink_reaction": {
+   "effect": 0.47,
+   "cond_sd": 0.818,
+   "n": 22
+  },
+  "all_players_draw_cards x gain_food_from_birdfeeder": {
+   "effect": 0.467,
+   "cond_sd": 0.909,
+   "n": 22
+  },
+  "pink_reaction x all_players_gain_food": {
+   "effect": 0.466,
+   "cond_sd": 0.845,
+   "n": 24
+  },
+  "predator_hunt x all_players_gain_food": {
+   "effect": 0.462,
+   "cond_sd": 0.744,
+   "n": 36
+  },
+  "each_player_gains_birdfeeder_food x discard_egg_gain_wild_food": {
+   "effect": 0.456,
+   "cond_sd": 1.019,
+   "n": 9
+  },
+  "fewest_birds_draw_cards x gain_food_from_birdfeeder": {
+   "effect": 0.453,
+   "cond_sd": 1.047,
+   "n": 9
+  },
+  "predator_hunt x lay_egg": {
+   "effect": 0.446,
+   "cond_sd": 0.731,
+   "n": 35
+  },
+  "lay_egg x discard_egg_gain_wild_food": {
+   "effect": 0.444,
+   "cond_sd": 0.912,
+   "n": 17
+  },
+  "all_players_draw_cards x draw_card": {
+   "effect": 0.44,
+   "cond_sd": 1.111,
+   "n": 2
+  },
+  "move_bird_habitat x none": {
+   "effect": 0.44,
+   "cond_sd": 1.036,
+   "n": 7
+  },
+  "play_additional_bird x gain_food_from_birdfeeder": {
+   "effect": 0.436,
+   "cond_sd": 1.024,
+   "n": 8
+  },
+  "discard_to_tuck x draw_bonus_cards_keep_one": {
+   "effect": 0.422,
+   "cond_sd": 0.944,
+   "n": 15
+  },
+  "tuck_card x repeat_brown_power": {
+   "effect": 0.415,
+   "cond_sd": 1.073,
+   "n": 5
+  },
+  "draw_cards_then_discard x gain_food_from_birdfeeder": {
+   "effect": 0.41,
+   "cond_sd": 1.055,
+   "n": 7
+  },
+  "cache_food x all_players_draw_cards": {
+   "effect": 0.405,
+   "cond_sd": 0.988,
+   "n": 6
+  },
+  "draw_cards_then_discard x lay_egg": {
+   "effect": 0.402,
+   "cond_sd": 1.043,
+   "n": 7
+  },
+  "pink_reaction x move_bird_habitat": {
+   "effect": 0.397,
+   "cond_sd": 1.055,
+   "n": 5
+  },
+  "draw_cards_player_select x pink_reaction": {
+   "effect": 0.395,
+   "cond_sd": 1.05,
+   "n": 6
+  },
+  "all_players_draw_cards x tuck_card": {
+   "effect": 0.382,
+   "cond_sd": 0.634,
+   "n": 50
+  },
+  "draw_bonus_cards_keep_one x draw_tray_cards": {
+   "effect": 0.378,
+   "cond_sd": 1.009,
+   "n": 11
+  },
+  "repeat_brown_power x gain_food_from_birdfeeder": {
+   "effect": 0.376,
+   "cond_sd": 1.004,
+   "n": 9
+  },
+  "none x cache_food": {
+   "effect": 0.375,
+   "cond_sd": 0.99,
+   "n": 5
+  },
+  "repeat_brown_power x empty": {
+   "effect": 0.374,
+   "cond_sd": 1.091,
+   "n": 1
+  },
+  "predator_hunt x fewest_birds_draw_cards": {
+   "effect": 0.367,
+   "cond_sd": 1.081,
+   "n": 5
+  },
+  "play_additional_bird x predator_hunt": {
+   "effect": 0.362,
+   "cond_sd": 0.831,
+   "n": 20
+  },
+  "move_bird_habitat x play_additional_bird": {
+   "effect": 0.361,
+   "cond_sd": 1.082,
+   "n": 4
+  },
+  "play_additional_bird x discard_egg_gain_wild_food": {
+   "effect": 0.358,
+   "cond_sd": 0.963,
+   "n": 14
+  },
+  "discard_egg_gain_wild_food x predator_hunt": {
+   "effect": 0.357,
+   "cond_sd": 0.721,
+   "n": 46
+  },
+  "tuck_card x gain_food_from_birdfeeder": {
+   "effect": 0.357,
+   "cond_sd": 0.788,
+   "n": 32
+  },
+  "all_players_gain_food x empty": {
+   "effect": 0.353,
+   "cond_sd": 0.751,
+   "n": 12
+  },
+  "draw_cards_player_select x discard_to_tuck": {
+   "effect": 0.35,
+   "cond_sd": 1.129,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x predator_hunt": {
+   "effect": 0.344,
+   "cond_sd": 0.768,
+   "n": 32
+  },
+  "none x lay_egg": {
+   "effect": 0.343,
+   "cond_sd": 0.79,
+   "n": 28
+  },
+  "all_players_draw_cards x discard_to_tuck": {
+   "effect": 0.341,
+   "cond_sd": 1.032,
+   "n": 2
+  },
+  "discard_to_tuck x play_additional_bird": {
+   "effect": 0.338,
+   "cond_sd": 1.089,
+   "n": 6
+  },
+  "all_players_draw_cards x lay_egg": {
+   "effect": 0.335,
+   "cond_sd": 0.957,
+   "n": 14
+  },
+  "discard_egg_gain_wild_food x deck_search_tuck_by_wingspan": {
+   "effect": 0.333,
+   "cond_sd": 0.909,
+   "n": 16
+  },
+  "gain_food_from_supply x move_bird_habitat": {
+   "effect": 0.332,
+   "cond_sd": 1.125,
+   "n": 1
+  },
+  "gain_food_from_supply x draw_cards_player_select": {
+   "effect": 0.33,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "draw_card x cache_food": {
+   "effect": 0.328,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "draw_card x pink_reaction": {
+   "effect": 0.328,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "predator_hunt x gain_food_from_birdfeeder": {
+   "effect": 0.325,
+   "cond_sd": 0.793,
+   "n": 32
+  },
+  "lay_egg x each_player_gains_birdfeeder_food": {
+   "effect": 0.324,
+   "cond_sd": 0.926,
+   "n": 12
+  },
+  "draw_tray_cards x gain_food_from_birdfeeder": {
+   "effect": 0.31,
+   "cond_sd": 1.086,
+   "n": 3
+  },
+  "deck_search_tuck_by_wingspan x draw_cards_player_select": {
+   "effect": 0.31,
+   "cond_sd": 1.131,
+   "n": 2
+  },
+  "draw_cards_player_select x draw_bonus_cards_keep_one": {
+   "effect": 0.306,
+   "cond_sd": 1.129,
+   "n": 2
+  },
+  "discard_to_tuck x predator_hunt": {
+   "effect": 0.305,
+   "cond_sd": 0.965,
+   "n": 12
+  },
+  "fewest_birds_gain_food x predator_hunt": {
+   "effect": 0.303,
+   "cond_sd": 1.025,
+   "n": 11
+  },
+  "all_players_draw_cards x play_additional_bird": {
+   "effect": 0.303,
+   "cond_sd": 1.009,
+   "n": 10
+  },
+  "draw_card x all_players_draw_cards": {
+   "effect": 0.301,
+   "cond_sd": 1.131,
+   "n": 2
+  },
+  "draw_bonus_cards_keep_one x all_players_gain_food": {
+   "effect": 0.301,
+   "cond_sd": 0.661,
+   "n": 67
+  },
+  "play_additional_bird x draw_cards_then_discard": {
+   "effect": 0.299,
+   "cond_sd": 0.945,
+   "n": 13
+  },
+  "none x draw_tray_cards": {
+   "effect": 0.298,
+   "cond_sd": 1.132,
+   "n": 2
+  },
+  "gain_food_from_supply x deck_search_tuck_by_wingspan": {
+   "effect": 0.29,
+   "cond_sd": 0.972,
+   "n": 9
+  },
+  "move_bird_habitat x gain_food_from_birdfeeder": {
+   "effect": 0.286,
+   "cond_sd": 1.027,
+   "n": 9
+  },
+  "predator_hunt x draw_bonus_cards_keep_one": {
+   "effect": 0.282,
+   "cond_sd": 0.721,
+   "n": 49
+  },
+  "draw_bonus_cards_keep_one x fewest_birds_gain_food": {
+   "effect": 0.277,
+   "cond_sd": 1.054,
+   "n": 8
+  },
+  "none x gain_food_from_supply": {
+   "effect": 0.265,
+   "cond_sd": 0.747,
+   "n": 34
+  },
+  "play_additional_bird x each_player_gains_birdfeeder_food": {
+   "effect": 0.256,
+   "cond_sd": 0.981,
+   "n": 12
+  },
+  "move_bird_habitat x fewest_birds_draw_cards": {
+   "effect": 0.253,
+   "cond_sd": 1.127,
+   "n": 1
+  },
+  "tuck_card x trade_food_with_supply": {
+   "effect": 0.253,
+   "cond_sd": 1.124,
+   "n": 2
+  },
+  "draw_cards_player_select x all_players_draw_cards": {
+   "effect": 0.252,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "draw_cards_player_select x move_bird_habitat": {
+   "effect": 0.252,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "discard_egg_gain_wild_food x discard_egg_gain_wild_food": {
+   "effect": 0.247,
+   "cond_sd": 0.834,
+   "n": 25
+  },
+  "none x move_bird_habitat": {
+   "effect": 0.246,
+   "cond_sd": 0.924,
+   "n": 12
+  },
+  "predator_hunt x discard_to_tuck": {
+   "effect": 0.246,
+   "cond_sd": 1.026,
+   "n": 8
+  },
+  "pink_reaction x fewest_birds_gain_food": {
+   "effect": 0.242,
+   "cond_sd": 1.111,
+   "n": 3
+  },
+  "play_additional_bird x cache_food": {
+   "effect": 0.241,
+   "cond_sd": 1.131,
+   "n": 2
+  },
+  "discard_egg_gain_wild_food x all_players_lay_eggs": {
+   "effect": 0.238,
+   "cond_sd": 1.078,
+   "n": 5
+  },
+  "none x all_players_lay_eggs": {
+   "effect": 0.237,
+   "cond_sd": 1.045,
+   "n": 7
+  },
+  "draw_tray_cards x lay_egg": {
+   "effect": 0.236,
+   "cond_sd": 1.061,
+   "n": 5
+  },
+  "all_players_lay_eggs x draw_cards_then_discard": {
+   "effect": 0.236,
+   "cond_sd": 1.061,
+   "n": 6
+  },
+  "all_players_gain_food x fewest_birds_draw_cards": {
+   "effect": 0.235,
+   "cond_sd": 1.049,
+   "n": 6
+  },
+  "draw_card x tuck_card": {
+   "effect": 0.23,
+   "cond_sd": 1.115,
+   "n": 3
+  },
+  "fewest_birds_draw_cards x lay_egg": {
+   "effect": 0.228,
+   "cond_sd": 1.095,
+   "n": 4
+  },
+  "all_players_gain_food x all_players_draw_cards": {
+   "effect": 0.228,
+   "cond_sd": 0.742,
+   "n": 32
+  },
+  "pink_reaction x deck_search_tuck_by_wingspan": {
+   "effect": 0.228,
+   "cond_sd": 0.759,
+   "n": 32
+  },
+  "draw_tray_cards x none": {
+   "effect": 0.226,
+   "cond_sd": 1.137,
+   "n": 1
+  },
+  "deck_search_tuck_by_wingspan x deck_search_tuck_by_wingspan": {
+   "effect": 0.222,
+   "cond_sd": 0.886,
+   "n": 23
+  },
+  "fewest_birds_draw_cards x all_players_gain_food": {
+   "effect": 0.221,
+   "cond_sd": 1.024,
+   "n": 10
+  },
+  "gain_food_from_supply x none": {
+   "effect": 0.218,
+   "cond_sd": 0.977,
+   "n": 8
+  },
+  "gain_food_from_birdfeeder x all_players_gain_food": {
+   "effect": 0.212,
+   "cond_sd": 0.857,
+   "n": 27
+  },
+  "deck_search_tuck_by_wingspan x cache_food": {
+   "effect": 0.207,
+   "cond_sd": 1.024,
+   "n": 10
+  },
+  "play_additional_bird x deck_search_tuck_by_wingspan": {
+   "effect": 0.204,
+   "cond_sd": 1.018,
+   "n": 10
+  },
+  "gain_food_from_supply x play_additional_bird": {
+   "effect": 0.199,
+   "cond_sd": 1.095,
+   "n": 3
+  },
+  "repeat_brown_power x discard_to_tuck": {
+   "effect": 0.197,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "tuck_card x cache_food": {
+   "effect": 0.194,
+   "cond_sd": 1.124,
+   "n": 2
+  },
+  "all_players_draw_cards x all_players_lay_eggs": {
+   "effect": 0.193,
+   "cond_sd": 1.105,
+   "n": 4
+  },
+  "cache_food x gain_food_from_supply": {
+   "effect": 0.192,
+   "cond_sd": 1.106,
+   "n": 2
+  },
+  "all_players_lay_eggs x lay_egg": {
+   "effect": 0.189,
+   "cond_sd": 1.02,
+   "n": 7
+  },
+  "draw_bonus_cards_keep_one x repeat_brown_power": {
+   "effect": 0.189,
+   "cond_sd": 1.054,
+   "n": 8
+  },
+  "discard_to_tuck x discard_to_tuck": {
+   "effect": 0.187,
+   "cond_sd": 1.114,
+   "n": 2
+  },
+  "lay_egg x tuck_card": {
+   "effect": 0.184,
+   "cond_sd": 0.851,
+   "n": 19
+  },
+  "deck_search_tuck_by_wingspan x discard_to_tuck": {
+   "effect": 0.184,
+   "cond_sd": 1.1,
+   "n": 3
+  },
+  "predator_hunt x fewest_birds_gain_food": {
+   "effect": 0.182,
+   "cond_sd": 1.097,
+   "n": 4
+  },
+  "discard_to_tuck x cache_food": {
+   "effect": 0.175,
+   "cond_sd": 1.14,
+   "n": 2
+  },
+  "fewest_birds_gain_food x all_players_gain_food": {
+   "effect": 0.168,
+   "cond_sd": 1.016,
+   "n": 9
+  },
+  "all_players_draw_cards x fewest_birds_draw_cards": {
+   "effect": 0.168,
+   "cond_sd": 1.084,
+   "n": 6
+  },
+  "discard_to_tuck x pink_reaction": {
+   "effect": 0.166,
+   "cond_sd": 1.08,
+   "n": 5
+  },
+  "predator_hunt x tuck_card": {
+   "effect": 0.165,
+   "cond_sd": 0.524,
+   "n": 107
+  },
+  "tuck_card x draw_card": {
+   "effect": 0.165,
+   "cond_sd": 1.01,
+   "n": 8
+  },
+  "fewest_birds_gain_food x none": {
+   "effect": 0.164,
+   "cond_sd": 1.105,
+   "n": 4
+  },
+  "fewest_birds_gain_food x draw_bonus_cards_keep_one": {
+   "effect": 0.164,
+   "cond_sd": 1.06,
+   "n": 5
+  },
+  "move_bird_habitat x discard_egg_gain_wild_food": {
+   "effect": 0.161,
+   "cond_sd": 1.072,
+   "n": 6
+  },
+  "gain_food_from_birdfeeder x repeat_brown_power": {
+   "effect": 0.156,
+   "cond_sd": 1.104,
+   "n": 4
+  },
+  "predator_hunt x draw_cards_then_discard": {
+   "effect": 0.153,
+   "cond_sd": 0.758,
+   "n": 33
+  },
+  "draw_bonus_cards_keep_one x draw_cards_then_discard": {
+   "effect": 0.151,
+   "cond_sd": 0.736,
+   "n": 48
+  },
+  "fewest_birds_gain_food x deck_search_tuck_by_wingspan": {
+   "effect": 0.15,
+   "cond_sd": 1.107,
+   "n": 3
+  },
+  "all_players_lay_eggs x gain_food_from_supply": {
+   "effect": 0.146,
+   "cond_sd": 0.998,
+   "n": 8
+  },
+  "draw_card x predator_hunt": {
+   "effect": 0.144,
+   "cond_sd": 1.091,
+   "n": 3
+  },
+  "discard_egg_gain_wild_food x draw_tray_cards": {
+   "effect": 0.143,
+   "cond_sd": 1.105,
+   "n": 3
+  },
+  "draw_cards_player_select x lay_egg": {
+   "effect": 0.142,
+   "cond_sd": 1.125,
+   "n": 2
+  },
+  "discard_egg_gain_wild_food x discard_to_tuck": {
+   "effect": 0.142,
+   "cond_sd": 1.128,
+   "n": 2
+  },
+  "all_players_draw_cards x draw_bonus_cards_keep_one": {
+   "effect": 0.138,
+   "cond_sd": 0.886,
+   "n": 24
+  },
+  "discard_egg_gain_wild_food x gain_food_from_birdfeeder": {
+   "effect": 0.137,
+   "cond_sd": 0.893,
+   "n": 19
+  },
+  "draw_cards_then_discard x all_players_lay_eggs": {
+   "effect": 0.132,
+   "cond_sd": 1.135,
+   "n": 2
+  },
+  "play_additional_bird x gain_food_from_supply": {
+   "effect": 0.127,
+   "cond_sd": 1.032,
+   "n": 8
+  },
+  "discard_to_tuck x all_players_gain_food": {
+   "effect": 0.126,
+   "cond_sd": 1.077,
+   "n": 6
+  },
+  "deck_search_tuck_by_wingspan x none": {
+   "effect": 0.118,
+   "cond_sd": 0.797,
+   "n": 35
+  },
+  "gain_food_from_birdfeeder x gain_food_from_birdfeeder": {
+   "effect": 0.117,
+   "cond_sd": 0.949,
+   "n": 17
+  },
+  "fewest_birds_draw_cards x tuck_card": {
+   "effect": 0.114,
+   "cond_sd": 0.89,
+   "n": 21
+  },
+  "repeat_brown_power x deck_search_tuck_by_wingspan": {
+   "effect": 0.113,
+   "cond_sd": 1.137,
+   "n": 2
+  },
+  "repeat_brown_power x draw_cards_then_discard": {
+   "effect": 0.113,
+   "cond_sd": 1.137,
+   "n": 2
+  },
+  "draw_bonus_cards_keep_one x draw_card": {
+   "effect": 0.113,
+   "cond_sd": 1.086,
+   "n": 4
+  },
+  "fewest_birds_draw_cards x discard_to_tuck": {
+   "effect": 0.11,
+   "cond_sd": 1.119,
+   "n": 3
+  },
+  "draw_cards_player_select x repeat_brown_power": {
+   "effect": 0.109,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "fewest_birds_draw_cards x gain_food_from_supply": {
+   "effect": 0.109,
+   "cond_sd": 1.111,
+   "n": 4
+  },
+  "play_additional_bird x lay_egg": {
+   "effect": 0.108,
+   "cond_sd": 0.99,
+   "n": 10
+  },
+  "all_players_lay_eggs x play_additional_bird": {
+   "effect": 0.105,
+   "cond_sd": 1.097,
+   "n": 4
+  },
+  "fewest_birds_gain_food x gain_food_from_birdfeeder": {
+   "effect": 0.102,
+   "cond_sd": 1.084,
+   "n": 5
+  },
+  "predator_hunt x cache_food": {
+   "effect": 0.101,
+   "cond_sd": 1.118,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x draw_cards_then_discard": {
+   "effect": 0.101,
+   "cond_sd": 0.986,
+   "n": 14
+  },
+  "fewest_birds_draw_cards x trade_food_with_supply": {
+   "effect": 0.1,
+   "cond_sd": 1.132,
+   "n": 2
+  },
+  "tuck_card x none": {
+   "effect": 0.1,
+   "cond_sd": 0.708,
+   "n": 43
+  },
+  "fewest_birds_draw_cards x pink_reaction": {
+   "effect": 0.097,
+   "cond_sd": 1.034,
+   "n": 10
+  },
+  "none x none": {
+   "effect": 0.096,
+   "cond_sd": 0.84,
+   "n": 30
+  },
+  "play_additional_bird x all_players_lay_eggs": {
+   "effect": 0.096,
+   "cond_sd": 1.12,
+   "n": 3
+  },
+  "discard_to_tuck x fewest_birds_draw_cards": {
+   "effect": 0.095,
+   "cond_sd": 1.136,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x draw_cards_player_select": {
+   "effect": 0.094,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "fewest_birds_draw_cards x draw_bonus_cards_keep_one": {
+   "effect": 0.094,
+   "cond_sd": 0.994,
+   "n": 13
+  },
+  "deck_search_tuck_by_wingspan x fewest_birds_draw_cards": {
+   "effect": 0.091,
+   "cond_sd": 1.135,
+   "n": 2
+  },
+  "repeat_brown_power x fewest_birds_draw_cards": {
+   "effect": 0.09,
+   "cond_sd": 1.128,
+   "n": 2
+  },
+  "deck_search_tuck_by_wingspan x repeat_brown_power": {
+   "effect": 0.09,
+   "cond_sd": 1.117,
+   "n": 3
+  },
+  "draw_bonus_cards_keep_one x draw_cards_player_select": {
+   "effect": 0.09,
+   "cond_sd": 1.09,
+   "n": 6
+  },
+  "draw_cards_then_discard x discard_egg_draw_cards": {
+   "effect": 0.087,
+   "cond_sd": 1.138,
+   "n": 1
+  },
+  "pink_reaction x discard_egg_draw_cards": {
+   "effect": 0.084,
+   "cond_sd": 1.084,
+   "n": 4
+  },
+  "draw_cards_then_discard x cache_food": {
+   "effect": 0.084,
+   "cond_sd": 1.124,
+   "n": 1
+  },
+  "gain_food_from_birdfeeder x pink_reaction": {
+   "effect": 0.08,
+   "cond_sd": 0.75,
+   "n": 44
+  },
+  "cache_food x lay_egg": {
+   "effect": 0.075,
+   "cond_sd": 1.079,
+   "n": 4
+  },
+  "draw_tray_cards x discard_egg_gain_wild_food": {
+   "effect": 0.074,
+   "cond_sd": 1.095,
+   "n": 1
+  },
+  "all_players_draw_cards x draw_cards_player_select": {
+   "effect": 0.071,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "all_players_gain_food x fewest_birds_gain_food": {
+   "effect": 0.066,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "draw_cards_player_select x tuck_card": {
+   "effect": 0.064,
+   "cond_sd": 1.106,
+   "n": 3
+  },
+  "fewest_birds_gain_food x all_players_draw_cards": {
+   "effect": 0.063,
+   "cond_sd": 1.051,
+   "n": 8
+  },
+  "all_players_gain_food x pink_reaction": {
+   "effect": 0.061,
+   "cond_sd": 0.72,
+   "n": 43
+  },
+  "predator_hunt x gain_food_from_supply": {
+   "effect": 0.061,
+   "cond_sd": 0.715,
+   "n": 35
+  },
+  "discard_to_tuck x discard_egg_gain_wild_food": {
+   "effect": 0.06,
+   "cond_sd": 1.087,
+   "n": 4
+  },
+  "gain_food_from_birdfeeder x all_players_lay_eggs": {
+   "effect": 0.059,
+   "cond_sd": 0.994,
+   "n": 13
+  },
+  "draw_bonus_cards_keep_one x all_players_lay_eggs": {
+   "effect": 0.056,
+   "cond_sd": 0.911,
+   "n": 18
+  },
+  "gain_food_from_birdfeeder x gain_food_from_supply": {
+   "effect": 0.055,
+   "cond_sd": 0.853,
+   "n": 22
+  },
+  "draw_cards_then_discard x draw_bonus_cards_keep_one": {
+   "effect": 0.055,
+   "cond_sd": 1.011,
+   "n": 11
+  },
+  "discard_egg_gain_wild_food x none": {
+   "effect": 0.054,
+   "cond_sd": 0.845,
+   "n": 22
+  },
+  "predator_hunt x draw_card": {
+   "effect": 0.054,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "all_players_draw_cards x fewest_birds_gain_food": {
+   "effect": 0.051,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "gain_food_from_supply x all_players_gain_food": {
+   "effect": 0.051,
+   "cond_sd": 1.071,
+   "n": 5
+  },
+  "play_additional_bird x draw_cards_player_select": {
+   "effect": 0.05,
+   "cond_sd": 1.135,
+   "n": 2
+  },
+  "gain_food_from_supply x discard_to_tuck": {
+   "effect": 0.046,
+   "cond_sd": 1.084,
+   "n": 3
+  },
+  "all_players_gain_food x repeat_brown_power": {
+   "effect": 0.046,
+   "cond_sd": 1.127,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x tuck_card": {
+   "effect": 0.042,
+   "cond_sd": 0.673,
+   "n": 51
+  },
+  "draw_cards_player_select x each_player_gains_birdfeeder_food": {
+   "effect": 0.041,
+   "cond_sd": 1.101,
+   "n": 3
+  },
+  "all_players_lay_eggs x cache_food": {
+   "effect": 0.04,
+   "cond_sd": 1.111,
+   "n": 3
+  },
+  "draw_cards_player_select x deck_search_tuck_by_wingspan": {
+   "effect": 0.04,
+   "cond_sd": 1.057,
+   "n": 5
+  },
+  "draw_bonus_cards_keep_one x move_bird_habitat": {
+   "effect": 0.039,
+   "cond_sd": 1.057,
+   "n": 6
+  },
+  "none x discard_egg_gain_wild_food": {
+   "effect": 0.035,
+   "cond_sd": 0.727,
+   "n": 41
+  },
+  "pink_reaction x trade_food_with_supply": {
+   "effect": 0.034,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "trade_food_with_supply x draw_bonus_cards_keep_one": {
+   "effect": 0.031,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "trade_food_with_supply x draw_cards_then_discard": {
+   "effect": 0.031,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "trade_food_with_supply x play_additional_bird": {
+   "effect": 0.031,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "trade_food_with_supply x predator_hunt": {
+   "effect": 0.031,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "trade_food_with_supply x tuck_card": {
+   "effect": 0.031,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "cache_food x each_player_gains_birdfeeder_food": {
+   "effect": 0.031,
+   "cond_sd": 1.113,
+   "n": 2
+  },
+  "fewest_birds_draw_cards x draw_cards_player_select": {
+   "effect": 0.03,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "discard_to_tuck x all_players_lay_eggs": {
+   "effect": 0.03,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "all_players_draw_cards x discard_egg_draw_cards": {
+   "effect": 0.03,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "deck_search_tuck_by_wingspan x draw_card": {
+   "effect": 0.029,
+   "cond_sd": 1.13,
+   "n": 3
+  },
+  "lay_egg x cache_food": {
+   "effect": 0.022,
+   "cond_sd": 1.048,
+   "n": 4
+  },
+  "gain_food_from_supply x gain_food_from_supply": {
+   "effect": 0.021,
+   "cond_sd": 1.126,
+   "n": 1
+  },
+  "draw_cards_then_discard x gain_food_from_supply": {
+   "effect": 0.019,
+   "cond_sd": 0.902,
+   "n": 14
+  },
+  "each_player_gains_birdfeeder_food x draw_tray_cards": {
+   "effect": 0.015,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "gain_food_from_birdfeeder x discard_egg_draw_cards": {
+   "effect": 0.013,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "discard_egg_gain_wild_food x fewest_birds_draw_cards": {
+   "effect": 0.013,
+   "cond_sd": 1.07,
+   "n": 4
+  },
+  "fewest_birds_gain_food x tuck_card": {
+   "effect": 0.012,
+   "cond_sd": 1.085,
+   "n": 6
+  },
+  "deck_search_tuck_by_wingspan x discard_egg_draw_cards": {
+   "effect": 0.011,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "pink_reaction x fewest_birds_draw_cards": {
+   "effect": 0.009,
+   "cond_sd": 1.102,
+   "n": 4
+  },
+  "draw_cards_then_discard x draw_tray_cards": {
+   "effect": 0.007,
+   "cond_sd": 1.139,
+   "n": 2
+  },
+  "fewest_birds_gain_food x lay_egg": {
+   "effect": 0.005,
+   "cond_sd": 1.114,
+   "n": 3
+  },
+  "draw_cards_then_discard x trade_food_with_supply": {
+   "effect": 0.004,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "all_players_gain_food x discard_egg_gain_wild_food": {
+   "effect": 0.004,
+   "cond_sd": 0.73,
+   "n": 47
+  },
+  "draw_bonus_cards_keep_one x tuck_card": {
+   "effect": 0.004,
+   "cond_sd": 0.504,
+   "n": 136
+  },
+  "draw_tray_cards x all_players_draw_cards": {
+   "effect": 0.004,
+   "cond_sd": 1.137,
+   "n": 1
+  },
+  "none x draw_bonus_cards_keep_one": {
+   "effect": 0.003,
+   "cond_sd": 0.756,
+   "n": 42
+  },
+  "draw_cards_then_discard x draw_cards_player_select": {
+   "effect": 0.003,
+   "cond_sd": 1.102,
+   "n": 4
+  },
+  "play_additional_bird x discard_to_tuck": {
+   "effect": 0.003,
+   "cond_sd": 1.137,
+   "n": 1
+  },
+  "predator_hunt x draw_cards_player_select": {
+   "effect": -0.0,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "cache_food x all_players_gain_food": {
+   "effect": -0.001,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "cache_food x discard_to_tuck": {
+   "effect": -0.001,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "none x discard_egg_draw_cards": {
+   "effect": -0.003,
+   "cond_sd": 1.137,
+   "n": 2
+  },
+  "discard_egg_draw_cards x deck_search_tuck_by_wingspan": {
+   "effect": -0.005,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "discard_egg_draw_cards x draw_bonus_cards_keep_one": {
+   "effect": -0.005,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "discard_egg_draw_cards x gain_food_from_birdfeeder": {
+   "effect": -0.005,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "discard_egg_draw_cards x pink_reaction": {
+   "effect": -0.005,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "gain_food_from_supply x fewest_birds_gain_food": {
+   "effect": -0.006,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "tuck_card x fewest_birds_gain_food": {
+   "effect": -0.01,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "predator_hunt x draw_tray_cards": {
+   "effect": -0.013,
+   "cond_sd": 1.151,
+   "n": 1
+  },
+  "trade_food_with_supply x all_players_draw_cards": {
+   "effect": -0.014,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "trade_food_with_supply x discard_egg_gain_wild_food": {
+   "effect": -0.014,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "trade_food_with_supply x gain_food_from_supply": {
+   "effect": -0.014,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "trade_food_with_supply x none": {
+   "effect": -0.014,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "draw_cards_then_discard x repeat_brown_power": {
+   "effect": -0.015,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "draw_bonus_cards_keep_one x discard_egg_draw_cards": {
+   "effect": -0.017,
+   "cond_sd": 1.138,
+   "n": 2
+  },
+  "draw_card x discard_egg_gain_wild_food": {
+   "effect": -0.02,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "draw_card x gain_food_from_supply": {
+   "effect": -0.02,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "fewest_birds_gain_food x discard_egg_gain_wild_food": {
+   "effect": -0.02,
+   "cond_sd": 1.042,
+   "n": 6
+  },
+  "discard_to_tuck x draw_card": {
+   "effect": -0.02,
+   "cond_sd": 1.125,
+   "n": 1
+  },
+  "fewest_birds_gain_food x all_players_lay_eggs": {
+   "effect": -0.021,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "predator_hunt x discard_egg_draw_cards": {
+   "effect": -0.022,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "lay_egg x draw_cards_player_select": {
+   "effect": -0.025,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "fewest_birds_draw_cards x cache_food": {
+   "effect": -0.025,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "fewest_birds_draw_cards x draw_card": {
+   "effect": -0.025,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "repeat_brown_power x draw_tray_cards": {
+   "effect": -0.025,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "draw_card x draw_bonus_cards_keep_one": {
+   "effect": -0.026,
+   "cond_sd": 1.064,
+   "n": 3
+  },
+  "move_bird_habitat x all_players_lay_eggs": {
+   "effect": -0.026,
+   "cond_sd": 1.153,
+   "n": 1
+  },
+  "move_bird_habitat x draw_card": {
+   "effect": -0.026,
+   "cond_sd": 1.153,
+   "n": 1
+  },
+  "play_additional_bird x fewest_birds_draw_cards": {
+   "effect": -0.027,
+   "cond_sd": 1.143,
+   "n": 2
+  },
+  "deck_search_tuck_by_wingspan x all_players_lay_eggs": {
+   "effect": -0.028,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "none x draw_card": {
+   "effect": -0.028,
+   "cond_sd": 1.153,
+   "n": 1
+  },
+  "none x repeat_brown_power": {
+   "effect": -0.029,
+   "cond_sd": 1.109,
+   "n": 3
+  },
+  "tuck_card x all_players_lay_eggs": {
+   "effect": -0.029,
+   "cond_sd": 1.048,
+   "n": 7
+  },
+  "none x draw_cards_player_select": {
+   "effect": -0.03,
+   "cond_sd": 1.136,
+   "n": 2
+  },
+  "all_players_lay_eggs x discard_to_tuck": {
+   "effect": -0.03,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "move_bird_habitat x empty": {
+   "effect": -0.032,
+   "cond_sd": 0.886,
+   "n": 7
+  },
+  "fewest_birds_draw_cards x all_players_draw_cards": {
+   "effect": -0.033,
+   "cond_sd": 1.105,
+   "n": 5
+  },
+  "fewest_birds_draw_cards x fewest_birds_gain_food": {
+   "effect": -0.034,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "fewest_birds_gain_food x draw_cards_then_discard": {
+   "effect": -0.035,
+   "cond_sd": 1.116,
+   "n": 4
+  },
+  "discard_to_tuck x fewest_birds_gain_food": {
+   "effect": -0.035,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "lay_egg x draw_bonus_cards_keep_one": {
+   "effect": -0.035,
+   "cond_sd": 0.884,
+   "n": 20
+  },
+  "draw_card x lay_egg": {
+   "effect": -0.039,
+   "cond_sd": 1.137,
+   "n": 1
+  },
+  "tuck_card x deck_search_tuck_by_wingspan": {
+   "effect": -0.039,
+   "cond_sd": 0.627,
+   "n": 51
+  },
+  "all_players_gain_food x draw_card": {
+   "effect": -0.039,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "each_player_gains_birdfeeder_food x predator_hunt": {
+   "effect": -0.041,
+   "cond_sd": 0.804,
+   "n": 24
+  },
+  "none x fewest_birds_gain_food": {
+   "effect": -0.046,
+   "cond_sd": 1.121,
+   "n": 3
+  },
+  "discard_to_tuck x gain_food_from_birdfeeder": {
+   "effect": -0.047,
+   "cond_sd": 1.071,
+   "n": 7
+  },
+  "repeat_brown_power x play_additional_bird": {
+   "effect": -0.047,
+   "cond_sd": 1.15,
+   "n": 1
+  },
+  "repeat_brown_power x gain_food_from_supply": {
+   "effect": -0.05,
+   "cond_sd": 1.088,
+   "n": 4
+  },
+  "repeat_brown_power x pink_reaction": {
+   "effect": -0.05,
+   "cond_sd": 1.118,
+   "n": 3
+  },
+  "all_players_draw_cards x all_players_gain_food": {
+   "effect": -0.052,
+   "cond_sd": 0.818,
+   "n": 28
+  },
+  "play_additional_bird x discard_egg_draw_cards": {
+   "effect": -0.053,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "tuck_card x fewest_birds_draw_cards": {
+   "effect": -0.055,
+   "cond_sd": 1.065,
+   "n": 7
+  },
+  "repeat_brown_power x none": {
+   "effect": -0.057,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "draw_cards_player_select x gain_food_from_supply": {
+   "effect": -0.059,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "draw_card x each_player_gains_birdfeeder_food": {
+   "effect": -0.064,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "draw_cards_then_discard x fewest_birds_draw_cards": {
+   "effect": -0.065,
+   "cond_sd": 1.153,
+   "n": 1
+  },
+  "fewest_birds_draw_cards x each_player_gains_birdfeeder_food": {
+   "effect": -0.065,
+   "cond_sd": 1.082,
+   "n": 6
+  },
+  "draw_tray_cards x draw_bonus_cards_keep_one": {
+   "effect": -0.07,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "draw_tray_cards x each_player_gains_birdfeeder_food": {
+   "effect": -0.07,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "all_players_draw_cards x repeat_brown_power": {
+   "effect": -0.072,
+   "cond_sd": 1.067,
+   "n": 7
+  },
+  "all_players_draw_cards x trade_food_with_supply": {
+   "effect": -0.073,
+   "cond_sd": 1.137,
+   "n": 2
+  },
+  "cache_food x cache_food": {
+   "effect": -0.076,
+   "cond_sd": 1.139,
+   "n": 1
+  },
+  "draw_cards_then_discard x none": {
+   "effect": -0.076,
+   "cond_sd": 0.993,
+   "n": 7
+  },
+  "fewest_birds_draw_cards x predator_hunt": {
+   "effect": -0.077,
+   "cond_sd": 0.984,
+   "n": 13
+  },
+  "none x fewest_birds_draw_cards": {
+   "effect": -0.079,
+   "cond_sd": 1.041,
+   "n": 9
+  },
+  "discard_egg_draw_cards x discard_egg_gain_wild_food": {
+   "effect": -0.079,
+   "cond_sd": 1.138,
+   "n": 1
+  },
+  "discard_egg_draw_cards x predator_hunt": {
+   "effect": -0.079,
+   "cond_sd": 1.138,
+   "n": 1
+  },
+  "draw_card x none": {
+   "effect": -0.082,
+   "cond_sd": 1.131,
+   "n": 2
+  },
+  "discard_egg_draw_cards x tuck_card": {
+   "effect": -0.082,
+   "cond_sd": 1.128,
+   "n": 2
+  },
+  "fewest_birds_draw_cards x discard_egg_gain_wild_food": {
+   "effect": -0.085,
+   "cond_sd": 0.993,
+   "n": 11
+  },
+  "fewest_birds_gain_food x gain_food_from_supply": {
+   "effect": -0.088,
+   "cond_sd": 1.152,
+   "n": 1
+  },
+  "all_players_lay_eggs x each_player_gains_birdfeeder_food": {
+   "effect": -0.093,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "all_players_gain_food x discard_egg_draw_cards": {
+   "effect": -0.093,
+   "cond_sd": 1.124,
+   "n": 2
+  },
+  "fewest_birds_draw_cards x deck_search_tuck_by_wingspan": {
+   "effect": -0.094,
+   "cond_sd": 0.978,
+   "n": 13
+  },
+  "fewest_birds_gain_food x pink_reaction": {
+   "effect": -0.095,
+   "cond_sd": 1.077,
+   "n": 6
+  },
+  "deck_search_tuck_by_wingspan x draw_tray_cards": {
+   "effect": -0.097,
+   "cond_sd": 1.078,
+   "n": 4
+  },
+  "move_bird_habitat x draw_cards_then_discard": {
+   "effect": -0.097,
+   "cond_sd": 1.075,
+   "n": 5
+  },
+  "gain_food_from_birdfeeder x fewest_birds_draw_cards": {
+   "effect": -0.098,
+   "cond_sd": 1.098,
+   "n": 4
+  },
+  "move_bird_habitat x discard_to_tuck": {
+   "effect": -0.099,
+   "cond_sd": 1.057,
+   "n": 5
+  },
+  "play_additional_bird x play_additional_bird": {
+   "effect": -0.1,
+   "cond_sd": 1.137,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x move_bird_habitat": {
+   "effect": -0.1,
+   "cond_sd": 1.095,
+   "n": 5
+  },
+  "all_players_lay_eggs x all_players_lay_eggs": {
+   "effect": -0.103,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "move_bird_habitat x cache_food": {
+   "effect": -0.104,
+   "cond_sd": 1.125,
+   "n": 1
+  },
+  "pink_reaction x repeat_brown_power": {
+   "effect": -0.105,
+   "cond_sd": 1.124,
+   "n": 2
+  },
+  "pink_reaction x discard_to_tuck": {
+   "effect": -0.106,
+   "cond_sd": 0.974,
+   "n": 9
+  },
+  "fewest_birds_gain_food x cache_food": {
+   "effect": -0.107,
+   "cond_sd": 1.141,
+   "n": 2
+  },
+  "fewest_birds_draw_cards x discard_egg_draw_cards": {
+   "effect": -0.107,
+   "cond_sd": 1.135,
+   "n": 2
+  },
+  "repeat_brown_power x fewest_birds_gain_food": {
+   "effect": -0.107,
+   "cond_sd": 1.128,
+   "n": 2
+  },
+  "move_bird_habitat x repeat_brown_power": {
+   "effect": -0.108,
+   "cond_sd": 1.139,
+   "n": 2
+  },
+  "fewest_birds_gain_food x each_player_gains_birdfeeder_food": {
+   "effect": -0.11,
+   "cond_sd": 1.108,
+   "n": 4
+  },
+  "gain_food_from_birdfeeder x cache_food": {
+   "effect": -0.112,
+   "cond_sd": 1.041,
+   "n": 6
+  },
+  "draw_bonus_cards_keep_one x pink_reaction": {
+   "effect": -0.115,
+   "cond_sd": 0.611,
+   "n": 91
+  },
+  "all_players_gain_food x all_players_lay_eggs": {
+   "effect": -0.116,
+   "cond_sd": 1.104,
+   "n": 4
+  },
+  "deck_search_tuck_by_wingspan x play_additional_bird": {
+   "effect": -0.116,
+   "cond_sd": 0.873,
+   "n": 13
+  },
+  "draw_bonus_cards_keep_one x none": {
+   "effect": -0.117,
+   "cond_sd": 0.634,
+   "n": 81
+  },
+  "gain_food_from_supply x tuck_card": {
+   "effect": -0.119,
+   "cond_sd": 0.921,
+   "n": 12
+  },
+  "cache_food x draw_bonus_cards_keep_one": {
+   "effect": -0.12,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "move_bird_habitat x tuck_card": {
+   "effect": -0.12,
+   "cond_sd": 0.966,
+   "n": 15
+  },
+  "discard_to_tuck x lay_egg": {
+   "effect": -0.122,
+   "cond_sd": 1.075,
+   "n": 4
+  },
+  "discard_egg_gain_wild_food x draw_card": {
+   "effect": -0.124,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "draw_bonus_cards_keep_one x play_additional_bird": {
+   "effect": -0.128,
+   "cond_sd": 0.812,
+   "n": 34
+  },
+  "gain_food_from_supply x cache_food": {
+   "effect": -0.128,
+   "cond_sd": 1.134,
+   "n": 2
+  },
+  "repeat_brown_power x discard_egg_gain_wild_food": {
+   "effect": -0.128,
+   "cond_sd": 1.061,
+   "n": 6
+  },
+  "each_player_gains_birdfeeder_food x gain_food_from_supply": {
+   "effect": -0.129,
+   "cond_sd": 1.091,
+   "n": 4
+  },
+  "move_bird_habitat x draw_bonus_cards_keep_one": {
+   "effect": -0.13,
+   "cond_sd": 1.056,
+   "n": 8
+  },
+  "repeat_brown_power x draw_bonus_cards_keep_one": {
+   "effect": -0.13,
+   "cond_sd": 1.026,
+   "n": 8
+  },
+  "all_players_gain_food x all_players_gain_food": {
+   "effect": -0.13,
+   "cond_sd": 0.836,
+   "n": 25
+  },
+  "each_player_gains_birdfeeder_food x repeat_brown_power": {
+   "effect": -0.135,
+   "cond_sd": 1.124,
+   "n": 2
+  },
+  "draw_bonus_cards_keep_one x cache_food": {
+   "effect": -0.138,
+   "cond_sd": 1.027,
+   "n": 11
+  },
+  "draw_bonus_cards_keep_one x draw_bonus_cards_keep_one": {
+   "effect": -0.142,
+   "cond_sd": 0.588,
+   "n": 107
+  },
+  "cache_food x deck_search_tuck_by_wingspan": {
+   "effect": -0.143,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "predator_hunt x move_bird_habitat": {
+   "effect": -0.144,
+   "cond_sd": 0.994,
+   "n": 11
+  },
+  "all_players_gain_food x each_player_gains_birdfeeder_food": {
+   "effect": -0.144,
+   "cond_sd": 0.862,
+   "n": 23
+  },
+  "gain_food_from_supply x draw_cards_then_discard": {
+   "effect": -0.146,
+   "cond_sd": 1.035,
+   "n": 6
+  },
+  "move_bird_habitat x all_players_gain_food": {
+   "effect": -0.147,
+   "cond_sd": 1.079,
+   "n": 6
+  },
+  "move_bird_habitat x predator_hunt": {
+   "effect": -0.152,
+   "cond_sd": 0.994,
+   "n": 10
+  },
+  "fewest_birds_gain_food x play_additional_bird": {
+   "effect": -0.153,
+   "cond_sd": 1.12,
+   "n": 3
+  },
+  "all_players_lay_eggs x repeat_brown_power": {
+   "effect": -0.158,
+   "cond_sd": 1.119,
+   "n": 2
+  },
+  "discard_egg_gain_wild_food x draw_bonus_cards_keep_one": {
+   "effect": -0.159,
+   "cond_sd": 0.793,
+   "n": 31
+  },
+  "all_players_draw_cards x cache_food": {
+   "effect": -0.165,
+   "cond_sd": 1.083,
+   "n": 5
+  },
+  "discard_egg_gain_wild_food x draw_cards_player_select": {
+   "effect": -0.166,
+   "cond_sd": 1.119,
+   "n": 3
+  },
+  "each_player_gains_birdfeeder_food x draw_cards_then_discard": {
+   "effect": -0.169,
+   "cond_sd": 0.935,
+   "n": 14
+  },
+  "discard_egg_gain_wild_food x repeat_brown_power": {
+   "effect": -0.172,
+   "cond_sd": 1.051,
+   "n": 7
+  },
+  "discard_egg_draw_cards x each_player_gains_birdfeeder_food": {
+   "effect": -0.173,
+   "cond_sd": 1.107,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x deck_search_tuck_by_wingspan": {
+   "effect": -0.173,
+   "cond_sd": 0.79,
+   "n": 34
+  },
+  "draw_bonus_cards_keep_one x all_players_draw_cards": {
+   "effect": -0.173,
+   "cond_sd": 0.61,
+   "n": 87
+  },
+  "tuck_card x move_bird_habitat": {
+   "effect": -0.175,
+   "cond_sd": 1.039,
+   "n": 7
+  },
+  "each_player_gains_birdfeeder_food x discard_to_tuck": {
+   "effect": -0.175,
+   "cond_sd": 1.075,
+   "n": 4
+  },
+  "gain_food_from_birdfeeder x discard_to_tuck": {
+   "effect": -0.176,
+   "cond_sd": 1.11,
+   "n": 2
+  },
+  "each_player_gains_birdfeeder_food x play_additional_bird": {
+   "effect": -0.176,
+   "cond_sd": 1.041,
+   "n": 6
+  },
+  "draw_bonus_cards_keep_one x gain_food_from_supply": {
+   "effect": -0.176,
+   "cond_sd": 0.68,
+   "n": 57
+  },
+  "all_players_draw_cards x predator_hunt": {
+   "effect": -0.177,
+   "cond_sd": 0.744,
+   "n": 32
+  },
+  "repeat_brown_power x all_players_lay_eggs": {
+   "effect": -0.178,
+   "cond_sd": 1.124,
+   "n": 1
+  },
+  "trade_food_with_supply x gain_food_from_birdfeeder": {
+   "effect": -0.179,
+   "cond_sd": 1.067,
+   "n": 2
+  },
+  "each_player_gains_birdfeeder_food x all_players_gain_food": {
+   "effect": -0.181,
+   "cond_sd": 1.089,
+   "n": 5
+  },
+  "draw_cards_then_discard x play_additional_bird": {
+   "effect": -0.183,
+   "cond_sd": 1.127,
+   "n": 2
+  },
+  "all_players_draw_cards x gain_food_from_supply": {
+   "effect": -0.184,
+   "cond_sd": 0.865,
+   "n": 22
+  },
+  "gain_food_from_birdfeeder x draw_bonus_cards_keep_one": {
+   "effect": -0.184,
+   "cond_sd": 0.814,
+   "n": 36
+  },
+  "none x all_players_draw_cards": {
+   "effect": -0.185,
+   "cond_sd": 0.743,
+   "n": 45
+  },
+  "all_players_lay_eggs x none": {
+   "effect": -0.186,
+   "cond_sd": 1.085,
+   "n": 5
+  },
+  "all_players_gain_food x play_additional_bird": {
+   "effect": -0.193,
+   "cond_sd": 0.938,
+   "n": 12
+  },
+  "move_bird_habitat x pink_reaction": {
+   "effect": -0.196,
+   "cond_sd": 0.967,
+   "n": 12
+  },
+  "draw_cards_then_discard x move_bird_habitat": {
+   "effect": -0.2,
+   "cond_sd": 1.126,
+   "n": 1
+  },
+  "deck_search_tuck_by_wingspan x draw_bonus_cards_keep_one": {
+   "effect": -0.205,
+   "cond_sd": 0.887,
+   "n": 22
+  },
+  "draw_cards_then_discard x each_player_gains_birdfeeder_food": {
+   "effect": -0.206,
+   "cond_sd": 1.069,
+   "n": 6
+  },
+  "lay_egg x play_additional_bird": {
+   "effect": -0.207,
+   "cond_sd": 1.105,
+   "n": 4
+  },
+  "all_players_gain_food x draw_cards_player_select": {
+   "effect": -0.209,
+   "cond_sd": 1.125,
+   "n": 3
+  },
+  "all_players_draw_cards x none": {
+   "effect": -0.209,
+   "cond_sd": 0.85,
+   "n": 29
+  },
+  "each_player_gains_birdfeeder_food x none": {
+   "effect": -0.21,
+   "cond_sd": 1.024,
+   "n": 7
+  },
+  "lay_egg x all_players_lay_eggs": {
+   "effect": -0.211,
+   "cond_sd": 1.138,
+   "n": 1
+  },
+  "draw_bonus_cards_keep_one x fewest_birds_draw_cards": {
+   "effect": -0.212,
+   "cond_sd": 1.066,
+   "n": 8
+  },
+  "all_players_draw_cards x empty": {
+   "effect": -0.213,
+   "cond_sd": 0.622,
+   "n": 27
+  },
+  "lay_egg x none": {
+   "effect": -0.213,
+   "cond_sd": 0.965,
+   "n": 14
+  },
+  "discard_to_tuck x gain_food_from_supply": {
+   "effect": -0.217,
+   "cond_sd": 1.064,
+   "n": 6
+  },
+  "none x pink_reaction": {
+   "effect": -0.218,
+   "cond_sd": 0.752,
+   "n": 37
+  },
+  "all_players_gain_food x deck_search_tuck_by_wingspan": {
+   "effect": -0.223,
+   "cond_sd": 0.914,
+   "n": 15
+  },
+  "pink_reaction x play_additional_bird": {
+   "effect": -0.224,
+   "cond_sd": 0.964,
+   "n": 12
+  },
+  "none x all_players_gain_food": {
+   "effect": -0.227,
+   "cond_sd": 0.81,
+   "n": 32
+  },
+  "play_additional_bird x repeat_brown_power": {
+   "effect": -0.229,
+   "cond_sd": 1.144,
+   "n": 1
+  },
+  "deck_search_tuck_by_wingspan x discard_egg_gain_wild_food": {
+   "effect": -0.23,
+   "cond_sd": 0.836,
+   "n": 27
+  },
+  "cache_food x move_bird_habitat": {
+   "effect": -0.232,
+   "cond_sd": 1.132,
+   "n": 2
+  },
+  "gain_food_from_supply x all_players_draw_cards": {
+   "effect": -0.235,
+   "cond_sd": 0.958,
+   "n": 8
+  },
+  "discard_to_tuck x each_player_gains_birdfeeder_food": {
+   "effect": -0.24,
+   "cond_sd": 0.965,
+   "n": 11
+  },
+  "deck_search_tuck_by_wingspan x each_player_gains_birdfeeder_food": {
+   "effect": -0.241,
+   "cond_sd": 0.938,
+   "n": 16
+  },
+  "lay_egg x fewest_birds_gain_food": {
+   "effect": -0.245,
+   "cond_sd": 1.128,
+   "n": 1
+  },
+  "draw_tray_cards x deck_search_tuck_by_wingspan": {
+   "effect": -0.248,
+   "cond_sd": 1.123,
+   "n": 2
+  },
+  "pink_reaction x discard_egg_gain_wild_food": {
+   "effect": -0.251,
+   "cond_sd": 0.929,
+   "n": 17
+  },
+  "gain_food_from_birdfeeder x discard_egg_gain_wild_food": {
+   "effect": -0.252,
+   "cond_sd": 0.894,
+   "n": 24
+  },
+  "gain_food_from_birdfeeder x all_players_draw_cards": {
+   "effect": -0.255,
+   "cond_sd": 0.788,
+   "n": 34
+  },
+  "tuck_card x tuck_card": {
+   "effect": -0.255,
+   "cond_sd": 0.482,
+   "n": 111
+  },
+  "play_additional_bird x none": {
+   "effect": -0.262,
+   "cond_sd": 1.065,
+   "n": 6
+  },
+  "draw_tray_cards x draw_cards_player_select": {
+   "effect": -0.263,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "draw_tray_cards x draw_cards_then_discard": {
+   "effect": -0.263,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "draw_tray_cards x gain_food_from_supply": {
+   "effect": -0.263,
+   "cond_sd": 1.148,
+   "n": 1
+  },
+  "fewest_birds_draw_cards x draw_cards_then_discard": {
+   "effect": -0.267,
+   "cond_sd": 1.075,
+   "n": 5
+  },
+  "gain_food_from_supply x gain_food_from_birdfeeder": {
+   "effect": -0.268,
+   "cond_sd": 1.067,
+   "n": 4
+  },
+  "draw_card x all_players_lay_eggs": {
+   "effect": -0.283,
+   "cond_sd": 1.137,
+   "n": 1
+  },
+  "draw_card x repeat_brown_power": {
+   "effect": -0.283,
+   "cond_sd": 1.137,
+   "n": 1
+  },
+  "draw_cards_then_discard x discard_egg_gain_wild_food": {
+   "effect": -0.285,
+   "cond_sd": 0.943,
+   "n": 11
+  },
+  "gain_food_from_birdfeeder x draw_card": {
+   "effect": -0.291,
+   "cond_sd": 1.034,
+   "n": 4
+  },
+  "predator_hunt x predator_hunt": {
+   "effect": -0.291,
+   "cond_sd": 0.596,
+   "n": 68
+  },
+  "draw_cards_player_select x draw_cards_then_discard": {
+   "effect": -0.291,
+   "cond_sd": 1.119,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x lay_egg": {
+   "effect": -0.292,
+   "cond_sd": 0.817,
+   "n": 25
+  },
+  "each_player_gains_birdfeeder_food x all_players_lay_eggs": {
+   "effect": -0.293,
+   "cond_sd": 1.099,
+   "n": 2
+  },
+  "move_bird_habitat x gain_food_from_supply": {
+   "effect": -0.295,
+   "cond_sd": 1.037,
+   "n": 6
+  },
+  "tuck_card x discard_egg_draw_cards": {
+   "effect": -0.299,
+   "cond_sd": 1.109,
+   "n": 2
+  },
+  "discard_egg_gain_wild_food x cache_food": {
+   "effect": -0.305,
+   "cond_sd": 1.109,
+   "n": 3
+  },
+  "all_players_lay_eggs x gain_food_from_birdfeeder": {
+   "effect": -0.307,
+   "cond_sd": 1.103,
+   "n": 4
+  },
+  "draw_card x all_players_gain_food": {
+   "effect": -0.308,
+   "cond_sd": 1.115,
+   "n": 2
+  },
+  "lay_egg x draw_cards_then_discard": {
+   "effect": -0.311,
+   "cond_sd": 1.074,
+   "n": 5
+  },
+  "each_player_gains_birdfeeder_food x fewest_birds_draw_cards": {
+   "effect": -0.314,
+   "cond_sd": 1.084,
+   "n": 4
+  },
+  "cache_food x predator_hunt": {
+   "effect": -0.315,
+   "cond_sd": 1.113,
+   "n": 2
+  },
+  "lay_egg x discard_to_tuck": {
+   "effect": -0.315,
+   "cond_sd": 1.112,
+   "n": 2
+  },
+  "gain_food_from_supply x each_player_gains_birdfeeder_food": {
+   "effect": -0.317,
+   "cond_sd": 1.108,
+   "n": 3
+  },
+  "draw_tray_cards x pink_reaction": {
+   "effect": -0.324,
+   "cond_sd": 1.133,
+   "n": 2
+  },
+  "all_players_draw_cards x each_player_gains_birdfeeder_food": {
+   "effect": -0.326,
+   "cond_sd": 0.836,
+   "n": 22
+  },
+  "repeat_brown_power x each_player_gains_birdfeeder_food": {
+   "effect": -0.326,
+   "cond_sd": 1.078,
+   "n": 4
+  },
+  "pink_reaction x all_players_lay_eggs": {
+   "effect": -0.327,
+   "cond_sd": 1.111,
+   "n": 3
+  },
+  "tuck_card x discard_to_tuck": {
+   "effect": -0.331,
+   "cond_sd": 0.931,
+   "n": 16
+  },
+  "draw_bonus_cards_keep_one x predator_hunt": {
+   "effect": -0.342,
+   "cond_sd": 0.559,
+   "n": 112
+  },
+  "discard_egg_gain_wild_food x gain_food_from_supply": {
+   "effect": -0.348,
+   "cond_sd": 0.893,
+   "n": 16
+  },
+  "gain_food_from_birdfeeder x play_additional_bird": {
+   "effect": -0.352,
+   "cond_sd": 0.916,
+   "n": 21
+  },
+  "draw_cards_then_discard x draw_cards_then_discard": {
+   "effect": -0.356,
+   "cond_sd": 1.088,
+   "n": 5
+  },
+  "gain_food_from_supply x discard_egg_gain_wild_food": {
+   "effect": -0.359,
+   "cond_sd": 1.028,
+   "n": 8
+  },
+  "gain_food_from_supply x draw_tray_cards": {
+   "effect": -0.36,
+   "cond_sd": 1.125,
+   "n": 1
+  },
+  "move_bird_habitat x all_players_draw_cards": {
+   "effect": -0.361,
+   "cond_sd": 1.05,
+   "n": 6
+  },
+  "gain_food_from_supply x all_players_lay_eggs": {
+   "effect": -0.364,
+   "cond_sd": 1.143,
+   "n": 1
+  },
+  "all_players_gain_food x gain_food_from_birdfeeder": {
+   "effect": -0.378,
+   "cond_sd": 1.038,
+   "n": 8
+  },
+  "deck_search_tuck_by_wingspan x predator_hunt": {
+   "effect": -0.379,
+   "cond_sd": 0.711,
+   "n": 35
+  },
+  "play_additional_bird x draw_bonus_cards_keep_one": {
+   "effect": -0.379,
+   "cond_sd": 0.945,
+   "n": 16
+  },
+  "pink_reaction x draw_bonus_cards_keep_one": {
+   "effect": -0.39,
+   "cond_sd": 0.761,
+   "n": 42
+  },
+  "repeat_brown_power x all_players_gain_food": {
+   "effect": -0.394,
+   "cond_sd": 1.023,
+   "n": 7
+  },
+  "draw_bonus_cards_keep_one x each_player_gains_birdfeeder_food": {
+   "effect": -0.399,
+   "cond_sd": 0.598,
+   "n": 89
+  },
+  "pink_reaction x predator_hunt": {
+   "effect": -0.401,
+   "cond_sd": 0.768,
+   "n": 32
+  },
+  "repeat_brown_power x lay_egg": {
+   "effect": -0.401,
+   "cond_sd": 1.061,
+   "n": 5
+  },
+  "repeat_brown_power x predator_hunt": {
+   "effect": -0.406,
+   "cond_sd": 0.999,
+   "n": 9
+  },
+  "gain_food_from_supply x draw_bonus_cards_keep_one": {
+   "effect": -0.418,
+   "cond_sd": 1.049,
+   "n": 6
+  },
+  "lay_egg x move_bird_habitat": {
+   "effect": -0.421,
+   "cond_sd": 1.005,
+   "n": 10
+  },
+  "predator_hunt x all_players_draw_cards": {
+   "effect": -0.424,
+   "cond_sd": 0.674,
+   "n": 50
+  },
+  "none x draw_cards_then_discard": {
+   "effect": -0.44,
+   "cond_sd": 0.881,
+   "n": 23
+  },
+  "draw_cards_player_select x all_players_gain_food": {
+   "effect": -0.442,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "draw_cards_player_select x discard_egg_gain_wild_food": {
+   "effect": -0.442,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "draw_cards_player_select x gain_food_from_birdfeeder": {
+   "effect": -0.442,
+   "cond_sd": 1.147,
+   "n": 1
+  },
+  "all_players_gain_food x none": {
+   "effect": -0.442,
+   "cond_sd": 0.845,
+   "n": 24
+  },
+  "draw_cards_player_select x none": {
+   "effect": -0.443,
+   "cond_sd": 1.108,
+   "n": 2
+  },
+  "fewest_birds_draw_cards x play_additional_bird": {
+   "effect": -0.443,
+   "cond_sd": 1.002,
+   "n": 7
+  },
+  "each_player_gains_birdfeeder_food x lay_egg": {
+   "effect": -0.448,
+   "cond_sd": 1.049,
+   "n": 7
+  },
+  "each_player_gains_birdfeeder_food x gain_food_from_birdfeeder": {
+   "effect": -0.449,
+   "cond_sd": 1.073,
+   "n": 6
+  },
+  "all_players_draw_cards x all_players_draw_cards": {
+   "effect": -0.451,
+   "cond_sd": 0.933,
+   "n": 15
+  },
+  "pink_reaction x gain_food_from_birdfeeder": {
+   "effect": -0.458,
+   "cond_sd": 0.958,
+   "n": 14
+  },
+  "play_additional_bird x move_bird_habitat": {
+   "effect": -0.459,
+   "cond_sd": 1.125,
+   "n": 1
+  },
+  "discard_to_tuck x tuck_card": {
+   "effect": -0.46,
+   "cond_sd": 0.89,
+   "n": 15
+  },
+  "gain_food_from_supply x pink_reaction": {
+   "effect": -0.461,
+   "cond_sd": 0.885,
+   "n": 12
+  },
+  "none x predator_hunt": {
+   "effect": -0.469,
+   "cond_sd": 0.658,
+   "n": 65
+  },
+  "all_players_lay_eggs x predator_hunt": {
+   "effect": -0.475,
+   "cond_sd": 0.962,
+   "n": 13
+  },
+  "discard_egg_gain_wild_food x pink_reaction": {
+   "effect": -0.478,
+   "cond_sd": 0.832,
+   "n": 25
+  },
+  "all_players_lay_eggs x pink_reaction": {
+   "effect": -0.486,
+   "cond_sd": 0.934,
+   "n": 15
+  },
+  "draw_bonus_cards_keep_one x discard_to_tuck": {
+   "effect": -0.487,
+   "cond_sd": 1.005,
+   "n": 11
+  },
+  "all_players_gain_food x cache_food": {
+   "effect": -0.487,
+   "cond_sd": 1.061,
+   "n": 7
+  },
+  "draw_cards_then_discard x all_players_draw_cards": {
+   "effect": -0.492,
+   "cond_sd": 1.124,
+   "n": 2
+  },
+  "lay_egg x all_players_gain_food": {
+   "effect": -0.499,
+   "cond_sd": 0.931,
+   "n": 14
+  },
+  "tuck_card x pink_reaction": {
+   "effect": -0.509,
+   "cond_sd": 0.571,
+   "n": 63
+  },
+  "all_players_lay_eggs x deck_search_tuck_by_wingspan": {
+   "effect": -0.52,
+   "cond_sd": 1.067,
+   "n": 6
+  },
+  "cache_food x tuck_card": {
+   "effect": -0.541,
+   "cond_sd": 1.084,
+   "n": 4
+  },
+  "all_players_draw_cards x discard_egg_gain_wild_food": {
+   "effect": -0.548,
+   "cond_sd": 0.8,
+   "n": 25
+  },
+  "each_player_gains_birdfeeder_food x all_players_draw_cards": {
+   "effect": -0.56,
+   "cond_sd": 0.708,
+   "n": 30
+  },
+  "discard_egg_gain_wild_food x draw_cards_then_discard": {
+   "effect": -0.563,
+   "cond_sd": 0.821,
+   "n": 26
+  },
+  "pink_reaction x cache_food": {
+   "effect": -0.575,
+   "cond_sd": 1.07,
+   "n": 2
+  },
+  "deck_search_tuck_by_wingspan x move_bird_habitat": {
+   "effect": -0.587,
+   "cond_sd": 0.975,
+   "n": 11
+  },
+  "draw_cards_then_discard x all_players_gain_food": {
+   "effect": -0.592,
+   "cond_sd": 1.047,
+   "n": 7
+  },
+  "repeat_brown_power x all_players_draw_cards": {
+   "effect": -0.598,
+   "cond_sd": 1.096,
+   "n": 4
+  },
+  "lay_egg x lay_egg": {
+   "effect": -0.608,
+   "cond_sd": 0.96,
+   "n": 11
+  },
+  "discard_egg_gain_wild_food x each_player_gains_birdfeeder_food": {
+   "effect": -0.609,
+   "cond_sd": 0.803,
+   "n": 25
+  },
+  "discard_egg_draw_cards x none": {
+   "effect": -0.609,
+   "cond_sd": 1.047,
+   "n": 4
+  },
+  "all_players_lay_eggs x tuck_card": {
+   "effect": -0.615,
+   "cond_sd": 1.006,
+   "n": 6
+  },
+  "discard_to_tuck x draw_cards_then_discard": {
+   "effect": -0.619,
+   "cond_sd": 1.015,
+   "n": 6
+  },
+  "fewest_birds_draw_cards x none": {
+   "effect": -0.623,
+   "cond_sd": 0.983,
+   "n": 12
+  },
+  "all_players_gain_food x draw_bonus_cards_keep_one": {
+   "effect": -0.631,
+   "cond_sd": 0.735,
+   "n": 45
+  },
+  "none x play_additional_bird": {
+   "effect": -0.636,
+   "cond_sd": 0.891,
+   "n": 16
+  },
+  "tuck_card x play_additional_bird": {
+   "effect": -0.651,
+   "cond_sd": 0.927,
+   "n": 18
+  },
+  "draw_cards_then_discard x deck_search_tuck_by_wingspan": {
+   "effect": -0.657,
+   "cond_sd": 0.918,
+   "n": 12
+  },
+  "draw_cards_player_select x cache_food": {
+   "effect": -0.657,
+   "cond_sd": 1.125,
+   "n": 1
+  },
+  "lay_egg x all_players_draw_cards": {
+   "effect": -0.669,
+   "cond_sd": 0.987,
+   "n": 10
+  },
+  "all_players_gain_food x draw_cards_then_discard": {
+   "effect": -0.671,
+   "cond_sd": 0.969,
+   "n": 15
+  },
+  "predator_hunt x discard_egg_gain_wild_food": {
+   "effect": -0.677,
+   "cond_sd": 0.783,
+   "n": 30
+  },
+  "each_player_gains_birdfeeder_food x draw_bonus_cards_keep_one": {
+   "effect": -0.689,
+   "cond_sd": 0.845,
+   "n": 22
+  },
+  "pink_reaction x draw_cards_player_select": {
+   "effect": -0.694,
+   "cond_sd": 1.118,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x none": {
+   "effect": -0.697,
+   "cond_sd": 0.874,
+   "n": 23
+  },
+  "all_players_gain_food x tuck_card": {
+   "effect": -0.697,
+   "cond_sd": 0.666,
+   "n": 58
+  },
+  "discard_egg_gain_wild_food x all_players_gain_food": {
+   "effect": -0.704,
+   "cond_sd": 0.819,
+   "n": 25
+  },
+  "cache_food x discard_egg_gain_wild_food": {
+   "effect": -0.718,
+   "cond_sd": 1.105,
+   "n": 3
+  },
+  "play_additional_bird x all_players_gain_food": {
+   "effect": -0.729,
+   "cond_sd": 0.846,
+   "n": 23
+  },
+  "play_additional_bird x tuck_card": {
+   "effect": -0.734,
+   "cond_sd": 0.75,
+   "n": 33
+  },
+  "tuck_card x all_players_gain_food": {
+   "effect": -0.745,
+   "cond_sd": 0.791,
+   "n": 32
+  },
+  "pink_reaction x none": {
+   "effect": -0.746,
+   "cond_sd": 0.872,
+   "n": 20
+  },
+  "pink_reaction x each_player_gains_birdfeeder_food": {
+   "effect": -0.75,
+   "cond_sd": 0.885,
+   "n": 21
+  },
+  "predator_hunt x trade_food_with_supply": {
+   "effect": -0.811,
+   "cond_sd": 1.112,
+   "n": 2
+  },
+  "gain_food_from_birdfeeder x each_player_gains_birdfeeder_food": {
+   "effect": -0.829,
+   "cond_sd": 0.895,
+   "n": 18
+  },
+  "discard_to_tuck x none": {
+   "effect": -0.859,
+   "cond_sd": 1.049,
+   "n": 5
+  },
+  "cache_food x draw_cards_then_discard": {
+   "effect": -0.868,
+   "cond_sd": 1.079,
+   "n": 4
+  },
+  "all_players_draw_cards x draw_cards_then_discard": {
+   "effect": -0.891,
+   "cond_sd": 0.898,
+   "n": 19
+  },
+  "discard_egg_gain_wild_food x all_players_draw_cards": {
+   "effect": -0.9,
+   "cond_sd": 0.782,
+   "n": 32
+  },
+  "move_bird_habitat x lay_egg": {
+   "effect": -0.928,
+   "cond_sd": 0.983,
+   "n": 8
+  },
+  "each_player_gains_birdfeeder_food x each_player_gains_birdfeeder_food": {
+   "effect": -0.949,
+   "cond_sd": 0.951,
+   "n": 10
+  },
+  "draw_bonus_cards_keep_one x deck_search_tuck_by_wingspan": {
+   "effect": -0.953,
+   "cond_sd": 0.679,
+   "n": 59
+  },
+  "predator_hunt x none": {
+   "effect": -0.989,
+   "cond_sd": 0.746,
+   "n": 42
+  },
+  "draw_cards_then_discard x empty": {
+   "effect": -1.005,
+   "cond_sd": 0.747,
+   "n": 15
+  },
+  "none x each_player_gains_birdfeeder_food": {
+   "effect": -1.033,
+   "cond_sd": 0.683,
+   "n": 48
+  },
+  "cache_food x pink_reaction": {
+   "effect": -1.051,
+   "cond_sd": 1.027,
+   "n": 8
+  },
+  "gain_food_from_supply x predator_hunt": {
+   "effect": -1.079,
+   "cond_sd": 0.905,
+   "n": 14
+  },
+  "none x empty": {
+   "effect": -1.106,
+   "cond_sd": 0.768,
+   "n": 10
+  },
+  "discard_egg_gain_wild_food x tuck_card": {
+   "effect": -1.119,
+   "cond_sd": 0.607,
+   "n": 63
+  },
+  "predator_hunt x empty": {
+   "effect": -1.139,
+   "cond_sd": 0.545,
+   "n": 40
+  },
+  "deck_search_tuck_by_wingspan x all_players_draw_cards": {
+   "effect": -1.158,
+   "cond_sd": 0.789,
+   "n": 28
+  },
+  "discard_egg_gain_wild_food x move_bird_habitat": {
+   "effect": -1.172,
+   "cond_sd": 1.002,
+   "n": 4
+  },
+  "lay_egg x predator_hunt": {
+   "effect": -1.295,
+   "cond_sd": 0.737,
+   "n": 29
+  },
+  "tuck_card x all_players_draw_cards": {
+   "effect": -1.386,
+   "cond_sd": 0.699,
+   "n": 45
+  },
+  "deck_search_tuck_by_wingspan x empty": {
+   "effect": -1.531,
+   "cond_sd": 0.642,
+   "n": 25
+  },
+  "pink_reaction x all_players_draw_cards": {
+   "effect": -1.6,
+   "cond_sd": 0.794,
+   "n": 27
+  },
+  "play_additional_bird x pink_reaction": {
+   "effect": -1.66,
+   "cond_sd": 0.908,
+   "n": 16
+  },
+  "draw_bonus_cards_keep_one x empty": {
+   "effect": -1.678,
+   "cond_sd": 0.876,
+   "n": 6
+  },
+  "draw_card x empty": {
+   "effect": -1.803,
+   "cond_sd": 1.092,
+   "n": 2
+  },
+  "all_players_gain_food x discard_to_tuck": {
+   "effect": -1.882,
+   "cond_sd": 1.009,
+   "n": 4
+  },
+  "pink_reaction x draw_card": {
+   "effect": -1.992,
+   "cond_sd": 1.063,
+   "n": 3
+  },
+  "draw_cards_then_discard x tuck_card": {
+   "effect": -2.061,
+   "cond_sd": 0.75,
+   "n": 26
+  },
+  "all_players_draw_cards x deck_search_tuck_by_wingspan": {
+   "effect": -2.819,
+   "cond_sd": 0.807,
+   "n": 21
+  },
+  "discard_to_tuck x empty": {
+   "effect": -3.112,
+   "cond_sd": 0.964,
+   "n": 4
+  }
+ }
+}

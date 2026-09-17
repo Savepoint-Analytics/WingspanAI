@@ -2710,3 +2710,23 @@ ranks between K=0 and K=4 agree only at ρ=0.54, so a real share of the K=0
 ordering — and of the mechanic-pair table the engine-potential term used —
 was path noise. Full K=4 attribution over all 382 games in flight; the pair
 table will be rebuilt from it (`mechanic_pair_effects_v2`).
+
+## Update: 2026-09-17 - K=4 attribution: the K=0 mechanic-pair table was mostly noise
+
+Full re-attribution of all 2,698 plays with four determinized continuations
+per branch. Aggregate unchanged (+4.27 card value, +1.62 timing; round shape
+intact); lme4 residual SD 4.69 → **3.03**; per-bird ranks agree ρ=0.54 with
+K=0, mechanic-pair ranks only **ρ=0.31**. `tuck_card × deck_search_tuck`
++2.96 → −0.04; `all_players_draw_cards × predator_hunt` +3.39 → −0.18. The
+table that picked two of layer C's pairs and fed the engine-potential term
+was path noise; `mechanic_pair_effects_v2.json` (K=4) replaces it as the
+term's table, unmeasured. Layer C P1's null matches v2; P2's +3.48 is the one
+surviving positive and is borderline after correction for three tests.
+
+### Follow-up tasks
+1. Engine-potential term, board-only variant on the v2 table with halved
+   effects — one 80-game arm; if negative, move synergy evidence into the
+   opener and draw choice instead of the evaluator.
+2. Layer A egg synergies in a capacity-aware context (near-full boards).
+3. Layer C on a searching pursuer for P2 only (the surviving pair).
+4. K=4 is the standard for any future attribution run; note the 4× cost.

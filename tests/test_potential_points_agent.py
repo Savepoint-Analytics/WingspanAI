@@ -672,8 +672,8 @@ class MechanicSynergyTests(TestCase):
         from wingspan_ai.agents.potential_points import load_mechanic_synergy_table
 
         table = load_mechanic_synergy_table()
-        self.assertEqual(table.version, "mechanic_pair_effects_v1")
-        self.assertGreater(table.effects[("tuck_card", "deck_search_tuck_by_wingspan")], 1.0)
+        self.assertEqual(table.version, "mechanic_pair_effects_v2")
+        self.assertIn(("tuck_card", "deck_search_tuck_by_wingspan"), table.effects)
         state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=3)
         player = state.players[0]
         player.habitats[Habitat.FOREST] = [BirdSlot(card=self.birds["Common Grackle"])]
@@ -703,7 +703,7 @@ class MechanicSynergyTests(TestCase):
         legal_actions = legal_actions_for_current_player(state)
         summary = with_term.summarize_decision(state, legal_actions, legal_actions[0])
         self.assertTrue(summary["mechanic_synergy"])
-        self.assertEqual(summary["mechanic_synergy_table"], "mechanic_pair_effects_v1")
+        self.assertEqual(summary["mechanic_synergy_table"], "mechanic_pair_effects_v2")
         self.assertIsNone(
             without.summarize_decision(state, legal_actions, legal_actions[0])[
                 "mechanic_synergy_table"
