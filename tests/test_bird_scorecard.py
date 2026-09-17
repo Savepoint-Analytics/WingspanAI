@@ -55,6 +55,13 @@ class BirdScorecardTests(TestCase):
         brown = [b for c in cards for b in c.payload["birds"] if b["power_color"] == "brown"]
         self.assertTrue(brown)
         self.assertGreater(sum(b["activations"] for b in brown), 0)
+        # The yield ledger credits what activations produced; a bird that
+        # activated must have produced something at least once in aggregate.
+        yielded = [b for b in brown if b["activations"] > 0 and b["power_yield"]]
+        self.assertTrue(yielded)
+        for bird in brown:
+            for value in bird["power_yield"].values():
+                self.assertIsInstance(value, int)
         catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
         self.assertTrue(validate_simulation_replay(catalog, result.events).is_valid)
 

@@ -48,6 +48,10 @@ class BirdSlot(BaseModel):
     #: dumps so state hashes, replay validation and archived artifacts are
     #: unchanged; the ``bird_scorecard`` event carries it explicitly.
     activations: int = Field(default=0, ge=0, exclude=True)
+    #: What this bird's power resolutions produced for its owner, as deltas of
+    #: player-level counters (``food``, ``cards``, ``eggs``, ``tucked``,
+    #: ``cached``). Telemetry only, excluded from dumps like ``activations``.
+    power_yield: dict[str, int] = Field(default_factory=dict, exclude=True)
 
     @property
     def available_egg_capacity(self) -> int:

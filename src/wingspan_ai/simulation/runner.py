@@ -535,6 +535,7 @@ def _emit_bird_scorecards(
                         "cached_food": slot.cached_food,
                         "tucked_cards": slot.tucked_cards,
                         "activations": slot.activations,
+                        "power_yield": dict(slot.power_yield),
                         "power_color": slot.card.power.color.value,
                         "bonus_card_tags": sorted(slot.card.bonus_card_tags),
                     }

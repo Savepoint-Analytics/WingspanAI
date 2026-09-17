@@ -943,6 +943,21 @@ def resolve_habitat_powers(
         _resolve_power_text(player, slot, slot.card.power.text, state, habitat=habitat, depth=depth)
 
 
+#: Player-level counters a power can move; the ledger records their deltas.
+_YIELD_KEYS = ("food", "cards", "eggs", "tucked", "cached")
+
+
+def _player_yield_snapshot(player: PlayerState) -> tuple[int, int, int, int, int]:
+    slots = [slot for habitat in player.habitats.values() for slot in habitat]
+    return (
+        sum(player.food_tokens.values()),
+        len(player.hand),
+        sum(slot.eggs for slot in slots),
+        sum(slot.tucked_cards for slot in slots),
+        sum(slot.cached_food for slot in slots),
+    )
+
+
 def _resolve_power_text(
     player: PlayerState,
     slot: BirdSlot,
@@ -951,9 +966,34 @@ def _resolve_power_text(
     habitat: Habitat | None = None,
     depth: int = 0,
 ) -> None:
+    """Resolve one power and credit what it produced to the bird (telemetry only).
+
+    The ledger is the player's counters before versus after, so a power that
+    repeats another bird's power is credited with the repeat; nested
+    resolutions (``depth > 0``) count as activations but do not re-credit
+    the same deltas.
+    """
+
     if not power_text:
         return
     slot.activations += 1
+    before = _player_yield_snapshot(player) if depth == 0 else None
+    _dispatch_power_handler(player, slot, power_text, state, habitat, depth)
+    if before is not None:
+        after = _player_yield_snapshot(player)
+        for key, was, now in zip(_YIELD_KEYS, before, after, strict=True):
+            if now != was:
+                slot.power_yield[key] = slot.power_yield.get(key, 0) + (now - was)
+
+
+def _dispatch_power_handler(
+    player: PlayerState,
+    slot: BirdSlot,
+    power_text: str,
+    state: GameState | None,
+    habitat: Habitat | None,
+    depth: int,
+) -> None:
     handler_key = slot.card.power.handler_key or classify_power_handler_key(
         power_text,
         slot.card.power.color,

@@ -19,6 +19,8 @@ Analysis layer:
 - `analysis/bonus_card_seed_coverage.py` and `analysis/bonus_card_keep_contrast.py`: seed selection and the per-card paired contrast for the forced-keep study.
 - `analysis/keep_policy_eval.py`: scores opening bonus-card policies on the forced arms without new games.
 - `analysis/bird_value_regression.py`: observational bird value — ridge on birds played with agent fixed effects, over every archived game.
+- `analysis/card_synergy_bench.py`: rules-computed pair synergy for every same-habitat brown pair (layer A of the synergy programme).
+- `analysis/play_counterfactuals.py` and `analysis/play_attribution_summary.py`: exact counterfactual rollouts per archived play — timing value, card value, context lift (layer B).
 
 Key rules docs:
 
@@ -28,6 +30,7 @@ Key rules docs:
 - `agents/bayesian_belief_model_plan.md`: first Bayesian belief model plan.
 - `agents/opponent_fit_denial_gap.md`: why no agent can value denying a card an opponent specifically needs.
 - `agents/opponent_response_belief_model.md`: Bayesian opponent-type and action-family response belief model.
+- `agents/synergy_planner_agent.md`: the synergy programme — rules-computed pair synergy, counterfactual play attribution, mechanic-level model, forced-play confirmation, and the engine-potential term it feeds.
 - `agents/net_value_opponent_response_agent.md`: score-margin, blocking, and next-opponent-response agent template.
 - `agents/opening_setup_policies.md`: opening hand, bonus-card, and starting-food setup policy definitions.
 - `events/simulation_event_taxonomy.md`: current simulation telemetry envelope and emitted event names.
