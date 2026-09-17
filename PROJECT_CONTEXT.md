@@ -2754,3 +2754,11 @@ Canvasback + Anhinga vs Black-Chinned Hummingbird / Osprey, 2×2, 60 seeds,
 if > 0 at p < 0.05. The K=4 table says the mechanic pair is ~0 for the
 searching agent's own plays; the cheap-pursuer arm said +3.5; this arm
 decides between them.
+
+### Layer A, capacity-aware (2026-09-17)
+`card_synergy_bench.py --contexts capped`: rows pre-filled with egg-full
+blanks, placed birds one egg below their limit. Grassland pairs with positive
+egg synergy: **830 → 34**; mean egg synergy 0.94 → 0.04; the P3 pair +2.00 →
+0.00. The bench's egg synergies measured egg room, not the pair — the layer C
+reversal reproduced in three seconds. Egg synergies are now reported at both
+ends; anything fed to an agent must be weighted by how often the cap binds.

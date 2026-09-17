@@ -80,7 +80,17 @@ BENCH_PLAYER = "player_1"
 CONTEXTS = {
     "rich": {"hand": 3, "food_each": 2},
     "scarce": {"hand": 0, "food_each": 0},
+    # Capacity-aware (2026-09-17, after layer C's P3 reversal): every other row
+    # holds two egg-full blanks and the placed birds start one egg below their
+    # own limit, so an egg-laying synergy is measured where the cap binds.
+    "capped": {"hand": 1, "food_each": 1, "capped": True},
 }
+DEFAULT_CONTEXTS = ("rich", "scarce")
+
+
+#: Bench states are pydantic models with extra="forbid", so the context flag
+#: lives beside them, keyed by identity (the states list keeps them alive).
+_CAPPED_STATES: dict[int, bool] = {}
 
 
 def bench_state(catalog, seed: int, context: str = "rich") -> GameState:
@@ -91,6 +101,13 @@ def bench_state(catalog, seed: int, context: str = "rich") -> GameState:
     player = state.players[0]
     for habitat in Habitat:
         player.habitats[habitat] = []
+    if settings.get("capped"):
+        for habitat in Habitat:
+            blank = blank_bird(catalog, habitat)
+            player.habitats[habitat] = [
+                BirdSlot(card=blank, eggs=blank.egg_limit) for _ in range(2)
+            ]
+    _CAPPED_STATES[id(state)] = bool(settings.get("capped", False))
     player.hand = list(state.decks.bird_deck[: settings["hand"]])
     del state.decks.bird_deck[: settings["hand"]]
     player.food_tokens = {food: settings["food_each"] for food in BASE_FOOD_TYPES}
@@ -130,8 +147,14 @@ def snapshot(state: GameState) -> dict[str, int]:
 
 
 def with_row(state: GameState, habitat: Habitat, cards: list[BirdCard]) -> GameState:
+    """Place ``cards`` in ``habitat`` (after any pre-filled blanks), eggs per context."""
+
     branch = state.model_copy(deep=True)
-    branch.players[0].habitats[habitat] = [BirdSlot(card=card) for card in cards]
+    capped = _CAPPED_STATES.get(id(state), False)
+    prefilled = [slot for slot in branch.players[0].habitats[habitat] if capped]
+    branch.players[0].habitats[habitat] = prefilled + [
+        BirdSlot(card=card, eggs=max(card.egg_limit - 1, 0) if capped else 0) for card in cards
+    ]
     return branch
 
 
@@ -157,12 +180,18 @@ def blank_bird(catalog, habitat: Habitat) -> BirdCard:
     return max(candidates, key=lambda card: (card.egg_limit, card.common_name))
 
 
-def run_bench(catalog, seeds: list[int], *, max_birds_per_habitat: int | None = None) -> dict:
-    states = [bench_state(catalog, seed, context) for seed in seeds for context in CONTEXTS]
+def run_bench(
+    catalog,
+    seeds: list[int],
+    *,
+    max_birds_per_habitat: int | None = None,
+    contexts: tuple[str, ...] = DEFAULT_CONTEXTS,
+) -> dict:
+    states = [bench_state(catalog, seed, context) for seed in seeds for context in contexts]
     brown = [card for card in catalog.birds if card.power.color == PowerColor.BROWN]
     results: dict = {
         "seeds": seeds,
-        "contexts": list(CONTEXTS),
+        "contexts": list(contexts),
         "singles": {},
         "pairs": {},
         "row_base": {},
@@ -559,13 +588,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--top", type=int, default=25)
     parser.add_argument("--max-birds-per-habitat", type=int, default=None)
+    parser.add_argument(
+        "--contexts",
+        nargs="+",
+        choices=tuple(CONTEXTS),
+        default=list(DEFAULT_CONTEXTS),
+        help="resource contexts to average over (same_row mode)",
+    )
+    parser.add_argument("--tag", default="", help="suffix for the output files")
     parser.add_argument("--workbook", type=Path, default=DEFAULT_WORKBOOK_PATH)
     parser.add_argument("--out", type=Path, default=None, help="directory for JSON + report")
     args = parser.parse_args(argv)
     catalog = load_base_game_content_catalog(args.workbook)
     runner = {
         "same_row": lambda: run_bench(
-            catalog, args.seeds, max_birds_per_habitat=args.max_birds_per_habitat
+            catalog,
+            args.seeds,
+            max_birds_per_habitat=args.max_birds_per_habitat,
+            contexts=tuple(args.contexts),
         ),
         "cross": lambda: run_cross_bench(catalog, args.seeds, max_birds=args.max_birds_per_habitat),
         "onplay": lambda: run_onplay_bench(
@@ -578,7 +618,9 @@ def main(argv: list[str] | None = None) -> int:
     print(text)
     if args.out is not None:
         args.out.mkdir(parents=True, exist_ok=True)
-        suffix = "" if args.mode == "same_row" else f"_{args.mode}"
+        suffix = ("" if args.mode == "same_row" else f"_{args.mode}") + (
+            f"_{args.tag}" if args.tag else ""
+        )
         (args.out / f"synergy_bench{suffix}.json").write_text(json.dumps(results, indent=1))
         (args.out / f"synergy_bench{suffix}.md").write_text(text)
     return 0

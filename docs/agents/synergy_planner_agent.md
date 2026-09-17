@@ -90,6 +90,17 @@ and next to a same-row partner (the cowbird class needs a partner with the
 right nest). Pink reactions are now also credited to the activation ledger.
 Triples seeded from the pair matrix remain the next extension.
 
+**Capacity-aware context (2026-09-17).** `--contexts capped` pre-fills every
+row with two egg-full blanks and starts the placed birds one egg below their
+own limit. In grassland, **830 ordered pairs with positive egg synergy under
+rich/scarce fall to 34 when capped** (mean egg synergy 0.94 → 0.04), and the
+layer C P3 pair — Baird's Sparrow next to Northern Mockingbird, +2.00 eggs per
+activation with room — reads **0.00**. The bench's egg synergies were the
+value of egg room, not of the pair, which is exactly what layer C found in
+play. A pair's synergy is a function of the board's spare capacity; the
+bench now reports it at both ends, and the realized value sits between them
+weighted by how often the cap binds — often, for an egg-laying agent.
+
 Output: `artifacts/synergy_bench/synergy_bench.json` (full matrix) and
 `synergy_bench.md`.
 
