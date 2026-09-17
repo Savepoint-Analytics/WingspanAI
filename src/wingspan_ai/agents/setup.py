@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -16,6 +17,7 @@ from wingspan_ai.rules.base_game import (
     choose_default_initial_selection,
     ordered_habitats,
 )
+from wingspan_ai.rules.bonus_scoring import normalize_bonus_name, parse_bonus_card_scoring
 from wingspan_ai.state.models import PlayerState, RoundState
 
 
@@ -71,12 +73,31 @@ class SetupPolicyMixin:
         return self.setup_policy.choose_initial_selection(player, context)
 
 
+#: How the potential-points opener ranks the two dealt bonus cards.
+#: ``"tag_overlap"`` is the historic scorer (hand keyword matches plus the
+#: card's prevalence). ``"expected_points"`` estimates the points the card
+#: will actually score from its printed formula, its printed prevalence and
+#: the qualifiers in hand; see ``expected_bonus_points``.
+BONUS_SCORING_KINDS = ("tag_overlap", "expected_points")
+DEFAULT_BONUS_SCORING = "tag_overlap"
+
+
 @dataclass(frozen=True)
 class PotentialPointsSetupPolicy:
     """Opening setup heuristic for final-score potential and early tempo."""
 
     policy_id: str = "potential_points_setup_v1"
     target_keep_count: int | None = None
+    bonus_scoring: str = DEFAULT_BONUS_SCORING
+
+    def __post_init__(self) -> None:
+        if self.bonus_scoring not in BONUS_SCORING_KINDS:
+            raise ValueError(
+                f"unknown bonus_scoring: {self.bonus_scoring!r}; expected one of "
+                f"{BONUS_SCORING_KINDS}"
+            )
+        if self.bonus_scoring != DEFAULT_BONUS_SCORING and self.policy_id.endswith("_v1"):
+            object.__setattr__(self, "policy_id", f"{self.policy_id}:{self.bonus_scoring}")
 
     def choose_initial_selection(
         self,
@@ -87,7 +108,11 @@ class PotentialPointsSetupPolicy:
             player,
             context,
             card_scorer=_potential_card_score,
-            bonus_scorer=_potential_bonus_score,
+            bonus_scorer=(
+                expected_bonus_points
+                if self.bonus_scoring == "expected_points"
+                else _potential_bonus_score
+            ),
             target_keep_count=self.target_keep_count,
         )
 
@@ -304,6 +329,59 @@ def _potential_bonus_score(bonus_card: BonusCard, hand: list[BirdCard]) -> float
     implemented_bonus = 0.5 if bonus_card.handler_key else 0.0
     prevalence = (bonus_card.prevalence_percent or 0.0) / 100
     return aligned_cards + implemented_bonus + prevalence
+
+
+#: Share of a dealt qualifying bird that ends up played. Opening hands keep
+#: three to five cards and the searching agent plays most of what it keeps.
+HAND_QUALIFIER_PLAY_RATE = 0.6
+#: Birds a two-player game adds from draws after the opening hand: about
+#: eleven birds reach the board, three or so of them from the opening hand.
+FUTURE_BIRDS_PLAYED = 8.0
+#: Cards scored from board state print no prevalence and have no qualifying
+#: birds, so they get one neutral prior rather than a formula: the median of
+#: the tagged cards' empty-hand expectations, so they are neither preferred
+#: nor avoided by construction.
+BOARD_STATE_BONUS_PRIOR = 1.5
+
+
+def expected_bonus_points(bonus_card: BonusCard, hand: list[BirdCard]) -> float:
+    """Points this card is expected to score over the game, from its formula.
+
+    Expected qualifiers reaching the board are the qualifying birds in hand at
+    ``HAND_QUALIFIER_PLAY_RATE`` plus ``FUTURE_BIRDS_PLAYED`` draws at the
+    card's printed prevalence. Per-bird cards pay linearly in that count;
+    tiered cards pay the formula's expectation under a Poisson count, which is
+    what makes a 5-to-8-bird threshold worth little on an 11-bird board. The
+    2026-09-16 forced-keep study found per-bird cards worth +3.25 points over
+    their partners and breadth of supply worth nothing, which is exactly what
+    this expectation says and the historic tag-overlap scorer did not.
+    """
+
+    rule = parse_bonus_card_scoring(bonus_card.victory_point_text)
+    if rule is None:
+        return 0.0
+    name = normalize_bonus_name(bonus_card.name)
+    if bonus_card.prevalence_percent is None:
+        return BOARD_STATE_BONUS_PRIOR
+    in_hand = sum(
+        1
+        for card in hand
+        if any(normalize_bonus_name(tag) == name for tag in card.bonus_card_tags)
+    )
+    expected_count = (
+        HAND_QUALIFIER_PLAY_RATE * in_hand
+        + FUTURE_BIRDS_PLAYED * bonus_card.prevalence_percent / 100.0
+    )
+    if rule.per_bird_points is not None:
+        return rule.per_bird_points * expected_count
+    # Tiered: E[points_for(K)] for K ~ Poisson(expected_count).
+    expected = 0.0
+    probability = math.exp(-expected_count)
+    for count in range(0, 16):
+        if count > 0:
+            probability *= expected_count / count
+        expected += probability * rule.points_for(count)
+    return expected
 
 
 def _archetype_card_score(

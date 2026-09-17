@@ -44,6 +44,10 @@ class BirdSlot(BaseModel):
     eggs: int = Field(default=0, ge=0)
     cached_food: int = Field(default=0, ge=0)
     tucked_cards: int = Field(default=0, ge=0)
+    #: Times this bird's power has resolved. Telemetry only: excluded from
+    #: dumps so state hashes, replay validation and archived artifacts are
+    #: unchanged; the ``bird_scorecard`` event carries it explicitly.
+    activations: int = Field(default=0, ge=0, exclude=True)
 
     @property
     def available_egg_capacity(self) -> int:

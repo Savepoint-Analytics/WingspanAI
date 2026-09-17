@@ -2461,3 +2461,57 @@ lever this agent misuses; a per-bird preference would already beat its policy.
    regression over archived games.
 4. Settle the base-game bonus-card composition (Anatomist / Visionary Leader
    in; Diet Specialist / Bird Bander out).
+
+## Update: 2026-09-16 - Replication, the expected_points opener, bird scorecards, and composition settled
+
+### Replication (pursuit confound)
+Forced-keep study re-run with `archetype_engine_builder` as the study agent
+vs `greedy_immediate`: 211 coverage seeds, 422 games, 27 minutes. The stake
+replicates (6.8 points per deal) and so does the ordering: per-bird +1.61,
+tiered **−1.25 (p=0.043)**, gap +2.9 (was +4.2). Individual card ranks agree
+only moderately across pursuers (ρ=0.33) and board-state cards flip positive
+for an egg-laying non-pursuer (Breeding Manager +7.5). Standing claim: a
+linear payoff beats a threshold; per-card values are pursuer-dependent.
+
+### The historic opening policy is worse than arbitrary
+`_bonus_alignment_score` hand-codes keyword matches for Bird Feeder and
+Backyard Birder — two of the worst keeps — and otherwise adds the bird's
+*total* tag count regardless of the card scored (the 2026-08-31 archetype tag
+bug, again). `dealt_first`, an arbitrary rule, beats it by +0.87 (p=0.031)
+over 322 measured deals.
+
+### `expected_points` opener (behind a switch)
+`PotentialPointsSetupPolicy(bonus_scoring="expected_points")`: expected
+points from the printed formula, printed prevalence and hand qualifiers;
+Poisson expectation for tiers; neutral prior for board-state cards. Scored
+on the archived forced games with no new runs (`analysis/keep_policy_eval.py`,
+the "free paired arm"): **+0.85 (p=0.011), 61% vs 52%** over 322 deals;
+62% out of sample on the engine-builder deals. Registered criterion met.
+Captures ~¼ of the 3.4–4.1-point oracle headroom. Default unchanged pending
+Alex's call; recommended to adopt and re-baseline.
+
+### Bird-value layer 2
+`bird_scorecard` event (per player at game end: points, eggs, cached food,
+tucked cards, power activations, round played, tags per bird; activations
+tracked on `BirdSlot` but excluded from dumps so hashes and replays are
+unchanged) and `analysis/bird_value_regression.py` (ridge on birds played,
+agent fixed effects, pure Python). Over 6,544 archived player-games: average
+bird +6.3 on the board; Burrowing Owl +8.0 above that (n=865), Barn Swallow
++6.3, Bushtit +6.1, Brewer's Blackbird +5.9; Song Sparrow −7.9, Bobolink
+−7.4, Turkey Vulture −6.7 (n=553). Observational; scorecard columns fill in
+as new games accrue.
+
+### Composition settled
+Workbook `Set` column: Bird Bander and Diet Specialist are `european`;
+Anatomist/Cartographer/Photographer `core, asia`; Visionary Leader `core`.
+The 26 cards dealt are the base-game deck. `docs/rules/bonus_card_composition.md`.
+
+### Follow-up tasks
+1. Alex: adopt `expected_points` as the opener default and re-baseline?
+2. A keep model on the 322 measured deals (hand, round goals, card) to chase
+   the remaining ~3 points of headroom; hold out the engine-builder deals.
+3. Bird-value layer 3 (forced bird keep) in waves by feature class, using
+   `bird_value_coefficients.json` and the weighted bonus coverage to pick the
+   first wave.
+4. Fix `_bonus_alignment_score`'s card-independent tag term where it also
+   drives bird selection (`_selection_score` weights it 1.8).

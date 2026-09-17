@@ -17,6 +17,8 @@ Analysis layer:
 - `analysis/holdout_guardrail.py`: the standing 5% greedy-opponent control, pooled across batches.
 - `analysis/card_structure.py`: static synergy tables — what the deck supplies each bonus card, and what each bird carries.
 - `analysis/bonus_card_seed_coverage.py` and `analysis/bonus_card_keep_contrast.py`: seed selection and the per-card paired contrast for the forced-keep study.
+- `analysis/keep_policy_eval.py`: scores opening bonus-card policies on the forced arms without new games.
+- `analysis/bird_value_regression.py`: observational bird value — ridge on birds played with agent fixed effects, over every archived game.
 
 Key rules docs:
 
@@ -61,6 +63,7 @@ Key rules docs:
 - `decisions/0004-cross-process-determinism-and-canonical-set-ordering.md`: cross-process determinism ADR.
 - `decisions/0005-artifact-storage-is-object-storage.md`: artifacts are durable in MinIO; local `artifacts/` is a prunable cache.
 - `rules/birdfeeder_dice.md`: the six-face die, reroll/refill rules, and derived probabilities.
+- `rules/bonus_card_composition.md`: the 26 core bonus cards are the base-game deck; Bird Bander and Diet Specialist are European.
 - `rules/game_content_schema.md`: current content schema and enum design.
 - `rules/power_handler_registry.md`: registry metadata approach for bird power handlers.
 - `rules/multiplayer_rule_audit.md`: 3-5 player rule verification and the publication gate.

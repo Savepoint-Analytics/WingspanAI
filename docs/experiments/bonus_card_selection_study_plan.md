@@ -143,13 +143,22 @@ The reverse question. Three layers, cheapest first:
    `(VP + 0.5 × eggs + power score) / cost`. Once §3 has run, `--card-values`
    weights each bird's bonus coverage by the measured keep advantage of those
    cards, which is the "works well with good bonus cards" column.
-2. **Realized value from telemetry** (needs one new event): a per-bird
-   scorecard at game end — printed points, eggs on it, food cached, cards
-   tucked, power activations (`bird_power_triggered` count), and the bonus
-   cards and round goals it counted toward. Then a ridge regression of final
-   score on birds-played indicators over every archived game, which is free
-   given the artifacts, gives an observational "points per appearance" per
-   bird, confounded by who plays it and when but broad.
+2. **Realized value from telemetry** — built 2026-09-16. `bird_scorecard`
+   events (one per player at game end: points, eggs, cached food, tucked
+   cards, power activations, round played, bonus tags per bird) and
+   `analysis/bird_value_regression.py`, a ridge regression of final score on
+   birds-played indicators with agent-kind fixed effects over every archived
+   game. First run: **6,544 player-games, 162 birds with ≥25 appearances.**
+   The average bird is worth +6.3 points on the board; relative to that,
+   Burrowing Owl leads (+8.0, n=865), then Barn Swallow (+6.3), Bushtit
+   (+6.1), Brewer's Blackbird (+5.9), American Kestrel (+5.2), Ferruginous
+   Hawk (+4.6); Song Sparrow (−7.9), Bobolink (−7.4), Turkey Vulture (−6.7,
+   n=553) trail. Agent fixed effects come out in the expected order
+   (`potential_points` +8.8 over the reference archetype). Observational:
+   agents choose birds they like, so the coefficient mixes worth with
+   circumstance; scorecard columns fill in as new games accrue. Report and
+   coefficients: `artifacts/bird_value_regression.md`,
+   `artifacts/bird_value_coefficients.json`.
 3. **Causal, the same instrument as §3**: `ForcedBirdKeepSetupPolicy` —
    for a seed where bird X is dealt, arm A forces X into the kept opening
    hand (policy fills the rest), arm B forces it out. The paired Δ is the
@@ -176,12 +185,11 @@ eggs as much as from bird points.
   ±7 points per card; the per-card table ranks, it does not certify.
   Pooled contrasts (per-bird vs tiered, broad vs narrow supply) carry the
   statistical weight.
-- **Catalog composition.** The catalog's 26 bonus cards include
-  `Anatomist [swift_start_asia]` (normalized to Anatomist) and `Visionary
-  Leader`, while birds carry tags for `Diet Specialist` and `Bird Bander`,
-  which are not in the deck. Which 26 the physical base game ships is a
-  content question to settle before any of this is quoted as a Wingspan
-  claim rather than a simulator claim.
+- **Catalog composition — settled 2026-09-16.** The workbook's `Set` column
+  marks Bird Bander and Diet Specialist `european`; Anatomist, Cartographer
+  and Photographer `core, asia` (core cards the Asia swift-start reprints);
+  Visionary Leader `core`. The 26 cards dealt are the base-game deck. See
+  `docs/rules/bonus_card_composition.md`.
 - One opponent, two players, rotation 0.
 
 ## 7. Launch
@@ -339,19 +347,86 @@ it inherits every caveat above and says nothing about the bird's own play.
   from 222 games in three hours. Quote the pooled effect (+3.25, p=0.009)
   and the six-point stake; quote individual cards as a ranking with the
   ±7-point resolution attached.
-- Next arm on this question: replicate with `archetype_engine_builder` as
-  the study agent (pursuit confound). If the per-bird effect survives a
-  non-searching pursuer, it is about the cards.
-- Build `PerBirdPreferenceSetupPolicy` (or a learned keep scorer on these
-  111 deals) behind a switch; its success criterion is >60% hindsight
-  accuracy on a fresh seed set, then a paired arm against the current
-  policy.
-- Bird-value study §5 layer 2 (per-bird scorecard event) is next after that.
+- Replication with `archetype_engine_builder` — done, see above: the
+  per-bird-over-tiered ordering survives; individual ranks only partly.
+- `expected_points` opening policy — built and evaluated, see above.
+- Bird-value study §5 layer 2 — built, see §5.
+
+### Replication with a non-searching pursuer (2026-09-16)
+
+Same instrument, `archetype_engine_builder` as the study agent against
+`greedy_immediate`, 211 coverage seeds (16 units per card), 422 games in 27
+minutes at `d43df91`. Artifacts `artifacts/bonus_keep_eb/`.
+
+| | `potential_points` study | `engine_builder` replication |
+|---|---:|---:|
+| mean \|keep A − keep B\| | 6.41 | **6.79** |
+| deals swinging 5+ | 58% | 46% |
+| per-bird cards, pooled | **+3.25 (p=0.009)** | +1.61 (p=0.14) |
+| tiered cards, pooled | −0.93 (p=0.16) | **−1.25 (p=0.043)** |
+| board-state cards, pooled | −1.12 (p=0.31) | +2.69 (p=0.10) |
+| per-bird minus tiered | +4.2 | +2.9 |
+| Spearman, per-card advantage across the two | | **0.33** |
+
+What replicates: the size of the stake, and per-bird over tiered — tiered
+cards are the one group significantly negative in both. What does not:
+individual card ranks (ρ = 0.33; Rodentologist +1.3 → −3.3, Falconer +7.0 →
++1.3, Food Web Expert +2.1 → +8.6), and board-state cards, which flip to
+positive for an agent that lays eggs without pursuing anything (Breeding
+Manager +7.5). Realized bonus points are half what the searching agent
+scores (2–4 vs 4–7), so for this agent keep value is mostly "which card
+happens to fit what I play anyway" — the pursuit confound, made visible.
+The claim that survives both pursuers: **a linear payoff beats a threshold,
+and the threshold cards are bad keeps.** Individual card values are
+pursuer-dependent and the ±5–7-point resolution does the rest.
+
+### The `expected_points` opening policy (2026-09-16)
+
+`PotentialPointsSetupPolicy(bonus_scoring="expected_points")` scores a card
+by the points its printed formula is expected to pay: qualifiers in hand at
+a 0.6 play rate plus eight future birds at the card's printed prevalence,
+paid linearly for per-bird cards and as the Poisson expectation of the tier
+formula otherwise; board-state cards get the tagged cards' median (1.5) so
+they are neither favoured nor avoided by fiat. Historic scoring stays the
+default behind the switch.
+
+Because both forced games exist per seed and birds/food are chosen
+conditional on the card, any policy that changes only the bonus choice can
+be scored on the archived games with no new runs
+(`analysis/keep_policy_eval.py`):
+
+| Deals | Policy | Score Δ vs study agent's own policy | p | Picked the better card |
+|---|---|---:|---:|---:|
+| 111 `potential_points` (in sample) | `expected_points` | +1.16 | 0.011 | 61% vs 52% |
+| 211 `engine_builder` (out of sample) | `expected_points` | +0.68 | 0.13 | 62% vs 53% |
+| 322 pooled | `expected_points` | **+0.85** | **0.011** | **61% vs 52%** |
+| 322 pooled | `dealt_first` (arbitrary) | +0.87 | 0.031 | 57% vs 52% |
+| | oracle | +3.4 / +4.1 | | 100% |
+
+The registered criterion (>60% on fresh deals) is met on both sets. Two
+honest readings sit next to it. First, `expected_points` captures about a
+quarter of the oracle headroom; the rest is deal-specific and needs a keep
+model that sees the hand and the round goals, not just the card. Second,
+an *arbitrary* rule scores as well as `expected_points`, because the
+historic policies are below arbitrary: `_bonus_alignment_score` hand-codes
+keyword matches for Bird Feeder (seed eaters) and Backyard Birder (birds
+under 4 points), two of the worst keeps in both studies, and otherwise adds
+`0.4 × len(card.bonus_card_tags)` — the bird's total tag count, which does
+not depend on the card being scored. That is the archetype tag bug of
+2026-08-31 in a second place. The accuracy edge (61% vs 57% for arbitrary)
+is what `expected_points` adds beyond removing the harm.
+
+**Decision (pending Alex's call):** make `expected_points` the default for
+`PotentialPointsSetupPolicy` and re-baseline. It costs nothing, meets the
+registered criterion twice, and the historic scorer is now known to be
+worse than arbitrary. The bigger prize — the other three points of
+headroom — is a keep model, and these 322 measured deals are its first
+training set.
 
 ### Caveats
 
 - One pursuit policy, one opponent, two players, seat 1 only.
 - Relative advantage over dealt partners; coverage balancing spreads partners
   but does not equalize them.
-- The catalog composition question (§6) stands: Anatomist and Visionary
-  Leader are in, Diet Specialist and Bird Bander are not.
+- Catalog composition is settled (`docs/rules/bonus_card_composition.md`):
+  the 26 cards dealt are the base-game deck.

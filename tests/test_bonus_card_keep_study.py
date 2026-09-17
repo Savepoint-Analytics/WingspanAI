@@ -133,3 +133,69 @@ class ForcedKeepFlowTests(TestCase):
             text = report(pairs)
             self.assertIn("Paired deals: 2", text)
             self.assertIn("| Card | n |", text)
+
+
+class ExpectedBonusPointsTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from wingspan_ai.content.loader import (
+            DEFAULT_WORKBOOK_PATH,
+            load_base_game_content_catalog,
+        )
+
+        cls.catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
+        cls.by_name = {card.name: card for card in cls.catalog.bonus_cards}
+
+    def test_per_bird_cards_pay_linearly_and_thresholds_pay_little(self) -> None:
+        from wingspan_ai.agents.setup import expected_bonus_points
+
+        falconer = expected_bonus_points(self.by_name["Falconer"], [])
+        bird_feeder = expected_bonus_points(self.by_name["Bird Feeder"], [])
+        # Falconer: 2 per bird at 13% of 8 future birds ~ 2.1. Bird Feeder: 43%
+        # share but needs 5 qualifiers for 3 points on an ~11-bird board.
+        self.assertGreater(falconer, bird_feeder)
+        self.assertAlmostEqual(falconer, 2 * 8.0 * 0.13, places=6)
+
+    def test_qualifiers_in_hand_raise_the_estimate(self) -> None:
+        from wingspan_ai.agents.setup import expected_bonus_points
+
+        card = self.by_name["Rodentologist"]
+        qualifier = next(
+            bird
+            for bird in self.catalog.birds
+            if "Rodentologist" in {tag.split("[")[0].strip() for tag in bird.bonus_card_tags}
+        )
+        self.assertGreater(
+            expected_bonus_points(card, [qualifier]), expected_bonus_points(card, [])
+        )
+
+    def test_board_state_cards_get_the_neutral_prior(self) -> None:
+        from wingspan_ai.agents.setup import BOARD_STATE_BONUS_PRIOR, expected_bonus_points
+
+        self.assertEqual(
+            expected_bonus_points(self.by_name["Oologist"], []), BOARD_STATE_BONUS_PRIOR
+        )
+
+    def test_policy_switch_changes_the_bonus_choice_and_the_policy_id(self) -> None:
+        from wingspan_ai.agents.setup import InitialSelectionContext, PotentialPointsSetupPolicy
+        from wingspan_ai.rules.base_game import setup_base_game
+
+        historic = PotentialPointsSetupPolicy()
+        expected = PotentialPointsSetupPolicy(bonus_scoring="expected_points")
+        self.assertEqual(expected.policy_id, "potential_points_setup_v1:expected_points")
+        with self.assertRaises(ValueError):
+            PotentialPointsSetupPolicy(bonus_scoring="oracle")
+        differing = 0
+        for seed in range(1, 41):
+            state = setup_base_game(
+                self.catalog,
+                player_ids=["p1", "p2"],
+                random_seed=seed,
+                apply_initial_selection=False,
+            )
+            player = state.players[0]
+            a = historic.choose_initial_selection(player, InitialSelectionContext())
+            b = expected.choose_initial_selection(player, InitialSelectionContext())
+            self.assertIn(b.kept_bonus_card_names[0], [c.name for c in player.bonus_cards])
+            differing += a.kept_bonus_card_names != b.kept_bonus_card_names
+        self.assertGreater(differing, 0)

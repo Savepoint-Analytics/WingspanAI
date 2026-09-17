@@ -10,8 +10,8 @@ from typing import Protocol
 from uuid import uuid4
 
 from wingspan_ai.agents.setup import InitialSelectionContext
-from wingspan_ai.content.schemas import ContentCatalog
-from wingspan_ai.rules.actions import LegalAction, render_action
+from wingspan_ai.content.schemas import ContentCatalog, Habitat
+from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import (
     apply_action,
     apply_initial_selection_choice,
@@ -128,6 +128,8 @@ def run_single_game(
     turns_played = 0
     terminal_reason = "game_over"
     current_round = state.round_state.round_number
+    # (player_id, bird name) -> round it was played, for the end-of-game scorecard.
+    rounds_played: dict[tuple[str, str], int] = {}
 
     while not state.round_state.game_over and turns_played < max_turns:
         if state.round_state.round_number != current_round:
@@ -172,6 +174,10 @@ def run_single_game(
         )
         action_state = state
         previous_round = state.round_state.round_number
+        if action.action_type == ActionType.PLAY_BIRD and action.bird_common_name:
+            rounds_played.setdefault(
+                (active_player.player_id, action.bird_common_name), previous_round
+            )
         state = apply_action(state, action)
         _record_public_snapshot(public_state_snapshots, state)
         turns_played += 1
@@ -199,6 +205,7 @@ def run_single_game(
         terminal_reason = "max_turns_reached"
 
     outcome = _build_outcome(state, resolved_run_id, random_seed, turns_played, terminal_reason)
+    _emit_bird_scorecards(sink, state, resolved_run_id, rounds_played)
     _emit_game_ended(sink, state, resolved_run_id, outcome)
     return SimulationResult(
         state=state,
@@ -496,6 +503,53 @@ def _emit_action_resolved(
             rng_draws=rng_draws,
         )
     )
+
+
+def _emit_bird_scorecards(
+    sink: InMemoryEventSink,
+    state: GameState,
+    simulation_run_id: str,
+    rounds_played: dict[tuple[str, str], int],
+) -> None:
+    """One event per player listing every played bird and what it ended up holding.
+
+    Feeds the bird-value study: printed points, eggs, cached food, tucked
+    cards and power activations per bird, with the round it was played and
+    the bonus cards it counts toward.
+    """
+
+    for player in state.players:
+        birds = []
+        for habitat in Habitat:
+            for slot_index, slot in enumerate(player.habitats[habitat]):
+                birds.append(
+                    {
+                        "common_name": slot.card.common_name,
+                        "habitat": habitat.value,
+                        "slot_index": slot_index,
+                        "round_played": rounds_played.get(
+                            (player.player_id, slot.card.common_name)
+                        ),
+                        "victory_points": slot.card.victory_points,
+                        "eggs": slot.eggs,
+                        "cached_food": slot.cached_food,
+                        "tucked_cards": slot.tucked_cards,
+                        "activations": slot.activations,
+                        "power_color": slot.card.power.color.value,
+                        "bonus_card_tags": sorted(slot.card.bonus_card_tags),
+                    }
+                )
+        sink.emit(
+            _base_event(
+                EventName.BIRD_SCORECARD,
+                state,
+                simulation_run_id,
+                player_id=player.player_id,
+                agent_id=player.agent_id,
+                bonus_card_names=[card.name for card in player.bonus_cards],
+                birds=birds,
+            )
+        )
 
 
 def _emit_game_ended(

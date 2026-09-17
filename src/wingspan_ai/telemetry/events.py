@@ -21,6 +21,7 @@ class EventName(StrEnum):
     LEGAL_ACTIONS_GENERATED = "legal_actions_generated"
     ACTION_SELECTED = "action_selected"
     ACTION_RESOLVED = "action_resolved"
+    BIRD_SCORECARD = "bird_scorecard"
     GAME_ENDED = "game_ended"
     AGENT_DECISION_SUMMARY = "agent_decision_summary"
 

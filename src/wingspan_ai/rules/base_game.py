@@ -953,6 +953,7 @@ def _resolve_power_text(
 ) -> None:
     if not power_text:
         return
+    slot.activations += 1
     handler_key = slot.card.power.handler_key or classify_power_handler_key(
         power_text,
         slot.card.power.color,

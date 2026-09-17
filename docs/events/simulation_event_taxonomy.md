@@ -42,6 +42,7 @@ Every event uses a stable envelope:
 | `legal_actions_generated` | Rules engine returns concrete legal actions. | `legal_action_count`, `legal_actions`, `legal_action_labels` |
 | `action_selected` | Agent selects an action. | `agent_id`, `action`, `action_label`, `state_hash_before` |
 | `action_resolved` | Transition has been applied. Its envelope uses the same action-start round/turn as `action_selected`; next-state counters live in the payload. | `acting_player_id`, `action`, `action_label`, `state_hash_before`, `state_hash_after`, `next_round_number`, `next_turn_number`, `next_round_action_number`, `next_global_turn_number`, `rng_draws` |
+| `bird_scorecard` | Runner, once per player just before `game_ended` (since 2026-09-16). | `player_id`, `agent_id`, `bonus_card_names`, `birds[]` with `common_name`, `habitat`, `slot_index`, `round_played`, `victory_points`, `eggs`, `cached_food`, `tucked_cards`, `activations` (power resolutions; tracked on `BirdSlot` but excluded from state dumps so hashes are unchanged), `power_color`, `bonus_card_tags` |
 | `game_ended` | Runner builds final outcome. | `outcome`, `score_breakdowns` |
 | `agent_decision_summary` | Agent provides policy diagnostics for the selected action. | `policy`, `legal_action_count`, `selected_action_type`, `action_selection_elapsed_ms`, `decision_summary_elapsed_ms`, `decision_total_elapsed_ms`, policy-specific fields |
 
