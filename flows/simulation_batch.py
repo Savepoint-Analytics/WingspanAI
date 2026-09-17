@@ -21,6 +21,7 @@ from wingspan_ai.agents import (
     StrategyArchetypeAgent,
     load_guardrail_config,
 )
+from wingspan_ai.agents.forced_play import ForcedPlayAgent
 from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
 from wingspan_ai.agents.setup import (
     ArchetypeSetupPolicy,
@@ -137,8 +138,15 @@ def run_seeded_game(
     potential_points_search: PotentialPointsSearchConfig | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
     setup_policy_overrides: dict[str, str] | None = None,
+    opening_hand_overrides: dict[str, list[str]] | None = None,
+    forced_play_birds: dict[str, list[str]] | None = None,
 ) -> dict[str, Any]:
-    """Run and persist one game within a labelled simulation batch."""
+    """Run and persist one game within a labelled simulation batch.
+
+    ``opening_hand_overrides`` and ``forced_play_birds`` map an agent kind to
+    bird names: the birds are swapped into that agent's dealt hand and played
+    as soon as legal (the forced keep-and-play instrument).
+    """
 
     load_dotenv()
     resolved_batch_kind = _validate_batch_kind(batch_kind)
@@ -191,6 +199,8 @@ def run_seeded_game(
             forced_bonus_choice=forced_bonus_choice,
             setup_policy_overrides=setup_policy_overrides,
         )
+        if forced_play_birds and agent_kind in forced_play_birds:
+            base_agent = ForcedPlayAgent(base_agent, tuple(forced_play_birds[agent_kind]))
         if guardrail_config is None or seat not in guardrail_seats:
             return base_agent
         return GuardrailedAgent(
@@ -208,11 +218,20 @@ def run_seeded_game(
     ]
     resolved_seat_rotation = seat_rotation % len(lineup_agents)
     seated_agents = lineup_agents[resolved_seat_rotation:] + lineup_agents[:resolved_seat_rotation]
+    seated_kinds = list(resolved_lineup[resolved_seat_rotation:]) + list(
+        resolved_lineup[:resolved_seat_rotation]
+    )
+    hand_overrides_by_player = {
+        f"player_{index + 1}": list(opening_hand_overrides[kind])
+        for index, kind in enumerate(seated_kinds)
+        if opening_hand_overrides and kind in opening_hand_overrides
+    }
     result = run_single_game(
         catalog,
         seated_agents,
         random_seed=random_seed,
         game_id=f"{resolved_batch_id}_seed_{random_seed}",
+        opening_hand_overrides=hand_overrides_by_player or None,
     )
     replay_validation = validate_simulation_replay(catalog, result.events)
     replay_validation_payload = asdict(replay_validation)
@@ -275,6 +294,16 @@ def run_seeded_game(
         ),
         "forced_bonus_choice": dict(forced_bonus_choice) if forced_bonus_choice else None,
         "setup_policy_overrides": dict(setup_policy_overrides) if setup_policy_overrides else None,
+        "opening_hand_overrides": dict(opening_hand_overrides) if opening_hand_overrides else None,
+        "forced_play_birds": dict(forced_play_birds) if forced_play_birds else None,
+        "injection_missing": next(
+            (
+                event.payload.get("injection_missing")
+                for event in result.events
+                if event.event_name == "game_started"
+            ),
+            None,
+        ),
         "setup_policy_ids": {
             agent.agent_id: getattr(
                 getattr(agent, "base_agent", agent), "setup_policy", None
@@ -365,6 +394,9 @@ def run_seeded_game(
         "search_opponent_models": batch_metadata["search_opponent_models"],
         "forced_bonus_choice": batch_metadata["forced_bonus_choice"],
         "setup_policy_overrides": batch_metadata["setup_policy_overrides"],
+        "opening_hand_overrides": batch_metadata["opening_hand_overrides"],
+        "forced_play_birds": batch_metadata["forced_play_birds"],
+        "injection_missing": batch_metadata["injection_missing"],
         "setup_policy_ids": batch_metadata["setup_policy_ids"],
         "ruleset_id": result.state.ruleset.ruleset_id,
         "outcome": asdict(result.outcome),
@@ -505,6 +537,7 @@ def _make_agent(
             planning_horizon=search.planning_horizon,
             search_food_candidates=search.search_food_candidates,
             search_opponent_model=opponent_model,
+            mechanic_synergy=search.mechanic_synergy,
         )
     elif agent_kind == "net_value_response":
         agent = NetValueOpponentResponseAgent(
@@ -715,6 +748,9 @@ def _write_batch_manifest(
                 "search_opponent_models": result.get("search_opponent_models", {}),
                 "forced_bonus_choice": result.get("forced_bonus_choice"),
                 "setup_policy_overrides": result.get("setup_policy_overrides"),
+                "opening_hand_overrides": result.get("opening_hand_overrides"),
+                "forced_play_birds": result.get("forced_play_birds"),
+                "injection_missing": result.get("injection_missing"),
                 "setup_policy_ids": result.get("setup_policy_ids", {}),
                 "replay_validation": result["replay_validation"],
                 "artifact_dir": result["artifact_dir"],
@@ -764,6 +800,8 @@ def run_simulation_batch(
     potential_points_search: PotentialPointsSearchConfig | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
     setup_policy_overrides: dict[str, str] | None = None,
+    opening_hand_overrides: dict[str, list[str]] | None = None,
+    forced_play_birds: dict[str, list[str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -803,6 +841,8 @@ def run_simulation_batch(
             potential_points_search=potential_points_search,
             forced_bonus_choice=forced_bonus_choice,
             setup_policy_overrides=setup_policy_overrides,
+            opening_hand_overrides=opening_hand_overrides,
+            forced_play_birds=forced_play_birds,
         )
         for seed in resolved_seeds
     ]

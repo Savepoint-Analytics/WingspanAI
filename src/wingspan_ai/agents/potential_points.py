@@ -73,6 +73,9 @@ class PotentialValueBreakdown:
     round_goal_potential: float
     endgame_conversion_potential: float
     dead_resource_penalty: float
+    #: Measured mechanic-pair interaction value of the board and hand; zero
+    #: unless the agent carries a synergy table. See ``mechanic_synergy_potential``.
+    mechanic_synergy_potential: float = 0.0
 
     @property
     def total(self) -> float:
@@ -87,6 +90,7 @@ class PotentialValueBreakdown:
             + self.bonus_card_potential
             + self.round_goal_potential
             + self.endgame_conversion_potential
+            + self.mechanic_synergy_potential
             - self.dead_resource_penalty
         )
 
@@ -150,6 +154,12 @@ DEFAULT_SEARCH_OPPONENT_MODEL = "belief"
 DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE = 0.05
 DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
 SEARCH_OPPONENT_MODELS = ("greedy", "belief")
+#: The engine-potential term (``docs/agents/synergy_planner_agent.md``): value
+#: the board and hand by the measured interaction of their power mechanics,
+#: from ``configs/synergy/mechanic_pair_effects_v1.json``. Off by default
+#: until the paired arm reads; registered prediction +1 to +3 points.
+DEFAULT_MECHANIC_SYNERGY = False
+DEFAULT_MECHANIC_SYNERGY_TABLE = "configs/synergy/mechanic_pair_effects_v1.json"
 
 
 @dataclass(frozen=True)
@@ -174,6 +184,9 @@ class PotentialPointsSearchConfig:
     #: standing control. ``0`` disables the holdout.
     search_opponent_holdout_share: float = DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE
     search_opponent_holdout_model: str = DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL
+    #: Engine-potential term from the mechanic-pair table; see
+    #: ``DEFAULT_MECHANIC_SYNERGY``.
+    mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
 
     def as_manifest_payload(self) -> dict:
         return asdict(self)
@@ -222,13 +235,21 @@ class PotentialPointsAgent(SetupPolicyMixin):
     #: agent this is the effective model for its game; the holdout is resolved
     #: by whoever constructs the agent (``PotentialPointsSearchConfig``).
     search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
+    #: Engine-potential term; see ``DEFAULT_MECHANIC_SYNERGY``.
+    mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
     top_alternatives: int = 5
     _opponent_model: SearchOpponentModel = field(init=False, repr=False, compare=False)
+    _synergy: MechanicSynergyTable | None = field(
+        init=False, repr=False, compare=False, default=None
+    )
 
     def __post_init__(self) -> None:
         # Loaded here rather than at module scope: the belief model depends on
         # ``net_value``, which imports this module.
         from wingspan_ai.agents.search_opponent import build_search_opponent_model
+
+        if self.mechanic_synergy:
+            self._synergy = load_mechanic_synergy_table()
 
         if self.search_opponent_model not in SEARCH_OPPONENT_MODELS:
             raise ValueError(
@@ -313,6 +334,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
                         horizon=self.planning_horizon,
                         food_candidates=self.search_food_candidates,
                         opponent_model=self._opponent_model,
+                        synergy=self._synergy,
                     ),
                     _immediate_score_delta(state, action, player_id),
                 )
@@ -332,11 +354,15 @@ class PotentialPointsAgent(SetupPolicyMixin):
         legal_actions: list[LegalAction],
     ) -> list[ActionPotentialEvaluation]:
         player_id = state.active_player.player_id
-        before = evaluate_state_potential(state, player_id, self.planning_horizon)
+        before = evaluate_state_potential(
+            state, player_id, self.planning_horizon, synergy=self._synergy
+        )
         evaluations: list[ActionPotentialEvaluation] = []
         for action in legal_actions:
             next_state = apply_action(state, action)
-            after = evaluate_state_potential(next_state, player_id, self.planning_horizon)
+            after = evaluate_state_potential(
+                next_state, player_id, self.planning_horizon, synergy=self._synergy
+            )
             evaluations.append(
                 ActionPotentialEvaluation(
                     action=action,
@@ -381,6 +407,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "search_food_candidates": self.search_food_candidates,
             "search_opponent_model": self.search_opponent_model,
             "opponent_model": self._opponent_model.telemetry_payload(),
+            "mechanic_synergy": self.mechanic_synergy,
+            "mechanic_synergy_table": self._synergy.version if self._synergy else None,
             # Module-level ablation switches are not in the manifest, so record
             # them where the artifacts can prove which arm a game belongs to.
             "ablation_flags": {
@@ -394,6 +422,8 @@ def evaluate_state_potential(
     state: GameState,
     player_id: str,
     horizon: str = DEFAULT_PLANNING_HORIZON,
+    *,
+    synergy: MechanicSynergyTable | None = None,
 ) -> PotentialValueBreakdown:
     """Estimate current final-score potential for one player."""
 
@@ -431,6 +461,9 @@ def evaluate_state_potential(
         round_goal_potential=_round_goal_potential(state, player, turns_remaining),
         endgame_conversion_potential=_endgame_conversion_potential(player, turns_remaining),
         dead_resource_penalty=_dead_resource_penalty(player, turns_remaining),
+        mechanic_synergy_potential=(
+            synergy.potential(player, turns_remaining) if synergy is not None else 0.0
+        ),
     )
 
 
@@ -451,6 +484,7 @@ def _search_action_value(
     horizon: str = DEFAULT_PLANNING_HORIZON,
     food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
     opponent_model: SearchOpponentModel | None = None,
+    synergy: MechanicSynergyTable | None = None,
 ) -> float:
     """Best planning value reachable from ``action`` within ``depth`` own turns.
 
@@ -472,6 +506,7 @@ def _search_action_value(
         horizon,
         food_candidates=food_candidates,
         opponent_model=opponent_model,
+        synergy=synergy,
     )
 
 
@@ -483,11 +518,12 @@ def _search_value_from_branch(
     horizon: str = DEFAULT_PLANNING_HORIZON,
     food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
     opponent_model: SearchOpponentModel | None = None,
+    synergy: MechanicSynergyTable | None = None,
 ) -> float:
     if opponent_model is None:
         opponent_model = _default_search_opponent_model()
     if depth <= 1 or branch.round_state.game_over:
-        return _terminal_planning_value(branch, player_id, horizon)
+        return _terminal_planning_value(branch, player_id, horizon, synergy)
     _play_opponent_turns_in_place(branch, player_id, opponent_model)
     player = _get_player(branch, player_id)
     if (
@@ -495,15 +531,17 @@ def _search_value_from_branch(
         or branch.active_player.player_id != player_id
         or player.action_cubes_available <= 0
     ):
-        return _terminal_planning_value(branch, player_id, horizon)
+        return _terminal_planning_value(branch, player_id, horizon, synergy)
     legal_actions = _search_candidate_actions(
         branch, player, legal_actions_for_current_player(branch), food_candidates
     )
     if not legal_actions:
-        return _terminal_planning_value(branch, player_id, horizon)
+        return _terminal_planning_value(branch, player_id, horizon, synergy)
 
     children = [apply_action(branch, next_action) for next_action in legal_actions]
-    leaf_values = [_terminal_planning_value(child, player_id, horizon) for child in children]
+    leaf_values = [
+        _terminal_planning_value(child, player_id, horizon, synergy) for child in children
+    ]
     if depth - 1 <= 1:
         return max(leaf_values)
     ranked = sorted(zip(leaf_values, children, strict=True), key=lambda item: item[0], reverse=True)
@@ -518,6 +556,7 @@ def _search_value_from_branch(
             horizon,
             food_candidates=food_candidates,
             opponent_model=opponent_model,
+            synergy=synergy,
         )
         for _leaf_value, child in ranked
     )
@@ -555,9 +594,7 @@ def _search_candidate_actions(
     ]
 
 
-def _expected_food_value(
-    state: GameState, action: LegalAction, demand: Counter[FoodType]
-) -> float:
+def _expected_food_value(state: GameState, action: LegalAction, demand: Counter[FoodType]) -> float:
     return sum(
         units * (1.0 + demand.get(food_type, 0))
         for food_type, units in expected_gain_food(state, action).items()
@@ -585,8 +622,9 @@ def _terminal_planning_value(
     state: GameState,
     player_id: str,
     horizon: str = DEFAULT_PLANNING_HORIZON,
+    synergy: MechanicSynergyTable | None = None,
 ) -> float:
-    potential = evaluate_state_potential(state, player_id, horizon)
+    potential = evaluate_state_potential(state, player_id, horizon, synergy=synergy)
     player = _get_player(state, player_id)
     turns_remaining = _turns_remaining_for_player(state, player_id, horizon)
     if turns_remaining <= 1:
@@ -1285,6 +1323,78 @@ def _immediate_score_delta(state: GameState, action: LegalAction, player_id: str
     before_score = score_player(state, player_id).total
     after_score = score_player(apply_action(state, action), player_id).total
     return float(after_score - before_score)
+
+
+#: Share of a hand card's measured interaction value credited while it is
+#: still in hand: the chance it gets played, roughly.
+SYNERGY_HAND_PLAY_RATE = 0.6
+#: Round-4 boards have little game left for a pair to pay; the board term is
+#: scaled by how much of the round is left, like every other potential term.
+SYNERGY_BOARD_TURNS_FULL = 4
+
+
+@dataclass(frozen=True)
+class MechanicSynergyTable:
+    """Measured value of (played power × power already on board), by handler key.
+
+    Built from the hierarchical fit over counterfactual play rollouts
+    (``analysis/r/play_attribution_hierarchical.R``); ``"empty"`` as the board
+    key is the value of a mechanic as the first bird on the board.
+    """
+
+    version: str
+    effects: dict[tuple[str, str], float]
+
+    def lift(self, played_key: str, board_keys: set[str]) -> float:
+        if not board_keys:
+            return self.effects.get((played_key, "empty"), 0.0)
+        return sum(self.effects.get((played_key, key), 0.0) for key in board_keys)
+
+    def potential(self, player: PlayerState, turns_remaining: int) -> float:
+        """Board pairs already formed plus the lift the hand could still realize."""
+
+        board = [slot.card for habitat in player.habitats.values() for slot in habitat]
+        board_keys = {_mechanic_key(card) for card in board}
+        board_term = 0.0
+        for card in board:
+            others = board_keys - {_mechanic_key(card)}
+            if others:
+                board_term += sum(self.effects.get((_mechanic_key(card), k), 0.0) for k in others)
+        board_scale = min(turns_remaining, SYNERGY_BOARD_TURNS_FULL) / SYNERGY_BOARD_TURNS_FULL
+        hand_term = sum(
+            max(self.lift(_mechanic_key(card), board_keys), 0.0) for card in player.hand
+        )
+        hand_scale = SYNERGY_HAND_PLAY_RATE * (1.0 if turns_remaining >= 2 else 0.5)
+        return board_term * board_scale + hand_term * hand_scale
+
+
+def _mechanic_key(card: BirdCard) -> str:
+    if card.power.color == PowerColor.NONE or not card.power.text:
+        return "none"
+    return card.power.handler_key or classify_power_handler_key(card.power.text, card.power.color)
+
+
+_SYNERGY_TABLE_CACHE: dict[str, MechanicSynergyTable] = {}
+
+
+def load_mechanic_synergy_table(path: str | None = None) -> MechanicSynergyTable:
+    resolved = path or DEFAULT_MECHANIC_SYNERGY_TABLE
+    if resolved not in _SYNERGY_TABLE_CACHE:
+        import json
+        from pathlib import Path
+
+        candidate = Path(resolved)
+        if not candidate.is_absolute() and not candidate.exists():
+            candidate = Path(__file__).resolve().parents[3] / resolved
+        data = json.loads(candidate.read_text(encoding="utf-8"))
+        effects = {}
+        for pair, entry in data["effects"].items():
+            played, board = pair.split(" x ")
+            effects[(played, board)] = float(entry["effect"])
+        _SYNERGY_TABLE_CACHE[resolved] = MechanicSynergyTable(
+            version=data["version"], effects=effects
+        )
+    return _SYNERGY_TABLE_CACHE[resolved]
 
 
 def _turns_remaining_for_player(

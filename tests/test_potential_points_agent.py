@@ -486,6 +486,7 @@ class EndgameSearchDepthTests(TestCase):
                 "search_opponent_model": "belief",
                 "search_opponent_holdout_share": 0.05,
                 "search_opponent_holdout_model": "greedy",
+                "mechanic_synergy": False,
             },
         )
 
@@ -649,4 +650,62 @@ class FeederOddsSwitchTests(TestCase):
         )
         self.assertEqual(
             summary["ablation_flags"], {"value_habitat_yield": True, "value_feeder_odds": True}
+        )
+
+
+class MechanicSynergyTests(TestCase):
+    """The engine-potential term: measured mechanic-pair value, behind a switch."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
+        cls.birds = {card.common_name: card for card in cls.catalog.birds}
+
+    def test_off_by_default_and_zero_in_the_breakdown(self) -> None:
+        agent = PotentialPointsAgent()
+        self.assertFalse(agent.mechanic_synergy)
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=3)
+        breakdown = evaluate_state_potential(state, "p1")
+        self.assertEqual(breakdown.mechanic_synergy_potential, 0.0)
+
+    def test_table_loads_and_rewards_a_measured_pair(self) -> None:
+        from wingspan_ai.agents.potential_points import load_mechanic_synergy_table
+
+        table = load_mechanic_synergy_table()
+        self.assertEqual(table.version, "mechanic_pair_effects_v1")
+        self.assertGreater(table.effects[("tuck_card", "deck_search_tuck_by_wingspan")], 1.0)
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=3)
+        player = state.players[0]
+        player.habitats[Habitat.FOREST] = [BirdSlot(card=self.birds["Common Grackle"])]
+        player.hand = [self.birds["Cooper's Hawk"]]
+        in_hand = table.potential(player, 6)
+        self.assertGreater(in_hand, 0.0)
+        player.habitats[Habitat.FOREST].append(BirdSlot(card=self.birds["Cooper's Hawk"]))
+        player.hand = []
+        on_board = table.potential(player, 6)
+        # Completing the pair is worth more than holding it, and the board
+        # term decays with the turns left in the round.
+        self.assertGreater(on_board, in_hand)
+        self.assertLess(table.potential(player, 1), on_board)
+
+    def test_switch_changes_the_evaluation_and_is_recorded(self) -> None:
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=3)
+        player = state.players[0]
+        player.habitats[Habitat.FOREST] = [BirdSlot(card=self.birds["Common Grackle"])]
+        with_term = PotentialPointsAgent(
+            search_depth=1, final_search_turns=0, mechanic_synergy=True
+        )
+        without = PotentialPointsAgent(search_depth=1, final_search_turns=0)
+        self.assertGreater(
+            evaluate_state_potential(state, "p1", synergy=with_term._synergy).total,
+            evaluate_state_potential(state, "p1").total,
+        )
+        legal_actions = legal_actions_for_current_player(state)
+        summary = with_term.summarize_decision(state, legal_actions, legal_actions[0])
+        self.assertTrue(summary["mechanic_synergy"])
+        self.assertEqual(summary["mechanic_synergy_table"], "mechanic_pair_effects_v1")
+        self.assertIsNone(
+            without.summarize_decision(state, legal_actions, legal_actions[0])[
+                "mechanic_synergy_table"
+            ]
         )

@@ -127,6 +127,7 @@ class SimulationBatchFlowTests(TestCase):
                     "search_opponent_model": "belief",
                     "search_opponent_holdout_share": 0.05,
                     "search_opponent_holdout_model": "greedy",
+                    "mechanic_synergy": False,
                 },
             )
             self.assertEqual(results[0]["player_two_agent_id"], "potential_points_p2")

@@ -2606,3 +2606,45 @@ Documented as a new agent, `docs/agents/synergy_planner_agent.md`. Built:
    residual SD 4.7 proves too noisy for card-pair estimates.
 5. R environment: `lme4` was reinstalled from source on 2026-09-17; `brms`
    for a full posterior when it is worth the compute.
+
+## Update: 2026-09-17 - Layer C instrument, engine-potential term, arms launched
+
+### Layer C (forced keep-and-play)
+`agents/forced_play.py`: `inject_opening_cards` swaps named birds into a
+dealt hand from the deck (recorded in `game_started`, re-applied by the replay
+validator so hashes verify); `KeepBirdsSetupPolicy` keeps them, displacing the
+base opener's birds rather than its food; `ForcedPlayAgent` plays them into a
+shared row as soon as legal, waits rather than split the pair, steers gain-food
+toward a waiting bird's fixed cost, and never lets a forced play eat its
+partner's food. Flows take `opening_hand_overrides` / `forced_play_birds` per
+agent kind. `analysis/forced_play_contrast.py` computes the 2×2 interaction
+`(AB − AB') − (A'B − A'B')` per seed with matched non-interacting controls.
+
+Arms launched (cheap study agent `archetype_engine_builder` vs greedy,
+`control`, rotation 0, 60 seeds × 4 arms × 3 pairs = 720 games,
+`artifacts/forced_play/cheap/`):
+- P1 Common Grackle + Cooper's Hawk (tuck × deck-search-tuck; layer B +3.0),
+  controls Eastern Phoebe / Yellow-Bellied Sapsucker.
+- P2 Canvasback + Anhinga (all-players-draw × predator; layer B +3.4),
+  controls Black-Chinned Hummingbird / Osprey.
+- P3 Baird's Sparrow + Northern Mockingbird (lay-egg-any × repeat; layer A
+  +2 eggs per activation), controls Eastern Phoebe / Indigo Bunting.
+Registered predictions: P3 interaction **> +2** (the bench says +2 eggs per
+activation and the mockingbird is a pure amplifier); P1 **+1 to +3**; P2
+**0 to +2** (layer B's +3.4 was measured on a searching pursuer; the archetype
+does not exploit extra cards well). Smoke completion: pairs land in the same
+row 8/8 when both are played, both played ~65–100% of seeds depending on food.
+
+### Engine-potential term (registered)
+`PotentialPointsAgent(mechanic_synergy=True)` adds `mechanic_synergy_potential`
+to the evaluator: for the board, the measured (played power × power on board)
+effects between every pair of played birds, scaled by turns left in the round;
+for the hand, each card's positive lift against the board (or its first-play
+value on an empty board) at a 0.6 play rate. Table:
+`configs/synergy/mechanic_pair_effects_v1.json` (584 pairs from the lme4 fit).
+Threaded through the search's terminal values and the config/manifest;
+off by default. Arm: standard 80-game design vs `rr_belief_opp`,
+`artifacts/rr_synergy_term`. **Registered prediction: +1 to +3 points**,
+concentrated in bird points and eggs, draws rising as the agent holds partial
+combos; null is the honest prior after four valuation nulls, and a card-choice
+term is the one kind that has paid.
