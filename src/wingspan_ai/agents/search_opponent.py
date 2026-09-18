@@ -36,6 +36,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from wingspan_ai.agents import profiling
 from wingspan_ai.agents.greedy import GreedyBaselineAgent, _heuristic_tiebreaker
 
 # ``net_value`` imports ``potential_points``, which is why ``potential_points``
@@ -136,7 +137,8 @@ class GreedySearchOpponentModel:
     )
 
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
-        return self._agent.select_action(state, legal_actions)
+        with profiling.node("greedy_opponent_model"):
+            return self._agent.select_action(state, legal_actions)
 
     def observe_action(
         self, state_before: GameState, action: LegalAction, acting_player_id: str
@@ -171,7 +173,8 @@ class BeliefSearchOpponentModel:
     def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
         if not legal_actions:
             raise ValueError("BeliefSearchOpponentModel cannot select from an empty action list")
-        distribution = self.predict_family(state, state.active_player.player_id)
+        with profiling.node("belief_predict_family"):
+            distribution = self.predict_family(state, state.active_player.player_id)
         available = {action.action_type for action in legal_actions}
         # The public candidate template can list a family the branch cannot
         # actually play (a hand with no affordable bird still looks playable
@@ -181,7 +184,8 @@ class BeliefSearchOpponentModel:
             if family in available:
                 pool = [action for action in legal_actions if action.action_type == family]
                 break
-        return max(pool, key=lambda action: _proxy_action_score(state, action))
+        with profiling.node("belief_within_family_pick"):
+            return max(pool, key=lambda action: _proxy_action_score(state, action))
 
     def predict_family(self, state: GameState, opponent_id: str) -> ResponseDistribution:
         """Distribution over ``opponent_id``'s next action family, from public state only."""

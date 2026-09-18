@@ -12,6 +12,7 @@ from typing import Any, Protocol
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+from wingspan_ai.agents import profiling
 from wingspan_ai.agents.setup import InitialSelectionContext
 from wingspan_ai.content.schemas import BirdCard, FoodType, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
@@ -163,11 +164,7 @@ class GuardrailEvaluation:
     def allowed_actions(self) -> list[LegalAction]:
         if self.fail_open:
             return [evaluation.action for evaluation in self.action_evaluations]
-        return [
-            evaluation.action
-            for evaluation in self.action_evaluations
-            if evaluation.allowed
-        ]
+        return [evaluation.action for evaluation in self.action_evaluations if evaluation.allowed]
 
     def candidate_actions(self, *, use_score_modifiers: bool = True) -> list[LegalAction]:
         allowed_evaluations = [
@@ -239,15 +236,10 @@ class ActionGuardrailEvaluator:
         state: GameState,
         legal_actions: list[LegalAction],
     ) -> GuardrailEvaluation:
-        evaluations = [
-            self._evaluate_action(state, action)
-            for action in legal_actions
-        ]
+        evaluations = [self._evaluate_action(state, action) for action in legal_actions]
         allowed_count = sum(1 for evaluation in evaluations if evaluation.allowed)
         fail_open = (
-            self.config.fail_open_when_all_excluded
-            and bool(evaluations)
-            and allowed_count == 0
+            self.config.fail_open_when_all_excluded and bool(evaluations) and allowed_count == 0
         )
         return GuardrailEvaluation(
             legal_action_count=len(legal_actions),
@@ -356,16 +348,21 @@ class GuardrailedAgent:
         if not legal_actions:
             raise ValueError("GuardrailedAgent cannot select from an empty action list")
 
-        evaluation = self.guardrails.evaluate(state, legal_actions)
-        candidate_actions = evaluation.candidate_actions(
-            use_score_modifiers=self.guardrails.config.use_score_modifiers_for_pruning
-        )
+        with profiling.node(
+            "guardrail_evaluate", aggregate=False, input_count=len(legal_actions)
+        ) as guard_node:
+            evaluation = self.guardrails.evaluate(state, legal_actions)
+            candidate_actions = evaluation.candidate_actions(
+                use_score_modifiers=self.guardrails.config.use_score_modifiers_for_pruning
+            )
+            guard_node.set(output_count=len(candidate_actions))
         if not candidate_actions:
             raise ValueError("Guardrails removed every action and fail-open is disabled")
 
         self._last_evaluation = evaluation
         self._last_candidate_actions = candidate_actions
-        return _select_with_base_agent(self.base_agent, state, candidate_actions)
+        with profiling.node("base_agent_select", aggregate=False):
+            return _select_with_base_agent(self.base_agent, state, candidate_actions)
 
     def summarize_decision(
         self,

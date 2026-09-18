@@ -23,6 +23,7 @@ from wingspan_ai.agents import (
 )
 from wingspan_ai.agents.forced_play import ForcedPlayAgent
 from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
+from wingspan_ai.agents.profiling import DEFAULT_PROFILE_MODE
 from wingspan_ai.agents.setup import (
     ArchetypeSetupPolicy,
     DefaultSetupPolicy,
@@ -141,6 +142,7 @@ def run_seeded_game(
     opening_hand_overrides: dict[str, list[str]] | None = None,
     forced_play_birds: dict[str, list[str]] | None = None,
     opening_food_bonus: dict[str, int] | None = None,
+    decision_profile_mode: str = DEFAULT_PROFILE_MODE,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch.
 
@@ -239,6 +241,7 @@ def run_seeded_game(
         game_id=f"{resolved_batch_id}_seed_{random_seed}",
         opening_hand_overrides=hand_overrides_by_player or None,
         opening_food_bonus=food_bonus_by_player or None,
+        decision_profile_mode=decision_profile_mode,
     )
     replay_validation = validate_simulation_replay(catalog, result.events)
     replay_validation_payload = asdict(replay_validation)
@@ -304,6 +307,7 @@ def run_seeded_game(
         "opening_hand_overrides": dict(opening_hand_overrides) if opening_hand_overrides else None,
         "forced_play_birds": dict(forced_play_birds) if forced_play_birds else None,
         "opening_food_bonus": dict(opening_food_bonus) if opening_food_bonus else None,
+        "decision_profile_mode": decision_profile_mode,
         "injection_missing": next(
             (
                 event.payload.get("injection_missing")
@@ -405,6 +409,7 @@ def run_seeded_game(
         "opening_hand_overrides": batch_metadata["opening_hand_overrides"],
         "forced_play_birds": batch_metadata["forced_play_birds"],
         "opening_food_bonus": batch_metadata["opening_food_bonus"],
+        "decision_profile_mode": decision_profile_mode,
         "injection_missing": batch_metadata["injection_missing"],
         "setup_policy_ids": batch_metadata["setup_policy_ids"],
         "ruleset_id": result.state.ruleset.ruleset_id,
@@ -762,6 +767,7 @@ def _write_batch_manifest(
                 "opening_hand_overrides": result.get("opening_hand_overrides"),
                 "forced_play_birds": result.get("forced_play_birds"),
                 "opening_food_bonus": result.get("opening_food_bonus"),
+                "decision_profile_mode": result.get("decision_profile_mode"),
                 "injection_missing": result.get("injection_missing"),
                 "setup_policy_ids": result.get("setup_policy_ids", {}),
                 "replay_validation": result["replay_validation"],
@@ -815,6 +821,7 @@ def run_simulation_batch(
     opening_hand_overrides: dict[str, list[str]] | None = None,
     forced_play_birds: dict[str, list[str]] | None = None,
     opening_food_bonus: dict[str, int] | None = None,
+    decision_profile_mode: str = DEFAULT_PROFILE_MODE,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -857,6 +864,7 @@ def run_simulation_batch(
             opening_hand_overrides=opening_hand_overrides,
             forced_play_birds=forced_play_birds,
             opening_food_bonus=opening_food_bonus,
+            decision_profile_mode=decision_profile_mode,
         )
         for seed in resolved_seeds
     ]

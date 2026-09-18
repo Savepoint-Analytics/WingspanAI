@@ -6,6 +6,7 @@ import random
 from dataclasses import dataclass, field
 from time import perf_counter
 
+from wingspan_ai.agents import profiling
 from wingspan_ai.agents.setup import SetupPolicyMixin
 from wingspan_ai.rules.actions import LegalAction, render_action
 from wingspan_ai.rules.base_game import (
@@ -145,9 +146,10 @@ class MonteCarloRolloutAgent(SetupPolicyMixin):
                 ):
                     self._last_budget_exhausted = True
                     return _rollout_evaluations(candidate_actions, scores_by_action)
-                scores_by_action[action_index].append(
-                    self._rollout_score(state, action, player_id)
-                )
+                with profiling.node("rollout"):
+                    scores_by_action[action_index].append(
+                        self._rollout_score(state, action, player_id)
+                    )
 
         return _rollout_evaluations(candidate_actions, scores_by_action)
 

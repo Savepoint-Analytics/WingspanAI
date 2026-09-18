@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from itertools import combinations, combinations_with_replacement
 from typing import Protocol
 
+from wingspan_ai.agents import profiling
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, BonusCard, FoodType, Habitat, PowerColor
 from wingspan_ai.rules.base_game import (
@@ -232,24 +233,26 @@ def _best_selection(
     target_keep_count: int | None = None,
 ) -> InitialSelection:
     setup_context = context or InitialSelectionContext()
-    bonus_card = max(
-        player.bonus_cards,
-        key=lambda bonus: (bonus_scorer(bonus, player.hand), bonus.name),
-    )
+    with profiling.node("bonus_card_choice", candidate_count=len(player.bonus_cards)):
+        bonus_card = max(
+            player.bonus_cards,
+            key=lambda bonus: (bonus_scorer(bonus, player.hand), bonus.name),
+        )
     best_score: float | None = None
     best_cards: tuple[BirdCard, ...] = ()
     best_food: tuple[FoodType, ...] = ()
 
     for cards in _opening_card_subsets(player.hand, target_keep_count=target_keep_count):
         food_count = BIRD_FOOD_SELECTION_TOTAL - len(cards)
-        food = _best_starting_food(cards, food_count)
-        score = _selection_score(
-            cards,
-            food,
-            bonus_card,
-            setup_context,
-            card_scorer=card_scorer,
-        )
+        with profiling.node("opening_subset_score"):
+            food = _best_starting_food(cards, food_count)
+            score = _selection_score(
+                cards,
+                food,
+                bonus_card,
+                setup_context,
+                card_scorer=card_scorer,
+            )
         if best_score is None or score > best_score:
             best_score = score
             best_cards = cards
@@ -371,9 +374,7 @@ def expected_bonus_points(bonus_card: BonusCard, hand: list[BirdCard]) -> float:
     if bonus_card.prevalence_percent is None:
         return BOARD_STATE_BONUS_PRIOR
     in_hand = sum(
-        1
-        for card in hand
-        if any(normalize_bonus_name(tag) == name for tag in card.bonus_card_tags)
+        1 for card in hand if any(normalize_bonus_name(tag) == name for tag in card.bonus_card_tags)
     )
     expected_count = (
         HAND_QUALIFIER_PLAY_RATE * in_hand
@@ -549,6 +550,5 @@ def _is_engine_card(card: BirdCard) -> bool:
 
 def _mentions_food(power_text: str) -> bool:
     return (
-        any(f"[{food.value}]" in power_text for food in BASE_FOOD_TYPES)
-        or "[wild]" in power_text
+        any(f"[{food.value}]" in power_text for food in BASE_FOOD_TYPES) or "[wild]" in power_text
     )

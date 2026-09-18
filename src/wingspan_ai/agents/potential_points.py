@@ -29,6 +29,7 @@ from dataclasses import asdict, dataclass, field
 from math import ceil
 from typing import TYPE_CHECKING
 
+from wingspan_ai.agents import profiling
 from wingspan_ai.agents.determinization import determinize_state
 from wingspan_ai.agents.feeder_odds import food_power_availability_multiplier
 from wingspan_ai.agents.setup import PotentialPointsSetupPolicy, SetupPolicyMixin
@@ -296,11 +297,18 @@ class PotentialPointsAgent(SetupPolicyMixin):
 
         player_id = state.active_player.player_id
         if self.determinization_samples > 0:
-            samples = [
-                determinize_state(state, player_id, sample_index)
-                for sample_index in range(self.determinization_samples)
-            ]
-            per_sample = [self._score_actions(sample, legal_actions) for sample in samples]
+            with profiling.node("determinize", output_count=self.determinization_samples):
+                samples = [
+                    determinize_state(state, player_id, sample_index)
+                    for sample_index in range(self.determinization_samples)
+                ]
+            per_sample = []
+            for sample_index, sample in enumerate(samples):
+                with profiling.node(
+                    "score_sample", aggregate=False, sample_index=sample_index
+                ) as sample_node:
+                    per_sample.append(self._score_actions(sample, legal_actions))
+                    sample_node.set(candidate_count=len(legal_actions))
             scores = [
                 (
                     sum(sample_scores[index][0] for sample_scores in per_sample) / len(samples),
@@ -309,7 +317,9 @@ class PotentialPointsAgent(SetupPolicyMixin):
                 for index in range(len(legal_actions))
             ]
         else:
-            scores = self._score_actions(state, legal_actions)
+            with profiling.node("score_true_state", aggregate=False) as sample_node:
+                scores = self._score_actions(state, legal_actions)
+                sample_node.set(candidate_count=len(legal_actions))
         return max(
             zip(scores, legal_actions, strict=True),
             key=lambda item: (item[0][0], item[0][1], _action_priority(item[1])),
@@ -334,9 +344,10 @@ class PotentialPointsAgent(SetupPolicyMixin):
                 self.search_depth,
                 _turns_remaining_for_player(state, player_id, self.planning_horizon),
             )
-            return [
-                (
-                    _search_action_value(
+            scores = []
+            for action in legal_actions:
+                with profiling.node("search_root_action", search_depth=depth):
+                    value = _search_action_value(
                         state,
                         action,
                         player_id,
@@ -346,15 +357,16 @@ class PotentialPointsAgent(SetupPolicyMixin):
                         food_candidates=self.search_food_candidates,
                         opponent_model=self._opponent_model,
                         synergy=self._synergy,
-                    ),
-                    _immediate_score_delta(state, action, player_id),
-                )
-                for action in legal_actions
+                    )
+                with profiling.node("immediate_delta"):
+                    tie_break = _immediate_score_delta(state, action, player_id)
+                scores.append((value, tie_break))
+            return scores
+        with profiling.node("evaluate_actions", candidate_count=len(legal_actions)):
+            return [
+                (evaluation.value_delta, evaluation.realized_delta)
+                for evaluation in self.evaluate_actions(state, legal_actions)
             ]
-        return [
-            (evaluation.value_delta, evaluation.realized_delta)
-            for evaluation in self.evaluate_actions(state, legal_actions)
-        ]
 
     def choose_action(self, state: GameState) -> LegalAction:
         return self.select_action(state, legal_actions_for_current_player(state))
@@ -370,10 +382,12 @@ class PotentialPointsAgent(SetupPolicyMixin):
         )
         evaluations: list[ActionPotentialEvaluation] = []
         for action in legal_actions:
-            next_state = apply_action(state, action)
-            after = evaluate_state_potential(
-                next_state, player_id, self.planning_horizon, synergy=self._synergy
-            )
+            with profiling.node("apply_action"):
+                next_state = apply_action(state, action)
+            with profiling.node("state_potential"):
+                after = evaluate_state_potential(
+                    next_state, player_id, self.planning_horizon, synergy=self._synergy
+                )
             evaluations.append(
                 ActionPotentialEvaluation(
                     action=action,
@@ -545,13 +559,15 @@ def _search_value_from_branch(
         or player.action_cubes_available <= 0
     ):
         return _terminal_planning_value(branch, player_id, horizon, synergy)
-    legal_actions = _search_candidate_actions(
-        branch, player, legal_actions_for_current_player(branch), food_candidates
-    )
+    with profiling.node("branch_legal_actions"):
+        all_legal = legal_actions_for_current_player(branch)
+    with profiling.node("food_candidate_prune"):
+        legal_actions = _search_candidate_actions(branch, player, all_legal, food_candidates)
     if not legal_actions:
         return _terminal_planning_value(branch, player_id, horizon, synergy)
 
-    children = [apply_action(branch, next_action) for next_action in legal_actions]
+    with profiling.node("expand_children"):
+        children = [apply_action(branch, next_action) for next_action in legal_actions]
     leaf_values = [
         _terminal_planning_value(child, player_id, horizon, synergy) for child in children
     ]
@@ -624,11 +640,14 @@ def _play_opponent_turns_in_place(
     if opponent_model is None:
         opponent_model = _default_search_opponent_model()
     while not branch.round_state.game_over and branch.active_player.player_id != player_id:
-        legal_actions = legal_actions_for_current_player(branch)
+        with profiling.node("opponent_legal_actions"):
+            legal_actions = legal_actions_for_current_player(branch)
         if not legal_actions:
             return
-        chosen = opponent_model.select_action(branch, legal_actions)
-        apply_action_in_place(branch, chosen)
+        with profiling.node("opponent_select"):
+            chosen = opponent_model.select_action(branch, legal_actions)
+        with profiling.node("opponent_apply"):
+            apply_action_in_place(branch, chosen)
 
 
 def _terminal_planning_value(
@@ -636,6 +655,16 @@ def _terminal_planning_value(
     player_id: str,
     horizon: str = DEFAULT_PLANNING_HORIZON,
     synergy: MechanicSynergyTable | None = None,
+) -> float:
+    with profiling.node("terminal_value"):
+        return _terminal_planning_value_timed(state, player_id, horizon, synergy)
+
+
+def _terminal_planning_value_timed(
+    state: GameState,
+    player_id: str,
+    horizon: str,
+    synergy: MechanicSynergyTable | None,
 ) -> float:
     potential = evaluate_state_potential(state, player_id, horizon, synergy=synergy)
     player = _get_player(state, player_id)

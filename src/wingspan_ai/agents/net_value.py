@@ -6,6 +6,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 
+from wingspan_ai.agents import profiling
 from wingspan_ai.agents.potential_points import _played_power_value, evaluate_state_potential
 from wingspan_ai.agents.setup import NetValueSetupPolicy, SetupPolicyMixin
 from wingspan_ai.belief import (
@@ -386,11 +387,13 @@ class NetValueOpponentResponseAgent(SetupPolicyMixin):
         legal_actions: list[LegalAction],
     ) -> list[ActionNetValueEvaluation]:
         player_id = state.active_player.player_id
-        candidate_actions = _candidate_actions(
-            state,
-            legal_actions,
-            max_candidate_actions=self.max_candidate_actions,
-        )
+        with profiling.node("candidate_actions", input_count=len(legal_actions)) as cand_node:
+            candidate_actions = _candidate_actions(
+                state,
+                legal_actions,
+                max_candidate_actions=self.max_candidate_actions,
+            )
+            cand_node.set(output_count=len(candidate_actions))
         before_self = evaluate_state_potential(state, player_id).total
         opponent_ids = [
             player.player_id for player in state.players if player.player_id != player_id
@@ -406,35 +409,37 @@ class NetValueOpponentResponseAgent(SetupPolicyMixin):
 
         evaluations = []
         for action in candidate_actions:
-            own_next_state = apply_action(state, action)
-            self_delta = evaluate_state_potential(own_next_state, player_id).total - before_self
-            opponent_immediate_delta = sum(
-                self.opponent_belief_model.potential_total(
+            with profiling.node("apply_action"):
+                own_next_state = apply_action(state, action)
+            with profiling.node("own_potential"):
+                self_delta = evaluate_state_potential(own_next_state, player_id).total - before_self
+            with profiling.node("opponent_immediate_potential"):
+                opponent_immediate_delta = sum(
+                    self.opponent_belief_model.potential_total(
+                        own_next_state,
+                        observer_player_id=player_id,
+                        opponent_id=opponent_id,
+                    )
+                    - before_opponents[opponent_id]
+                    for opponent_id in opponent_ids
+                )
+            with profiling.node("opponent_response"):
+                opponent_response = _estimate_next_opponent_response(
                     own_next_state,
                     observer_player_id=player_id,
-                    opponent_id=opponent_id,
+                    belief_model=self.opponent_belief_model,
+                    max_response_actions=self.max_opponent_response_actions,
+                    response_mode=self.response_mode,
+                    belief_state_for=self.belief_state_for,
                 )
-                - before_opponents[opponent_id]
-                for opponent_id in opponent_ids
-            )
-            opponent_response = _estimate_next_opponent_response(
-                own_next_state,
-                observer_player_id=player_id,
-                belief_model=self.opponent_belief_model,
-                max_response_actions=self.max_opponent_response_actions,
-                response_mode=self.response_mode,
-                belief_state_for=self.belief_state_for,
-            )
-            denial_value = (
-                self.denial_weight
-                * _shared_resource_denial_value(
+            with profiling.node("denial_value"):
+                denial_value = self.denial_weight * _shared_resource_denial_value(
                     state,
                     action,
                     observer_player_id=player_id,
                     opponent_ids=opponent_ids,
                     belief_model=self.opponent_belief_model,
                 )
-            )
             evaluations.append(
                 ActionNetValueEvaluation(
                     action=action,
@@ -518,7 +523,7 @@ def _estimate_next_opponent_response(
             response_action_type=None,
             response_value_delta=0.0,
             response_legal_action_count=0,
-    )
+        )
 
     opponent_id = _next_opponent_player_id(state, observer_player_id)
     if opponent_id is None:
@@ -681,10 +686,7 @@ def _tray_card_denial_value(
         card = state.bird_tray[tray_index]
         # Deny the opponent who would gain most from it.
         value += max(
-            (
-                _opponent_card_value(card, public_state, opponent)
-                for opponent in opponents
-            ),
+            (_opponent_card_value(card, public_state, opponent) for opponent in opponents),
             default=0.0,
         )
     return value
@@ -741,9 +743,7 @@ def _opponent_card_value(
     bonus_fit = bonus_fit_value(card, posterior) * BONUS_FIT_DENIAL_WEIGHT
     affordability = _public_affordability(card, opponent)
     return (
-        best_power_value
-        + card.victory_points * VICTORY_POINT_DENIAL_WEIGHT
-        + bonus_fit
+        best_power_value + card.victory_points * VICTORY_POINT_DENIAL_WEIGHT + bonus_fit
     ) * affordability
 
 
@@ -807,11 +807,7 @@ def _food_denial_value(
             opponent_id=opponent_id,
         )
         opponent_demand.update(
-            {
-                food_type: demand
-                for food_type, demand in belief.food_demand.items()
-                if demand > 0
-            }
+            {food_type: demand for food_type, demand in belief.food_demand.items() if demand > 0}
         )
     value = 0.0
     for food_type, weight in expected_foods.items():
@@ -999,10 +995,14 @@ def _public_draw_cards_delta(
     deck_prior = max(draw_count - min(draw_count, len(public_state.bird_tray)), 0) * (
         belief.expected_card_quality * 0.5
     )
-    return tray_value * 0.45 + deck_prior + _public_habitat_engine_value(
-        public_state,
-        player,
-        Habitat.WETLAND,
+    return (
+        tray_value * 0.45
+        + deck_prior
+        + _public_habitat_engine_value(
+            public_state,
+            player,
+            Habitat.WETLAND,
+        )
     )
 
 
@@ -1161,9 +1161,7 @@ def _has_open_habitat_slot(player: PublicPlayerState) -> bool:
 
 def _minimum_public_egg_cost(player: PublicPlayerState) -> int:
     open_slot_indexes = [
-        len(player.habitats[habitat])
-        for habitat in Habitat
-        if len(player.habitats[habitat]) < 5
+        len(player.habitats[habitat]) for habitat in Habitat if len(player.habitats[habitat]) < 5
     ]
     if not open_slot_indexes:
         return 999

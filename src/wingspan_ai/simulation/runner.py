@@ -9,7 +9,9 @@ from time import perf_counter
 from typing import Protocol
 from uuid import uuid4
 
+from wingspan_ai.agents import profiling
 from wingspan_ai.agents.forced_play import grant_opening_food, inject_opening_cards
+from wingspan_ai.agents.profiling import DEFAULT_PROFILE_MODE, PROFILE_MODES
 from wingspan_ai.agents.setup import InitialSelectionContext
 from wingspan_ai.content.schemas import ContentCatalog, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
@@ -68,8 +70,12 @@ def run_single_game(
     max_turns: int = 200,
     opening_hand_overrides: dict[str, list[str]] | None = None,
     opening_food_bonus: dict[str, int] | None = None,
+    decision_profile_mode: str = DEFAULT_PROFILE_MODE,
 ) -> SimulationResult:
     """Run one seeded game and return final state, outcome, and telemetry.
+
+    ``decision_profile_mode`` is ``"off"``, ``"summary"`` (per-node totals on
+    every decision, the default) or ``"tree"`` (the full node tree as well).
 
     ``opening_hand_overrides`` maps a player id to birds swapped into that
     player's dealt hand from the deck before the opening choice (the forced
@@ -79,6 +85,8 @@ def run_single_game(
 
     if len(agents) < 1:
         raise ValueError("run_single_game requires at least one agent")
+    if decision_profile_mode not in PROFILE_MODES:
+        raise ValueError(f"decision_profile_mode must be one of {PROFILE_MODES}")
 
     resolved_game_id = game_id or f"game_{random_seed}"
     resolved_run_id = simulation_run_id or str(uuid4())
@@ -100,11 +108,13 @@ def run_single_game(
     setup_selection_events: list[dict] = []
     for player, agent in zip(state.players, agents, strict=True):
         player.agent_id = agent.agent_id
-        selection, selection_source, setup_policy_id = _choose_agent_initial_selection(
-            agent,
-            player,
-            _initial_selection_context(state),
-        )
+        with profiling.activate("choose_initial_selection") as setup_profiler:
+            selection, selection_source, setup_policy_id = _choose_agent_initial_selection(
+                agent,
+                player,
+                _initial_selection_context(state),
+            )
+        setup_profile = setup_profiler.finish().payload(decision_profile_mode)
         discarded_birds_for_player, discarded_bonus_for_player = apply_initial_selection_choice(
             player, selection
         )
@@ -121,6 +131,7 @@ def run_single_game(
                 "starting_food": [food.value for food in selection.starting_food],
                 "discarded_bird_names": [card.common_name for card in discarded_birds_for_player],
                 "discarded_bonus_card_names": [card.name for card in discarded_bonus_for_player],
+                "decision_profile": setup_profile,
             }
         )
     state.decks.bird_discard.extend(bird_discards)
@@ -170,8 +181,10 @@ def run_single_game(
             break
 
         action_selection_started_at = perf_counter()
-        action = agent.choose_action(state)
+        with profiling.activate("select_action") as decision_profiler:
+            action = agent.choose_action(state)
         action_selection_elapsed_ms = (perf_counter() - action_selection_started_at) * 1000
+        decision_profile = decision_profiler.finish().payload(decision_profile_mode)
         if action not in legal_actions:
             raise ValueError(f"agent {agent.agent_id} selected an illegal action: {action}")
 
@@ -193,6 +206,7 @@ def run_single_game(
             legal_actions,
             action,
             action_selection_elapsed_ms=action_selection_elapsed_ms,
+            decision_profile=decision_profile,
         )
         action_state = state
         previous_round = state.round_state.round_number
@@ -474,6 +488,7 @@ def _emit_agent_decision_summary(
     action: LegalAction,
     *,
     action_selection_elapsed_ms: float,
+    decision_profile: dict | None = None,
 ) -> None:
     summarizer = getattr(agent, "summarize_decision", None)
     summary_started_at = perf_counter()
@@ -494,6 +509,7 @@ def _emit_agent_decision_summary(
             action_selection_elapsed_ms + summary_elapsed_ms,
             3,
         ),
+        "decision_profile": decision_profile,
     }
     sink.emit(
         _base_event(

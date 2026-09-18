@@ -33,9 +33,7 @@ def drawn_tray_cards(state: GameState, action: LegalAction) -> list[BirdCard]:
     agent cannot prefer one over another.
     """
 
-    indices = action.tray_indices or (
-        (action.tray_index,) if action.tray_index is not None else ()
-    )
+    indices = action.tray_indices or ((action.tray_index,) if action.tray_index is not None else ())
     return [
         state.bird_tray[index]
         for index in indices
@@ -56,9 +54,7 @@ def can_afford(player: PlayerState, food_cost: FoodCost) -> bool:
 
 
 def has_habitat_room(player: PlayerState, card: BirdCard) -> bool:
-    return any(
-        len(player.habitats[habitat]) < MAX_HABITAT_SLOTS for habitat in card.habitats
-    )
+    return any(len(player.habitats[habitat]) < MAX_HABITAT_SLOTS for habitat in card.habitats)
 
 
 def base_card_affinity(
@@ -212,7 +208,5 @@ def round_goal_chase_affinity(
 
 def habitat_room_for(player: PlayerState, card: BirdCard) -> list[Habitat]:
     return [
-        habitat
-        for habitat in card.habitats
-        if len(player.habitats[habitat]) < MAX_HABITAT_SLOTS
+        habitat for habitat in card.habitats if len(player.habitats[habitat]) < MAX_HABITAT_SLOTS
     ]

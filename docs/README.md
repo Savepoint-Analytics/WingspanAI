@@ -15,6 +15,7 @@ Analysis layer:
 - `analysis/apply_sql_views.py`: applies and probes the analysis views.
 - `analysis/arm_contrast.py`: paired contrast of experimental arms against a baseline.
 - `analysis/holdout_guardrail.py`: the standing 5% greedy-opponent control, pooled across batches.
+- `analysis/decision_profile_report.py`: latency percentiles, node breakdown, cache hit rates and value per second against a baseline.
 - `analysis/card_structure.py`: static synergy tables — what the deck supplies each bonus card, and what each bird carries.
 - `analysis/bonus_card_seed_coverage.py` and `analysis/bonus_card_keep_contrast.py`: seed selection and the per-card paired contrast for the forced-keep study.
 - `analysis/keep_policy_eval.py`: scores opening bonus-card policies on the forced arms without new games.
@@ -27,6 +28,7 @@ Analysis layer:
 Key rules docs:
 
 - `architecture/simulator_architecture.md`: base simulator and rules-engine design.
+- `architecture/decision_profiling.md`: the decision-tree profiler, the latency/value-per-ms report, the ledger of every arm's points-per-second, and where a default decision's time goes.
 - `agents/archetype_policy_fix.md`: why the archetype bots were indistinguishable and how they were fixed.
 - `agents/baseline_agents.md`: random, greedy, archetype, and Monte Carlo baseline definitions.
 - `agents/bayesian_belief_model_plan.md`: first Bayesian belief model plan.

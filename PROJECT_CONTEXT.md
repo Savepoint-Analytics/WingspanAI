@@ -2801,3 +2801,41 @@ draw choice. Instruments and lessons in `docs/agents/synergy_planner_agent.md`.
 5. Holdout guardrail: run `analysis/holdout_guardrail.py` over all default-
    agent roots at the next write-up (rr_belief_opp, rr_opener_v2,
    rr_synergy_term, rr_synergy_board, bonus_keep, forced_play/pp).
+
+## Update: 2026-09-17 - Decision-tree profiling and value per millisecond
+
+### What changed
+`agents/profiling.py`: a game-agnostic `DecisionProfiler` active per decision
+and per opening choice; `profiling.node(name, aggregate=True, **metadata)` is
+a no-op without an active profiler (~0.3 µs), aggregates hot nodes, reports
+self time so shares add up, counts cache hits. Runner attaches
+`decision_profile` (`summary` by default, `tree` on request, `off`) to
+`agent_decision_summary` and `setup_selection_applied`; flows and manifests
+carry `decision_profile_mode`. Instrumented: the whole potential_points
+search, both opponent models, net_value, Monte Carlo, guardrails, openers.
+Overhead 2–3%; 1.5 KB per decision. `analysis/decision_profile_report.py`
+gives latency percentiles by agent/player count/round, the node table, and
+`--value-against` points-per-second with a keep/optimize/drop/gate class.
+Doc: `docs/architecture/decision_profiling.md`. 402 tests.
+
+### Ledger (from the archive, every arm has per-decision latency)
+Search depth 3 vs 1: +10.4 for 121 → 9,366 ms (**optimize**). Belief opponent
+model: ≈0 for −57% latency (**keep**). Gain-food pruning: −1.0 for −18%
+(neutral). Board-only synergy: +1.3 n.s. for +11% (neutral). Full synergy
+term: −4.5 for +33% (**drop**). v2 opener: −3.0 (**drop**).
+
+### Where the time goes (104 profiled default decisions)
+`expand_children` **73%** at 12.5 ms per child versus `opponent_apply` at
+0.17 ms for the same transition in place — the `GameState` deep copy is ~98%
+of expanding a child. `terminal_value` 19% (4,677 leaves per decision).
+Opponent model 3%. Latency by round: 1.8 → 5.9 → 10.5 → 15.7 s mean.
+
+### Follow-up tasks
+1. Incremental apply/undo (or copy-on-write) for search children — the one
+   optimization worth ~70% of decision latency; measure with the profiler
+   before/after and confirm bit-identical decisions.
+2. Beam pre-ranking without expansion, then a `max_decision_time_ms` budget
+   on `potential_points` that degrades K → depth → one-ply, each step priced
+   by the ledger.
+3. Read every future arm through `decision_profile_report.py --value-against`
+   as well as `arm_contrast`.
