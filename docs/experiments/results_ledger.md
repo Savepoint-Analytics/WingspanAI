@@ -31,6 +31,7 @@ losing side alive at 5% (`docs/experiments/standing_holdouts.md`).
 | 2026-09-17 | board-only synergy term, halved | rr_belief_opp | +1.31 | 0.17 | +0.01 | 7,577 → 8,419 | +1.56 | not adopted **(H)** |
 | 2026-09-17 | fast search-child expansion (trusted apply + lean copy) | rr_belief_opp | 0.00 (bit-identical, 104/104 decisions) | — | 0 | 5,187 → 2,588 (probe) | ∞ | **adopted (H)** |
 | 2026-09-18 | measured opener `potential_points_setup_v3_keep3` (K=4 play values pick the three kept birds) | rr_belief_opp | −1.90 | 0.13 | +0.06 | — | — | not adopted **(H)**; play value ≠ keep value |
+| 2026-09-18 | oracle-type opponent model (converged posterior known from turn one) | rr_belief_opp | +0.24 | 0.83 | +0.03 | ≈ belief | ≈0 | null; opponent-model family closed at 2p |
 
 Earlier nulls on the pre-search agent (2026-09-01 to 09-04), all inside a
 ±1.9-point detection limit at n=200: seat-3 advantage at 3p did not

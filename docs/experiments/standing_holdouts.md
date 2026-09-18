@@ -79,6 +79,10 @@ Decisions **not** guarded by a holdout, and why:
   lost the re-baseline −3.0: its bird selection is the known defect and the
   `setup_policy` holdout above covers the opener slot; a second opener
   holdout would double the deviating games for a decision already explained.
+- The oracle-type opponent model (+0.24 n.s., 2026-09-18): a bound that
+  reads the opponent's agent id, never a candidate default, so nothing was
+  adopted or dropped; the opponent-model slot is already guarded by the
+  greedy holdout.
 - Search depth, beam, K, food candidates: these are cost knobs priced by
   the ledger, not adopt/drop decisions. Their contrasts are re-run when the
   agent changes.

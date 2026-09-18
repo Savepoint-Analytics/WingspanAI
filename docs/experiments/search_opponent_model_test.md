@@ -309,3 +309,22 @@ watching) and moves the question to 3–4 players, where the seat-order
 study found real interaction.
 
 **Cost.** Identical to `belief` (one dict lookup replaces 25 Bayes updates).
+
+**Result (2026-09-18).** `artifacts/rr_oracle_opp` vs `rr_belief_opp`, 80
+paired games at `9adb314`, clean: `potential_points` **78.41 → 78.65
+(+0.24, p=0.83)**, win 0.875 → 0.900 (+0.025, p=0.57); by opponent +0.40 /
++3.00 / −0.70 / −1.75, none significant; 5 of 80 games identical. Null, as
+registered. Decision latency unchanged within load noise.
+
+Reading: three opponent models — greedy (applies every opponent action),
+belief (learns the type over the game), oracle (knows the converged type
+from turn one) — score within ±0.3 of each other at two players. What the
+search's opponent turns do with the type does not matter here, because the
+opponent model only decides which family the imagined opponent plays and
+the acting player's own plan is robust to that at 2p (the tray and feeder
+contention it creates is similar under every family). The
+opponent-model family is closed at two players: keep `belief` for its
+cost, keep the 5% greedy holdout watching, and take the question to three
+and four players where the seat-order study found real interaction.
+Refitting the profile priors to the roster is not worth an arm on this
+evidence — the oracle already supplies what a perfect refit would learn.

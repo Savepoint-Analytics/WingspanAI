@@ -3011,3 +3011,17 @@ count on the same values is not the next move.
 Oracle arm launched automatically at 00:39 (`rr_oracle_opp`); budget arm
 follows. The opener arm took 45 min on four runners with the fast path
 (the 2026-09-16 belief arm took 1 h 15 min).
+
+## Update: 2026-09-18 - Oracle-type opponent model: +0.24 (null); opponent-model family closed at 2p
+
+`artifacts/rr_oracle_opp` vs `rr_belief_opp`, 80 paired games at `9adb314`:
+`potential_points` **78.41 → 78.65 (+0.24, p=0.83)**, win +0.025 (p=0.57);
+by opponent +0.40 / +3.00 / −0.70 / −1.75. Null, as registered. Greedy,
+belief and oracle opponent models now sit within ±0.3 of each other: the
+acting player's plan at two players is robust to which family the imagined
+opponent plays. Decision: `belief` stays (for cost), the greedy holdout
+keeps watching, no profile-prior refit (the oracle already supplies what a
+refit would learn), and the opponent-modelling question moves to 3–4
+players. Nothing adopted or dropped, so no new holdout. Write-up in
+`docs/experiments/search_opponent_model_test.md`. The arm took 48 min.
+Budget arm (`rr_budget_5s`) launched by the queue at 01:27.
