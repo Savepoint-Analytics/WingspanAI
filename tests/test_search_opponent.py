@@ -11,6 +11,7 @@ from wingspan_ai.agents.potential_points import (
 from wingspan_ai.agents.search_opponent import (
     BeliefSearchOpponentModel,
     GreedySearchOpponentModel,
+    OracleTypeSearchOpponentModel,
     build_search_opponent_model,
 )
 from wingspan_ai.belief import OpponentProfile
@@ -219,6 +220,51 @@ class BeliefSearchOpponentModelTests(TestCase):
         )
 
 
+class OracleTypeSearchOpponentModelTests(TestCase):
+    def setUp(self) -> None:
+        self.catalog = make_sample_catalog()
+
+    def test_known_kinds_start_at_the_converged_posterior_and_never_update(self) -> None:
+        model = build_search_opponent_model("oracle", owner_agent_id="pp")
+        self.assertIsInstance(model, OracleTypeSearchOpponentModel)
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=7)
+        for player in state.players:
+            player.agent_id = "pp" if player.player_id == "p1" else "engine_builder_p2"
+        distribution = model.predict_family(state, "p2")
+        posterior = distribution.profile_posterior
+        self.assertAlmostEqual(sum(posterior.values()), 1.0, places=3)
+        self.assertGreater(posterior[OpponentProfile.FOOD_ACCELERATION], 0.4)
+        self.assertNotAlmostEqual(posterior[OpponentProfile.EGG_FOCUS], 1 / 6, places=2)
+        branch = apply_action(state, legal_actions_for_current_player(state)[0])
+        model.observe_action(branch, legal_actions_for_current_player(branch)[0], "p2")
+        self.assertEqual(model.belief_state_for("p2").observation_count, 0)
+        self.assertEqual(model.belief_state_for("p2").profile_posterior, posterior)
+        self.assertEqual(model.telemetry_payload()["oracle_fixed_players"], ["p2"])
+
+    def test_unknown_kinds_fall_back_to_ordinary_updating(self) -> None:
+        model = OracleTypeSearchOpponentModel(owner_agent_id="pp")
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=7)
+        for player in state.players:
+            player.agent_id = "pp" if player.player_id == "p1" else "mystery_p2"
+        branch = apply_action(state, legal_actions_for_current_player(state)[0])
+        model.observe_action(branch, legal_actions_for_current_player(branch)[0], "p2")
+        self.assertEqual(model.belief_state_for("p2").observation_count, 1)
+        self.assertEqual(model.telemetry_payload()["oracle_fixed_players"], [])
+
+    def test_agent_accepts_the_oracle_switch(self) -> None:
+        agent = PotentialPointsAgent(
+            search_depth=1,
+            final_search_turns=0,
+            determinization_samples=0,
+            search_opponent_model="oracle",
+        )
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=7)
+        for player in state.players:
+            player.agent_id = agent.agent_id if player.player_id == "p1" else "greedy_immediate_p2"
+        legal_actions = legal_actions_for_current_player(state)
+        self.assertIn(agent.select_action(state, legal_actions), legal_actions)
+
+
 class SearchOpponentConfigTests(TestCase):
     def test_config_and_manifest_carry_the_switch(self) -> None:
         payload = PotentialPointsSearchConfig().as_manifest_payload()
@@ -245,9 +291,9 @@ class SearchOpponentConfigTests(TestCase):
 
     def test_unknown_model_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
-            PotentialPointsAgent(search_opponent_model="oracle")
+            PotentialPointsAgent(search_opponent_model="psychic")
         with self.assertRaises(ValueError):
-            build_search_opponent_model("oracle", owner_agent_id="pp")
+            build_search_opponent_model("psychic", owner_agent_id="pp")
 
 
 class HoldoutTests(TestCase):
@@ -367,7 +413,7 @@ class HoldoutTests(TestCase):
             resolve_search_opponent_model(
                 "belief",
                 holdout_share=0.1,
-                holdout_model="oracle",
+                holdout_model="psychic",
                 random_seed=1,
                 lineup=("a",),
                 lineup_position=0,

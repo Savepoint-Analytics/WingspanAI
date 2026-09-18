@@ -279,3 +279,33 @@ or if refitted priors make `value_maximizing` identifiable, at which point the
   might.
 - `same_choice` in the probe was 92%; across the arm only 3 of 80 games were
   identical. Divergence is expected — the point is that it is not directional.
+
+## Follow-up arm (registered 2026-09-18): the oracle-type bound
+
+**Question.** The belief model in the search is worth ≈0 points at 2p. Is
+that because type inference is slow (25 observations to converge), or
+because knowing the type buys nothing with this response model? The
+cheapest way to separate the two is to hand the search the answer.
+
+**Model.** `search_opponent_model="oracle"`
+(`OracleTypeSearchOpponentModel`): the belief model seeded, for every
+opponent seat from turn one, with the posterior it converges to for that
+agent kind by the end of a game — pooled from 56–60 games per kind across
+`rr_belief_opp`, `rr_opener_v2` and `rr_synergy_board` by
+`analysis/oracle_type_posteriors.py` into
+`configs/belief/oracle_type_posteriors.json` — and never updated. It reads
+the seat's `agent_id`, which no real player can; it is a bound, not a
+candidate default. Kinds absent from the table fall back to ordinary
+updating. The converged posteriors are themselves the calibration finding
+above in numbers: `greedy_immediate` → food_acceleration 0.49 / egg_focus
+0.32; `archetype_engine_builder` → food_acceleration 0.52; `net_value_response`
+→ card_draw 0.77; `archetype_bonus_card_focus` → card_draw 0.41.
+
+**Prediction.** Null: −1 to +1 against `rr_belief_opp` on the standard 80
+paired games. A result at or above +2 says inference speed is the
+bottleneck and a refit of the profile priors to the roster is worth an arm;
+a null closes the opponent-model family at 2p (the 5% greedy holdout keeps
+watching) and moves the question to 3–4 players, where the seat-order
+study found real interaction.
+
+**Cost.** Identical to `belief` (one dict lookup replaces 25 Bayes updates).

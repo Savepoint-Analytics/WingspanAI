@@ -54,7 +54,10 @@ from wingspan_ai.state.models import GameState, to_public_state
 
 _PUBLIC_MODEL = PublicOpponentBeliefModel()
 
-SEARCH_OPPONENT_MODELS = ("greedy", "belief")
+SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle")
+#: Where the oracle-type model reads each opponent kind's converged posterior
+#: (written by ``analysis/oracle_type_posteriors.py``).
+DEFAULT_ORACLE_TYPE_POSTERIORS = "configs/belief/oracle_type_posteriors.json"
 #: Default flipped to ``"belief"`` on 2026-09-16 after the 80-game arm in
 #: ``docs/experiments/search_opponent_model_test.md``: score +0.31 (p=0.73),
 #: decision cost more than halved.
@@ -236,11 +239,100 @@ class BeliefSearchOpponentModel:
         }
 
 
+@dataclass
+class OracleTypeSearchOpponentModel(BeliefSearchOpponentModel):
+    """The belief model with perfect type knowledge from turn one.
+
+    An experimental bound, not a shippable model: it reads each opponent
+    seat's ``agent_id`` — information a real player never has — and starts
+    from the posterior the belief model converges to for that agent kind
+    after a full game (``configs/belief/oracle_type_posteriors.json``), then
+    never updates. If the score does not move against ``belief``, faster or
+    better type inference cannot be worth anything at this player count with
+    this response model; if it moves, that is the ceiling for inference.
+    Opponent kinds absent from the table fall back to ordinary updating.
+    """
+
+    model_id: str = "oracle"
+    posteriors_path: str | None = None
+    _table: dict[str, dict[str, float]] = field(default_factory=dict, init=False, repr=False)
+    _fixed: set[str] = field(default_factory=set, init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        self._table = _load_oracle_posteriors(self.posteriors_path)
+
+    def predict_family(self, state: GameState, opponent_id: str) -> ResponseDistribution:
+        if opponent_id not in self.belief_states:
+            self._seed_belief(state, opponent_id)
+        return super().predict_family(state, opponent_id)
+
+    def observe_action(
+        self, state_before: GameState, action: LegalAction, acting_player_id: str
+    ) -> None:
+        if acting_player_id not in self.belief_states:
+            self._seed_belief(state_before, acting_player_id)
+        if acting_player_id in self._fixed:
+            return
+        super().observe_action(state_before, action, acting_player_id)
+
+    def _seed_belief(self, state: GameState, opponent_id: str) -> None:
+        agent_id = next((p.agent_id for p in state.players if p.player_id == opponent_id), None)
+        kind = _agent_kind(agent_id) if agent_id else None
+        posterior = self._table.get(kind or "")
+        if posterior is None:
+            self.belief_states[opponent_id] = OpponentBeliefState.uniform(opponent_id)
+            return
+        uniform = OpponentBeliefState.uniform(opponent_id)
+        self.belief_states[opponent_id] = OpponentBeliefState(
+            opponent_id=opponent_id,
+            profile_posterior={
+                profile: float(posterior.get(profile.value, 0.0))
+                for profile in uniform.profile_posterior
+            },
+            observation_count=0,
+            profile_models=uniform.profile_models,
+            model_id=f"{uniform.model_id}+oracle_type",
+        )
+        self._fixed.add(opponent_id)
+
+    def telemetry_payload(self) -> dict:
+        payload = super().telemetry_payload()
+        payload["oracle_fixed_players"] = sorted(self._fixed)
+        return payload
+
+
+_ORACLE_CACHE: dict[str, dict[str, dict[str, float]]] = {}
+
+
+def _load_oracle_posteriors(path: str | None) -> dict[str, dict[str, float]]:
+    resolved = path or DEFAULT_ORACLE_TYPE_POSTERIORS
+    if resolved not in _ORACLE_CACHE:
+        import json
+        from pathlib import Path
+
+        candidate = Path(resolved)
+        if not candidate.is_absolute() and not candidate.exists():
+            candidate = Path(__file__).resolve().parents[3] / resolved
+        data = json.loads(candidate.read_text(encoding="utf-8"))
+        _ORACLE_CACHE[resolved] = {
+            kind: {profile: float(p) for profile, p in posterior.items()}
+            for kind, posterior in data["posteriors"].items()
+        }
+    return _ORACLE_CACHE[resolved]
+
+
+def _agent_kind(agent_id: str) -> str:
+    kind = agent_id.removeprefix("guardrailed_")
+    return kind.rsplit("_p", 1)[0] if "_p" in kind else kind
+
+
 def build_search_opponent_model(kind: str, *, owner_agent_id: str) -> SearchOpponentModel:
     if kind == "greedy":
         return GreedySearchOpponentModel()
     if kind == "belief":
         return BeliefSearchOpponentModel(owner_agent_id=owner_agent_id)
+    if kind == "oracle":
+        return OracleTypeSearchOpponentModel(owner_agent_id=owner_agent_id)
     raise ValueError(
         f"unknown search opponent model: {kind!r}; expected one of {SEARCH_OPPONENT_MODELS}"
     )

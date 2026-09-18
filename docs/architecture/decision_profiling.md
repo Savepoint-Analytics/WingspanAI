@@ -177,6 +177,60 @@ Class: **keep (cheaper, no loss)**. The next target is now the leaf
 evaluator: 4,087 `terminal_value` calls per decision at 0.21 ms, a third of
 the remaining time, which a beam pre-ranking without expansion attacks.
 
+## The decision budget (2026-09-18)
+
+`PotentialPointsAgent(max_decision_time_ms=...)`, also on
+`PotentialPointsSearchConfig` and so in every manifest. With a budget the
+decision is **anytime**:
+
+1. the one-ply evaluator on the true state answers first (~20 ms);
+2. the search then deepens one ply at a time over the K hidden-information
+   samples, while the measured per-sample cost of the last completed level
+   (times the measured ratio between the last two levels, or 12× before
+   one exists) says the next level fits in the time left;
+3. at the deepest level it runs as many samples as fit — at least one — and
+   stops.
+
+So under pressure it degrades **K, then depth, then to one-ply**, in that
+order, and always returns the deepest answer it completed. Without a
+budget the decision is bit-identical to the unbudgeted agent (the ladder is
+not run). The ladder's lower levels cost about 6% of a full depth-3
+decision (a ply multiplies cost by roughly the branching factor). Every
+budgeted decision records `budget = {depth_used, samples_used, cut_short,
+elapsed_ms}` in `agent_decision_summary`, and the profiler shows one
+`budget_level` node per ply.
+
+The price of each degradation step is what the ledger measures: depth
+3 → 1 is −10.4 points; K 4 → 1 is unmeasured on its own.
+
+First probe, `artifacts/profile_budget_5s`: four games vs
+`archetype_engine_builder`, `max_decision_time_ms=5000`, run while four arm
+runners loaded the machine (load average ~80, so every decision was slower
+than it would be alone):
+
+| | value |
+|---|---:|
+| decisions | 104 |
+| max decision | **4,972 ms** (budget 5,000; never exceeded) |
+| mean / p50 / p95 | 1,884 / 1,654 / 4,563 ms |
+| cut short | 32 of 104 |
+| depth used when 3 was available | 3 in 49, 2 in 23 |
+| samples used | 4 in 92, 3 in 5, 2 in 6, 1 in 1 |
+| by round, mean | 1.4 → 2.0 → 2.3 → 2.0 s |
+| scores vs the unbudgeted fast probe (same seeds) | 2 of 4 games identical; the other two scored higher budgeted (65 vs 56, 89 vs 73) |
+
+Four games say nothing about strength; they say the cap holds, the ladder
+degrades K before depth as designed, and a 5 s budget on a loaded laptop
+costs a ply on a fifth of decisions. The registered arm below prices that.
+
+**Registered arm (2026-09-18): `max_decision_time_ms=5000` vs unbudgeted**,
+80 paired games against `rr_belief_opp`, four runners (so under the same
+kind of load as the probe). Prediction: −2 to 0 points; success is a loss
+under 2 points with p95 latency under 5 s in every round, which would make
+the budgeted agent the production configuration. A loss above 3 says the
+cut decisions are the ones that matter and the ladder should prefer depth
+over samples (K 4 → 2 before depth 3 → 2).
+
 ## Latency by round (production shape)
 
 Default agent over 2,080 decisions: round 1 ≈ 1.8 s mean (p95 5.4 s), round 2

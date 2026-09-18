@@ -1,0 +1,51 @@
+{
+  "version": "oracle_type_posteriors_v1",
+  "source": "end-of-game opponent_belief_states of potential_points seats in artifacts/rr_belief_opp, artifacts/rr_opener_v2, artifacts/rr_synergy_board, averaged by opponent agent kind",
+  "generated_at": "2026-09-18T06:59:44+00:00",
+  "games_by_kind": {
+    "bonus_card_focus": 56,
+    "engine_builder": 56,
+    "greedy_immediate": 60,
+    "net_value_response": 56
+  },
+  "mean_observations_by_kind": {
+    "bonus_card_focus": 25.4,
+    "engine_builder": 25.4,
+    "greedy_immediate": 25.1,
+    "net_value_response": 25.3
+  },
+  "posteriors": {
+    "bonus_card_focus": {
+      "card_draw": 0.4134,
+      "random_legal": 0.1929,
+      "food_acceleration": 0.178,
+      "engine_builder": 0.0912,
+      "egg_focus": 0.0749,
+      "value_maximizing": 0.0496
+    },
+    "engine_builder": {
+      "food_acceleration": 0.5229,
+      "card_draw": 0.1955,
+      "random_legal": 0.1473,
+      "value_maximizing": 0.0608,
+      "engine_builder": 0.0535,
+      "egg_focus": 0.02
+    },
+    "greedy_immediate": {
+      "food_acceleration": 0.4938,
+      "egg_focus": 0.3165,
+      "card_draw": 0.0989,
+      "value_maximizing": 0.0664,
+      "random_legal": 0.0198,
+      "engine_builder": 0.0046
+    },
+    "net_value_response": {
+      "card_draw": 0.7729,
+      "random_legal": 0.1728,
+      "egg_focus": 0.0309,
+      "food_acceleration": 0.0167,
+      "engine_builder": 0.0059,
+      "value_maximizing": 0.0008
+    }
+  }
+}

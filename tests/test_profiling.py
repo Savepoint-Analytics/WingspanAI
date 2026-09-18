@@ -53,11 +53,14 @@ class ProfilerTests(TestCase):
         self.assertIsNone(profiling.active())
         with profiling.node("anything", candidate_count=3) as node:
             node.set(chosen=True)  # the null node accepts metadata silently
-        started = perf_counter_ns()
-        for _ in range(20000):
-            with profiling.node("hot"):
-                pass
-        per_call_ns = (perf_counter_ns() - started) / 20000
+        # Best of five batches: robust to a loaded machine (arms running).
+        per_call_ns = float("inf")
+        for _ in range(5):
+            started = perf_counter_ns()
+            for _ in range(4000):
+                with profiling.node("hot"):
+                    pass
+            per_call_ns = min(per_call_ns, (perf_counter_ns() - started) / 4000)
         self.assertLess(per_call_ns, 3000)
 
     def test_modes(self) -> None:

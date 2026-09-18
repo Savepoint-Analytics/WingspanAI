@@ -2931,3 +2931,47 @@ with the study agent on `potential_points_setup_v3_keep3`, four lineup
 runners, clean worktree. Note the standing holdouts run inside this arm and
 not in the 2026-09-16 baseline; at 5% per field that is ≤ 4 deviating
 games per field, all bit-identical for `search_child_expansion`.
+
+## Update: 2026-09-18 - Opener arm running; oracle-type model and decision budget built and registered
+
+### Opener arm (3) in flight
+`artifacts/rr_opener_v3`, four runners from the clean worktree at
+`70aa484`; manifests confirm `potential_points_setup_v3_keep3` on the study
+seat and `default_setup_v1` elsewhere, `dirty: false`.
+
+### Oracle-type opponent model (4), registered
+`search_opponent_model="oracle"` (`OracleTypeSearchOpponentModel`): the
+belief model seeded from turn one with the posterior it converges to for
+each opponent kind by game end, pooled over 56–60 games per kind from three
+default-agent roots by `analysis/oracle_type_posteriors.py` into
+`configs/belief/oracle_type_posteriors.json`; never updated; reads the
+seat's `agent_id`, so a bound and not a candidate default. The table is the
+calibration finding in numbers: greedy → food_acceleration 0.49, engine
+builder → food_acceleration 0.52, net_value → card_draw 0.77, bonus-card
+focus → card_draw 0.41 — the model identifies action mix, not type.
+**Prediction: null, −1 to +1 vs `rr_belief_opp`**; ≥ +2 would say inference
+speed is the bottleneck and a refit of profile priors to the roster is
+worth an arm; a null closes the opponent-model family at 2p and moves the
+question to 3–4 players. Cost identical to `belief`. Doc:
+`docs/experiments/search_opponent_model_test.md` (follow-up section).
+
+### Decision budget (5), built and probed
+`max_decision_time_ms` on the agent and the search config: anytime
+decision — one-ply evaluator first, then one ply at a time over the K
+samples while the measured cost of the last level says the next fits, as
+many samples as fit at the deepest level; degrades K, then depth, then to
+one-ply; bit-identical without a budget; `budget = {depth_used,
+samples_used, cut_short, elapsed_ms}` on every decision. Probe at 5 s on a
+loaded machine (four runners): **max 4,972 ms, never exceeded**; 32 of 104
+decisions cut; depth 2 instead of 3 in 23; K < 4 in 12; scores identical
+in 2 of 4 games and higher in the other two (n=4, noise).
+**Registered arm: 5 s budget vs unbudgeted, 80 paired games vs
+`rr_belief_opp`; prediction −2 to 0; success < 2 points lost with p95
+under 5 s in every round → production configuration.** Doc:
+`docs/architecture/decision_profiling.md`.
+
+### Queue
+Compute is the constraint (one laptop, four runners saturate it). Order:
+opener arm (running) → oracle arm → budget arm. Launch scripts for the
+next two are prepared under `artifacts/<root>/launch/` and start when the
+previous arm's `GROUP COMPLETE` lines appear.

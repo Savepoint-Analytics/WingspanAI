@@ -27,6 +27,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from math import ceil
+from time import perf_counter
 from typing import TYPE_CHECKING
 
 from wingspan_ai.agents import profiling
@@ -155,7 +156,22 @@ DEFAULT_SEARCH_FOOD_CANDIDATES: int | None = 6
 DEFAULT_SEARCH_OPPONENT_MODEL = "belief"
 DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE = 0.05
 DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
-SEARCH_OPPONENT_MODELS = ("greedy", "belief")
+#: ``"oracle"`` is the belief model seeded with each opponent kind's converged
+#: posterior from turn one (reads the seat's agent id: an experimental bound
+#: on type inference, never a production model).
+SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle")
+#: Wall-clock budget per decision, in milliseconds; ``None`` is unbudgeted.
+#: With a budget the decision is anytime: the one-ply evaluator answers
+#: first, then the search deepens one ply at a time over the hidden-
+#: information samples while the measured cost of the last level says the
+#: next one fits, taking as many samples at the deepest level as the
+#: remaining time allows (degrading K, then depth, then to one-ply). Without
+#: a budget the decision is bit-identical to the unbudgeted agent. The
+#: ladder's lower levels cost about 6% of a full depth-3 decision.
+DEFAULT_MAX_DECISION_TIME_MS: float | None = None
+#: Cost multiplier assumed for the first deepening, before a measured ratio
+#: between two completed levels exists (the branching factor, roughly).
+_BUDGET_DEFAULT_LEVEL_RATIO = 12.0
 #: The engine-potential term (``docs/agents/synergy_planner_agent.md``): value
 #: the board and hand by the measured interaction of their power mechanics,
 #: from ``configs/synergy/mechanic_pair_effects_v1.json``. Off by default
@@ -211,6 +227,8 @@ class PotentialPointsSearchConfig:
     mechanic_synergy_weight: float = DEFAULT_MECHANIC_SYNERGY_WEIGHT
     #: ``"fast"`` or ``"copy"``; see ``DEFAULT_SEARCH_CHILD_EXPANSION``.
     search_child_expansion: str = DEFAULT_SEARCH_CHILD_EXPANSION
+    #: Per-decision wall-clock budget; see ``DEFAULT_MAX_DECISION_TIME_MS``.
+    max_decision_time_ms: float | None = DEFAULT_MAX_DECISION_TIME_MS
     #: Standing holdouts applied per game on top of the legacy opponent-model
     #: holdout; see ``DEFAULT_HOLDOUTS``.
     holdouts: tuple[Holdout, ...] = DEFAULT_HOLDOUTS
@@ -228,6 +246,7 @@ class PotentialPointsSearchConfig:
         "mechanic_synergy_hand",
         "mechanic_synergy_weight",
         "search_child_expansion",
+        "max_decision_time_ms",
     )
 
     def as_manifest_payload(self) -> dict:
@@ -311,7 +330,12 @@ class PotentialPointsAgent(SetupPolicyMixin):
     mechanic_synergy_weight: float = DEFAULT_MECHANIC_SYNERGY_WEIGHT
     #: ``"fast"`` or ``"copy"``; see ``DEFAULT_SEARCH_CHILD_EXPANSION``.
     search_child_expansion: str = DEFAULT_SEARCH_CHILD_EXPANSION
+    #: Per-decision wall-clock budget; see ``DEFAULT_MAX_DECISION_TIME_MS``.
+    max_decision_time_ms: float | None = DEFAULT_MAX_DECISION_TIME_MS
     top_alternatives: int = 5
+    #: What the last budgeted decision managed: depth and samples used, ms
+    #: spent, whether the budget cut it short. ``None`` when unbudgeted.
+    last_budget_report: dict | None = field(init=False, repr=False, compare=False, default=None)
     _opponent_model: SearchOpponentModel = field(init=False, repr=False, compare=False)
     _synergy: MechanicSynergyTable | None = field(
         init=False, repr=False, compare=False, default=None
@@ -337,6 +361,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
                 f"unknown search_child_expansion: {self.search_child_expansion!r}; "
                 f"expected one of {SEARCH_CHILD_EXPANSIONS}"
             )
+        if self.max_decision_time_ms is not None and self.max_decision_time_ms <= 0:
+            raise ValueError("max_decision_time_ms must be positive or None")
         self._opponent_model = build_search_opponent_model(
             self.search_opponent_model, owner_agent_id=self.agent_id
         )
@@ -364,6 +390,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
         if not legal_actions:
             raise ValueError("PotentialPointsAgent cannot select from an empty action list")
 
+        if self.max_decision_time_ms is not None:
+            return self._select_action_budgeted(state, legal_actions)
         player_id = state.active_player.player_id
         if self.determinization_samples > 0:
             with profiling.node("determinize", output_count=self.determinization_samples):
@@ -394,25 +422,113 @@ class PotentialPointsAgent(SetupPolicyMixin):
             key=lambda item: (item[0][0], item[0][1], _action_priority(item[1])),
         )[1]
 
+    def _select_action_budgeted(
+        self, state: GameState, legal_actions: list[LegalAction]
+    ) -> LegalAction:
+        """Anytime decision under ``max_decision_time_ms``; see the constant's note."""
+
+        started = perf_counter()
+        deadline = started + self.max_decision_time_ms / 1000.0
+        player_id = state.active_player.player_id
+        full_depth = self._search_depth_for(state, player_id)
+        sample_count = self.determinization_samples
+        if sample_count > 0:
+            with profiling.node("determinize", output_count=sample_count):
+                samples = [
+                    determinize_state(state, player_id, sample_index)
+                    for sample_index in range(sample_count)
+                ]
+        else:
+            samples = [state]
+
+        def average(per_sample: list[list[tuple[float, float]]]) -> list[tuple[float, float]]:
+            n = len(per_sample)
+            return [
+                (
+                    sum(scores[index][0] for scores in per_sample) / n,
+                    sum(scores[index][1] for scores in per_sample) / n,
+                )
+                for index in range(len(legal_actions))
+            ]
+
+        # Level 0: the one-ply evaluator on the true state, the answer of last resort.
+        with profiling.node("budget_level", aggregate=False, search_depth=0):
+            best = self._score_actions(state, legal_actions, depth=0)
+        used_depth, used_samples, cut_short = 0, 0, False
+        level_seconds_per_sample: dict[int, float] = {}
+        for depth in range(1, full_depth + 1):
+            previous = level_seconds_per_sample.get(depth - 1)
+            before_previous = level_seconds_per_sample.get(depth - 2)
+            if previous is None:
+                predicted_per_sample = 0.0
+            elif before_previous:
+                predicted_per_sample = previous * max(previous / before_previous, 1.0)
+            else:
+                predicted_per_sample = previous * _BUDGET_DEFAULT_LEVEL_RATIO
+            remaining = deadline - perf_counter()
+            if predicted_per_sample > remaining:
+                cut_short = True
+                break
+            per_sample: list[list[tuple[float, float]]] = []
+            level_started = perf_counter()
+            with profiling.node("budget_level", aggregate=False, search_depth=depth) as node:
+                for sample in samples:
+                    if per_sample:
+                        seconds_each = (perf_counter() - level_started) / len(per_sample)
+                        if seconds_each > deadline - perf_counter():
+                            cut_short = True
+                            break
+                    per_sample.append(self._score_actions(sample, legal_actions, depth=depth))
+                node.set(output_count=len(per_sample))
+            level_seconds_per_sample[depth] = (perf_counter() - level_started) / len(per_sample)
+            best = average(per_sample)
+            used_depth, used_samples = depth, len(per_sample)
+            if cut_short:
+                break
+        self.last_budget_report = {
+            "budget_ms": self.max_decision_time_ms,
+            "elapsed_ms": round((perf_counter() - started) * 1000.0, 1),
+            "full_depth": full_depth,
+            "depth_used": used_depth,
+            "samples_used": used_samples,
+            "samples_available": len(samples),
+            "cut_short": cut_short,
+        }
+        return max(
+            zip(best, legal_actions, strict=True),
+            key=lambda item: (item[0][0], item[0][1], _action_priority(item[1])),
+        )[1]
+
+    def _search_depth_for(self, state: GameState, player_id: str) -> int:
+        """Plies of own-turn search this decision gets: 0 outside the search window."""
+
+        if _get_player(state, player_id).action_cubes_available > self.final_search_turns:
+            return 0
+        return min(
+            self.search_depth,
+            _turns_remaining_for_player(state, player_id, self.planning_horizon),
+        )
+
     def _score_actions(
         self,
         state: GameState,
         legal_actions: list[LegalAction],
+        *,
+        depth: int | None = None,
     ) -> list[tuple[float, float]]:
         """Score each action as ``(primary, tie_break)`` on one fully specified state.
 
         Inside the endgame-search window the primary value is the search value
         and the tie-break the immediate score delta; outside it, the potential
         delta and the realized-score delta. The same scores drive both the
-        true-state and the determinized paths.
+        true-state and the determinized paths. ``depth`` overrides the
+        configured search depth (``0`` forces the one-ply evaluator).
         """
 
         player_id = state.active_player.player_id
-        if _get_player(state, player_id).action_cubes_available <= self.final_search_turns:
-            depth = min(
-                self.search_depth,
-                _turns_remaining_for_player(state, player_id, self.planning_horizon),
-            )
+        if depth is None:
+            depth = self._search_depth_for(state, player_id)
+        if depth > 0:
             scores = []
             for action in legal_actions:
                 with profiling.node("search_root_action", search_depth=depth):
@@ -510,6 +626,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "mechanic_synergy_hand": self.mechanic_synergy_hand,
             "mechanic_synergy_weight": self.mechanic_synergy_weight,
             "search_child_expansion": self.search_child_expansion,
+            "max_decision_time_ms": self.max_decision_time_ms,
+            "budget": self.last_budget_report,
             # Module-level ablation switches are not in the manifest, so record
             # them where the artifacts can prove which arm a game belongs to.
             "ablation_flags": {

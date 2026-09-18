@@ -24,6 +24,8 @@ Analysis layer:
 - `analysis/play_counterfactuals.py` and `analysis/play_attribution_summary.py`: exact counterfactual rollouts per archived play — timing value, card value, context lift (layer B).
 - `analysis/r/play_attribution_hierarchical.R`: lme4 hierarchical model of play value — bird random effects and mechanic-pair interactions with shrinkage.
 - `analysis/forced_play_contrast.py`: layer C — the 2×2 forced keep-and-play interaction contrast with matched controls.
+- `analysis/bird_play_values.py`: writes the per-bird K=4 play-value table the measured opener reads (`configs/bird_values/`).
+- `analysis/oracle_type_posteriors.py`: writes each opponent kind's converged belief posterior for the oracle-type search opponent model (`configs/belief/`).
 
 Key rules docs:
 
