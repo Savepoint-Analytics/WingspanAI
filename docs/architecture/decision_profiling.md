@@ -231,6 +231,42 @@ the budgeted agent the production configuration. A loss above 3 says the
 cut decisions are the ones that matter and the ladder should prefer depth
 over samples (K 4 → 2 before depth 3 → 2).
 
+**Result (2026-09-18).** `artifacts/rr_budget_5s` vs `rr_belief_opp`, 80
+paired games at `9adb314`, four runners: `potential_points` **78.41 → 76.40
+(−2.01, p=0.047)**, win −0.037 (p=0.44); by opponent −3.95 / −1.00 / −0.65
+/ −2.45. Mean decision 7,577 → 2,727 ms (×0.36), per game 197 → 71 s;
+**+0.41 points per second saved** — the best price on the ledger after the
+free wins (depth 3 → 1 buys −10.4 for −99%). Latency by round 2.4 / 2.6 /
+3.0 / 3.1 s mean, p95 4.7 / 4.9 / **5.1 / 5.4 s**, max 12.9 s. The registered
+band (−2 to 0) was hit at its edge and the success criterion (< 2 lost,
+p95 < 5 s in every round) missed on both counts by a hair. **Not the
+production configuration yet.** What the 2,080 budget reports say:
+
+| | |
+|---|---|
+| decisions cut short | 1,167 (56%): 32% in round 1, 64–70% in rounds 2–4 |
+| when depth 3 was available (1,440) | depth 3 in 535, **depth 2 in 883**, depth 1 in 22 |
+| samples at the deepest level | 4 in 1,558, 3 in 163, 2 in 188, 1 in 171 |
+| overruns > 5.5 s | 51, worst 12.9 s: 52–70 legal actions at the root (gain-food preference actions), depth 2, 1 sample |
+
+Two defects, both in the ladder rather than the idea:
+
+1. **It spends the budget on samples, not depth.** Depth 2 with four
+   samples replaced depth 3 in 61% of the decisions that could have gone
+   deeper; the ledger prices depth (−10.4 for two plies) and has never
+   priced K. The loss is consistent with paying for the wrong thing.
+2. **The level-cost prediction misses big roots.** The next level is
+   predicted from the last two levels' ratio; a 70-action root at depth 2
+   costs far more than the ratio says, and a level, once started, runs a
+   whole sample. A deadline check between root actions that abandons the
+   level (returning the previous level's answer) caps the overrun at one
+   root action.
+
+Next: price K on its own (depth 3, K=1 vs K=4, one arm), then a v2 ladder
+that runs the deepest level with one sample first and adds samples with the
+time left, with the in-level abort. Registered target for v2: ≤ 1 point
+lost at 5 s with p95 under the cap in every round.
+
 ## Latency by round (production shape)
 
 Default agent over 2,080 decisions: round 1 ≈ 1.8 s mean (p95 5.4 s), round 2

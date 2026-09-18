@@ -3025,3 +3025,40 @@ refit would learn), and the opponent-modelling question moves to 3–4
 players. Nothing adopted or dropped, so no new holdout. Write-up in
 `docs/experiments/search_opponent_model_test.md`. The arm took 48 min.
 Budget arm (`rr_budget_5s`) launched by the queue at 01:27.
+
+## Update: 2026-09-18 - 5 s decision budget: −2.0 (p=0.047) for −64% latency; the ladder paid for samples instead of depth
+
+### Result (arm 5)
+`artifacts/rr_budget_5s` vs `rr_belief_opp`, 80 paired games at `9adb314`,
+four runners: `potential_points` **78.41 → 76.40 (−2.01, p=0.047)**, win
+−0.037 (p=0.44). Mean decision 7,577 → 2,727 ms, per game 197 → 71 s:
+**+0.41 points per second saved**, the best price on the ledger after the
+free wins. p95 by round 4.7 / 4.9 / 5.1 / 5.4 s, max 12.9 s. The registered
+band (−2 to 0) was hit at its edge; the success criterion (< 2 lost, p95 <
+5 s every round) missed on both counts by a hair. Not the production
+configuration yet.
+
+### Diagnosis (2,080 budget reports)
+56% of decisions cut. Where depth 3 was available, **depth 2 replaced it in
+61%** of decisions while samples stayed at four in 75% — the ladder spent
+the cap on K, which the ledger has never priced, instead of depth, which
+it prices at −10.4 for two plies. 51 overruns above 5.5 s (worst 12.9 s)
+came from 52–70-action roots: the level-cost prediction from the last two
+levels' ratio misses big roots, and a level runs a whole sample once
+started. Full write-up in `docs/architecture/decision_profiling.md`.
+
+### Decision
+No default change, no holdout (a production knob; when a budget ships,
+the unbudgeted agent becomes the held-out side). Two follow-ups
+registered below. The three arms of 2026-09-18 took 45–50 min each on four
+runners; the fast path made a same-day arm cycle routine.
+
+### Registered next arms
+1. **Price K**: depth 3 with K=1 vs the K=4 baseline, 80 paired games.
+   Prediction: −1 to −3 (the determinized-search test put K=4 at +2.4 over
+   the true state, a different comparison). This is the number the budget
+   ladder needs.
+2. **Budget v2**: deepest level with one sample first, more samples with
+   the time left, deadline check between root actions that abandons a
+   level. Prediction at 5 s: ≥ −1 with p95 under the cap in every round →
+   production configuration, holdout on the unbudgeted agent.

@@ -83,6 +83,10 @@ Decisions **not** guarded by a holdout, and why:
   reads the opponent's agent id, never a candidate default, so nothing was
   adopted or dropped; the opponent-model slot is already guarded by the
   greedy holdout.
+- The 5 s decision budget (−2.0, p=0.047, 2026-09-18): a production knob,
+  not a default; nothing changed for the batches, so no holdout until a
+  budget becomes the shipped configuration (then the unbudgeted agent is
+  the held-out side).
 - Search depth, beam, K, food candidates: these are cost knobs priced by
   the ledger, not adopt/drop decisions. Their contrasts are re-run when the
   agent changes.
