@@ -227,6 +227,12 @@ What the split says:
   a non-searching agent plays the pair. Either it needs the pursuer to
   plan around it, or layer B's +3.0 was a pursuer artefact — the same
   pursuit confound the bonus-card study found.
+- **P2 does not transfer to the searching pursuer.** Re-run with
+  `potential_points` as the study agent (60 seeds, four arms, 240 games):
+  interaction **−1.67 (p=0.35)**, −1.96 on the 51 completed seeds. The K=4
+  table had already put this mechanic pair at −0.18 for the searching
+  agent's own plays; the cheap pursuer's +3.48 was that agent's, not the
+  cards'. No pair confirms for the searching agent.
 - **P3 reverses, and the reason is general.** The bench scored +2 eggs per
   activation on an egg-empty board. In play, egg capacity binds: the sparrow
   holds 2, the mockingbird 4, the grassland action already lays 2 a turn,
@@ -397,18 +403,35 @@ shrinkage, not a full posterior).
 4. Layer C forced-play arms for the top combinations.
 5. Agent ablation, 80 games paired, registered prediction above.
 
-## Where the programme stands (2026-09-17)
+## Where the programme stands (2026-09-17, end of day)
 
-Three instruments built and validated; one first-order result per layer.
-Layer A: 12,386 same-row pairs benched, plus cross-row, on-play and pink
-modes; egg synergies need a capacity-aware context (P3). Layer B: 2,698
-plays attributed, twice; the aggregate shape is robust and the per-pair
-table needed determinized continuations to mean anything. Layer C: the
-instrument works (88–95% completion after two fixes) and confirmed one of
-three pairs. The engine-potential term, built on the K=0 table with a
-hand-holding term, cost 4.5 points; its next variant (board-only, v2 table,
-halved) is a single arm away. The reusable lesson is the one the whole
-project keeps finding: measure the instrument before believing the number.
+Three instruments built and validated; the question answered, mostly in the
+negative for the agent and in the affirmative for the method.
+
+- **Layer A** benched 12,386 same-row pairs plus cross-row, on-play and pink
+  modes. With capacity binding, egg synergies collapse (830 → 34 positive
+  grassland pairs); the bench's synergies were the value of spare room.
+- **Layer B** attributed 2,698 plays with exact counterfactuals. The
+  aggregate shape is robust and interpretable — engines pay in round 1,
+  late plays are overstated by three points, timing is worth 1.5 — but the
+  per-pair table needed determinized continuations (K=4) to be anything but
+  path noise (pair-rank ρ = 0.31 between K=0 and K=4).
+- **Layer C** works (88–95% completion after two instrument fixes) and
+  confirmed **no pair for the searching agent**: P1 null, P2 +3.5 for a
+  cheap pursuer but −1.7 for `potential_points`, P3 reversed by capacity.
+- **The agent term**: −4.5 with a hand term (paying to hold), +1.3 (n.s.)
+  board-only at half weight on the v2 table. Off, parked.
+
+Standing conclusion: in two-player base Wingspan, as played by these agents,
+pair-level synergy is small next to card main effects (Cooper's Hawk +3.5,
+Anhinga +5.0, Baird's Sparrow +10 over their controls) and is
+pursuer-dependent and capacity-dependent. The evaluator is not where the
+combination evidence pays; the two card-choice decisions that have paid —
+the opener and, untested, the draw choice — are where the bird main effects
+and the capacity-aware bench should go next. The reusable result is the
+method: exact counterfactuals, rules-computed benches, forced-play
+confirmation, and the repeated finding that the instrument must be measured
+before the number is believed.
 
 ## Caveats
 

@@ -2772,3 +2772,32 @@ remains is below the 80-game detection limit (~1.9). Decision: term stays
 off; not adopted, not moved to the opener either — the registered
 "move synergy evidence to card-selection" trigger (below −1.5) did not fire.
 Worth one 200-game arm if the pipeline is idle; otherwise parked.
+
+### Arm B result (2026-09-17): layer C P2 on the searching pursuer is null
+`artifacts/forced_play/pp/P2`, 240 games (~6 h shared with another project):
+interaction **−1.67 (p=0.35)**, −1.96 on 51 completed seeds; main effects
+−1.2 / −1.2. The cheap pursuer's +3.48 does not transfer; the K=4 table's
+−0.18 for this mechanic pair on the searching agent's plays was right. No
+pair confirms for the searching agent across layer C.
+
+### Synergy programme: standing conclusion
+Pair-level synergy in 2p base Wingspan, as played by these agents, is small
+next to card main effects, pursuer-dependent, and capacity-dependent. The
+evaluator is not where combination evidence pays (−4.5 with a hand term,
++1.3 n.s. board-only). Next uses of the evidence are card-choice decisions:
+the opener (bird main effects from layer B/C, capacity-aware bench) and the
+draw choice. Instruments and lessons in `docs/agents/synergy_planner_agent.md`.
+
+### Follow-up tasks (consolidated)
+1. Opener: fix `PotentialPointsSetupPolicy` bird/food selection (−4 vs the
+   plain opener) using layer B's bird card values (K=4, shrunken) as the bird
+   scorer; free paired-arm evaluation on the bonus-keep deals where possible,
+   then one 80-game arm.
+2. Draw choice: tray-card preference from the same card values, behind a
+   switch; one arm.
+3. Keep model on the 322 measured deals (hand, round goals, card), held-out
+   on the engine-builder deals.
+4. Oracle opponent-type bound (does perfect type knowledge help at 2p?).
+5. Holdout guardrail: run `analysis/holdout_guardrail.py` over all default-
+   agent roots at the next write-up (rr_belief_opp, rr_opener_v2,
+   rr_synergy_term, rr_synergy_board, bonus_keep, forced_play/pp).
