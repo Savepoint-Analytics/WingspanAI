@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -10,6 +11,7 @@ from itertools import combinations, combinations_with_replacement
 from typing import Protocol
 
 from wingspan_ai.agents import profiling
+from wingspan_ai.agents.bird_values import BirdPlayValues, load_bird_play_values
 from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, BonusCard, FoodType, Habitat, PowerColor
 from wingspan_ai.rules.base_game import (
@@ -85,10 +87,70 @@ class SetupPolicyMixin:
 #: ``docs/experiments/bonus_card_selection_study_plan.md``.
 BONUS_SCORING_KINDS = ("tag_overlap", "expected_points")
 DEFAULT_BONUS_SCORING = "expected_points"
-_BONUS_SCORING_POLICY_IDS = {
-    "tag_overlap": "potential_points_setup_v1",
-    "expected_points": "potential_points_setup_v2",
+
+#: How the potential-points opener values the dealt birds.
+#: ``"heuristic"`` is the hand-written ``_potential_card_score`` plus the
+#: alignment, playability and habitat terms in ``_selection_score``. Its keep
+#: count floats and it keeps five birds and no food in 119 of 120 deals; it
+#: lost −3.0 (p=0.022) to the plain opener on 2026-09-16 with the same bonus
+#: choice that is worth +0.85 on its own.
+#: ``"measured"`` scores a keep set in final-score points: each kept bird's
+#: measured round-1 play value (``agents/bird_values.py``, K=4 counterfactual
+#: attribution), discounted when the starting food cannot pay for it, plus a
+#: price per starting food token when the keep count floats. The registered
+#: 2026-09-17 arm (``potential_points_setup_v3_keep3``) holds the plain
+#: opener's structure — three birds, two food — and changes only *which*
+#: birds and food, so the arm reads the bird values alone. The default stays
+#: ``"heuristic"`` until it is read.
+BIRD_SCORING_KINDS = ("heuristic", "measured")
+DEFAULT_BIRD_SCORING = "heuristic"
+#: Points one starting food token is worth to the measured opener when the
+#: keep count floats. A gain-food action yields one to two tokens and the
+#: search values an early action at roughly five points; 2.5 is the midpoint
+#: and a registered parameter, not a measurement. Unused at a fixed count.
+DEFAULT_OPENING_FOOD_VALUE = 2.5
+#: Share of a bird's play value the measured opener credits when the starting
+#: food cannot pay its cost (it must first be earned with an action).
+DEFAULT_UNAFFORDABLE_DISCOUNT = 0.5
+
+_SETUP_POLICY_IDS = {
+    ("tag_overlap", "heuristic"): "potential_points_setup_v1",
+    ("expected_points", "heuristic"): "potential_points_setup_v2",
+    ("expected_points", "measured"): "potential_points_setup_v3",
+    ("tag_overlap", "measured"): "potential_points_setup_v3_tag",
 }
+_KEEP_SUFFIX = re.compile(r"^(?P<base>.+?)_keep(?P<count>\d+)$")
+
+
+def potential_points_setup_policy(policy_id: str) -> PotentialPointsSetupPolicy:
+    """Build the potential-points opener variant a policy id names.
+
+    ``potential_points_setup_v3_keep3`` is the measured opener at the plain
+    opener's keep structure; a bare ``..._v3`` lets the keep count float
+    against the food price.
+    """
+
+    base_id, target_keep_count = policy_id, None
+    match = _KEEP_SUFFIX.match(policy_id)
+    if match:
+        base_id, target_keep_count = match["base"], int(match["count"])
+    for (bonus_scoring, bird_scoring), known in _SETUP_POLICY_IDS.items():
+        if known == base_id:
+            return PotentialPointsSetupPolicy(
+                bonus_scoring=bonus_scoring,
+                bird_scoring=bird_scoring,
+                target_keep_count=target_keep_count,
+            )
+    raise ValueError(
+        f"unknown potential_points setup policy id: {policy_id!r}; expected one of "
+        f"{tuple(_SETUP_POLICY_IDS.values())} with an optional _keepN suffix"
+    )
+
+
+def is_potential_points_setup_policy_id(policy_id: str) -> bool:
+    match = _KEEP_SUFFIX.match(policy_id)
+    base_id = match["base"] if match else policy_id
+    return base_id in _SETUP_POLICY_IDS.values()
 
 
 @dataclass(frozen=True)
@@ -98,6 +160,10 @@ class PotentialPointsSetupPolicy:
     policy_id: str = field(init=False)
     target_keep_count: int | None = None
     bonus_scoring: str = DEFAULT_BONUS_SCORING
+    bird_scoring: str = DEFAULT_BIRD_SCORING
+    bird_play_values_path: str | None = None
+    opening_food_value: float = DEFAULT_OPENING_FOOD_VALUE
+    unaffordable_discount: float = DEFAULT_UNAFFORDABLE_DISCOUNT
 
     def __post_init__(self) -> None:
         if self.bonus_scoring not in BONUS_SCORING_KINDS:
@@ -105,17 +171,42 @@ class PotentialPointsSetupPolicy:
                 f"unknown bonus_scoring: {self.bonus_scoring!r}; expected one of "
                 f"{BONUS_SCORING_KINDS}"
             )
-        object.__setattr__(self, "policy_id", _BONUS_SCORING_POLICY_IDS[self.bonus_scoring])
+        if self.bird_scoring not in BIRD_SCORING_KINDS:
+            raise ValueError(
+                f"unknown bird_scoring: {self.bird_scoring!r}; expected one of {BIRD_SCORING_KINDS}"
+            )
+        policy_id = _SETUP_POLICY_IDS[(self.bonus_scoring, self.bird_scoring)]
+        if self.target_keep_count is not None:
+            policy_id = f"{policy_id}_keep{self.target_keep_count}"
+        object.__setattr__(self, "policy_id", policy_id)
 
     def choose_initial_selection(
         self,
         player: PlayerState,
         context: InitialSelectionContext | None = None,
     ) -> InitialSelection:
+        if self.bird_scoring == "measured":
+            values = load_bird_play_values(self.bird_play_values_path)
+
+            def selection_scorer(cards, food, bonus_card, setup_context):
+                return _measured_selection_score(
+                    cards,
+                    food,
+                    values,
+                    food_value=self.opening_food_value,
+                    unaffordable_discount=self.unaffordable_discount,
+                )
+        else:
+
+            def selection_scorer(cards, food, bonus_card, setup_context):
+                return _selection_score(
+                    cards, food, bonus_card, setup_context, card_scorer=_potential_card_score
+                )
+
         return _best_selection(
             player,
             context,
-            card_scorer=_potential_card_score,
+            selection_scorer=selection_scorer,
             bonus_scorer=(
                 expected_bonus_points
                 if self.bonus_scoring == "expected_points"
@@ -228,10 +319,18 @@ def _best_selection(
     player: PlayerState,
     context: InitialSelectionContext | None,
     *,
-    card_scorer,
     bonus_scorer,
+    card_scorer=None,
+    selection_scorer=None,
     target_keep_count: int | None = None,
 ) -> InitialSelection:
+    if selection_scorer is None:
+        if card_scorer is None:
+            raise ValueError("_best_selection needs a card_scorer or a selection_scorer")
+
+        def selection_scorer(cards, food, bonus_card, setup_context):
+            return _selection_score(cards, food, bonus_card, setup_context, card_scorer=card_scorer)
+
     setup_context = context or InitialSelectionContext()
     with profiling.node("bonus_card_choice", candidate_count=len(player.bonus_cards)):
         bonus_card = max(
@@ -246,13 +345,7 @@ def _best_selection(
         food_count = BIRD_FOOD_SELECTION_TOTAL - len(cards)
         with profiling.node("opening_subset_score"):
             food = _best_starting_food(cards, food_count)
-            score = _selection_score(
-                cards,
-                food,
-                bonus_card,
-                setup_context,
-                card_scorer=card_scorer,
-            )
+            score = selection_scorer(cards, food, bonus_card, setup_context)
         if best_score is None or score > best_score:
             best_score = score
             best_cards = cards
@@ -297,6 +390,52 @@ def _selection_score(
     score -= max(len(cards) - 3, 0) * 0.45
     score -= max(2 - len(cards), 0) * 0.35
     return score
+
+
+def _measured_selection_score(
+    cards: tuple[BirdCard, ...],
+    food: tuple[FoodType, ...],
+    values: BirdPlayValues,
+    *,
+    food_value: float,
+    unaffordable_discount: float,
+) -> float:
+    """Keep-set value in points: measured play values, food-gated, plus the food kept.
+
+    Birds are paid for greedily in value order from the starting food, so two
+    birds cannot both count as affordable on the same two tokens.
+    """
+
+    available: Counter[FoodType] = Counter(food)
+    score = food_value * len(food)
+    for card in sorted(cards, key=lambda c: (-values.value(c.common_name), c.common_name)):
+        value = values.value(card.common_name)
+        if _pay_from_pool(available, card):
+            score += value
+        else:
+            score += value * unaffordable_discount
+    return score
+
+
+def _pay_from_pool(available: Counter[FoodType], card: BirdCard) -> bool:
+    """Deduct the card's food cost from ``available`` if it can be paid; else leave it."""
+
+    cost = card.food_cost
+    if cost.minimum_total <= 0:
+        return True
+    if not _can_pay_fixed_food(available, card):
+        return False
+    total = sum(available.values())
+    if total < cost.minimum_total:
+        return False
+    for food_type, count in cost.fixed.items():
+        available[food_type] -= count
+    wild = cost.minimum_total - sum(cost.fixed.values())
+    for food_type in sorted(available, key=lambda f: (-available[f], f.value)):
+        while wild > 0 and available[food_type] > 0:
+            available[food_type] -= 1
+            wild -= 1
+    return True
 
 
 def _best_starting_food(

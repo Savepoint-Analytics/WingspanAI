@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 from wingspan_ai.agents import profiling
 from wingspan_ai.agents.determinization import determinize_state
 from wingspan_ai.agents.feeder_odds import food_power_availability_multiplier
+from wingspan_ai.agents.holdout import Holdout, resolve_holdouts
 from wingspan_ai.agents.setup import PotentialPointsSetupPolicy, SetupPolicyMixin
 from wingspan_ai.content.birdfeeder import (
     BIRDFEEDER_DICE_COUNT,
@@ -166,6 +167,19 @@ DEFAULT_MECHANIC_SYNERGY_TABLE = "configs/synergy/mechanic_pair_effects_v2.json"
 #: combo pieces; the registered follow-up is board-only at half weight.
 DEFAULT_MECHANIC_SYNERGY_HAND = True
 DEFAULT_MECHANIC_SYNERGY_WEIGHT = 1.0
+#: How the search expands child states. ``"fast"`` applies actions the search
+#: itself generated without re-validation and copies states without the RNG
+#: audit trail — bit-identical decisions at about half the expansion cost
+#: (0.66 → 0.31 ms per child, 2026-09-17). ``"copy"`` is the historic path.
+DEFAULT_SEARCH_CHILD_EXPANSION = "fast"
+SEARCH_CHILD_EXPANSIONS = ("copy", "fast")
+#: Standing holdouts (``agents/holdout.py``): every decided switch keeps its
+#: losing side alive in a deterministic 5% of games. ``search_opponent_model``
+#: has its own legacy holdout fields below and is not repeated here.
+DEFAULT_HOLDOUTS: tuple[Holdout, ...] = (
+    Holdout("mechanic_synergy", True),  # the dropped full synergy term
+    Holdout("search_child_expansion", "copy"),  # correctness canary for the fast path
+)
 
 
 @dataclass(frozen=True)
@@ -195,9 +209,57 @@ class PotentialPointsSearchConfig:
     mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
     mechanic_synergy_hand: bool = DEFAULT_MECHANIC_SYNERGY_HAND
     mechanic_synergy_weight: float = DEFAULT_MECHANIC_SYNERGY_WEIGHT
+    #: ``"fast"`` or ``"copy"``; see ``DEFAULT_SEARCH_CHILD_EXPANSION``.
+    search_child_expansion: str = DEFAULT_SEARCH_CHILD_EXPANSION
+    #: Standing holdouts applied per game on top of the legacy opponent-model
+    #: holdout; see ``DEFAULT_HOLDOUTS``.
+    holdouts: tuple[Holdout, ...] = DEFAULT_HOLDOUTS
+
+    #: Fields that describe the agent itself (everything but the holdout spec).
+    AGENT_FIELDS = (
+        "search_depth",
+        "final_search_turns",
+        "search_beam_width",
+        "determinization_samples",
+        "planning_horizon",
+        "search_food_candidates",
+        "search_opponent_model",
+        "mechanic_synergy",
+        "mechanic_synergy_hand",
+        "mechanic_synergy_weight",
+        "search_child_expansion",
+    )
 
     def as_manifest_payload(self) -> dict:
-        return asdict(self)
+        payload = asdict(self)
+        payload["holdouts"] = [asdict(holdout) for holdout in self.holdouts]
+        return payload
+
+    def resolve_effective(
+        self, *, random_seed: int, lineup: Sequence[str], lineup_position: int
+    ) -> tuple[dict, list[str]]:
+        """Effective agent fields for one game after every holdout draw.
+
+        The opponent-model holdout keeps its legacy key so the games it holds
+        out are the same ones every arm since 2026-09-16 has held out.
+        """
+
+        values = {name: getattr(self, name) for name in self.AGENT_FIELDS}
+        applied: list[str] = []
+        opponent_model, is_holdout = self.resolve_opponent_model(
+            random_seed=random_seed, lineup=lineup, lineup_position=lineup_position
+        )
+        values["search_opponent_model"] = opponent_model
+        if is_holdout:
+            applied.append("search_opponent_model")
+        values, more = resolve_holdouts(
+            values,
+            self.holdouts,
+            random_seed=random_seed,
+            lineup=lineup,
+            lineup_position=lineup_position,
+        )
+        return values, applied + more
 
     def resolve_opponent_model(
         self, *, random_seed: int, lineup: Sequence[str], lineup_position: int
@@ -247,6 +309,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
     mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
     mechanic_synergy_hand: bool = DEFAULT_MECHANIC_SYNERGY_HAND
     mechanic_synergy_weight: float = DEFAULT_MECHANIC_SYNERGY_WEIGHT
+    #: ``"fast"`` or ``"copy"``; see ``DEFAULT_SEARCH_CHILD_EXPANSION``.
+    search_child_expansion: str = DEFAULT_SEARCH_CHILD_EXPANSION
     top_alternatives: int = 5
     _opponent_model: SearchOpponentModel = field(init=False, repr=False, compare=False)
     _synergy: MechanicSynergyTable | None = field(
@@ -267,6 +331,11 @@ class PotentialPointsAgent(SetupPolicyMixin):
             raise ValueError(
                 f"unknown search opponent model: {self.search_opponent_model!r}; "
                 f"expected one of {SEARCH_OPPONENT_MODELS}"
+            )
+        if self.search_child_expansion not in SEARCH_CHILD_EXPANSIONS:
+            raise ValueError(
+                f"unknown search_child_expansion: {self.search_child_expansion!r}; "
+                f"expected one of {SEARCH_CHILD_EXPANSIONS}"
             )
         self._opponent_model = build_search_opponent_model(
             self.search_opponent_model, owner_agent_id=self.agent_id
@@ -357,9 +426,12 @@ class PotentialPointsAgent(SetupPolicyMixin):
                         food_candidates=self.search_food_candidates,
                         opponent_model=self._opponent_model,
                         synergy=self._synergy,
+                        fast=self.search_child_expansion == "fast",
                     )
                 with profiling.node("immediate_delta"):
-                    tie_break = _immediate_score_delta(state, action, player_id)
+                    tie_break = _immediate_score_delta(
+                        state, action, player_id, fast=self.search_child_expansion == "fast"
+                    )
                 scores.append((value, tie_break))
             return scores
         with profiling.node("evaluate_actions", candidate_count=len(legal_actions)):
@@ -381,9 +453,10 @@ class PotentialPointsAgent(SetupPolicyMixin):
             state, player_id, self.planning_horizon, synergy=self._synergy
         )
         evaluations: list[ActionPotentialEvaluation] = []
+        fast = self.search_child_expansion == "fast"
         for action in legal_actions:
             with profiling.node("apply_action"):
-                next_state = apply_action(state, action)
+                next_state = apply_action(state, action, trusted=fast, lean=fast)
             with profiling.node("state_potential"):
                 after = evaluate_state_potential(
                     next_state, player_id, self.planning_horizon, synergy=self._synergy
@@ -436,6 +509,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "mechanic_synergy_table": self._synergy.version if self._synergy else None,
             "mechanic_synergy_hand": self.mechanic_synergy_hand,
             "mechanic_synergy_weight": self.mechanic_synergy_weight,
+            "search_child_expansion": self.search_child_expansion,
             # Module-level ablation switches are not in the manifest, so record
             # them where the artifacts can prove which arm a game belongs to.
             "ablation_flags": {
@@ -512,6 +586,7 @@ def _search_action_value(
     food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
     opponent_model: SearchOpponentModel | None = None,
     synergy: MechanicSynergyTable | None = None,
+    fast: bool = True,
 ) -> float:
     """Best planning value reachable from ``action`` within ``depth`` own turns.
 
@@ -524,7 +599,7 @@ def _search_action_value(
 
     if opponent_model is None:
         opponent_model = _default_search_opponent_model()
-    next_state = apply_action(state, action)
+    next_state = apply_action(state, action, trusted=fast, lean=fast)
     return _search_value_from_branch(
         next_state,
         player_id,
@@ -534,6 +609,7 @@ def _search_action_value(
         food_candidates=food_candidates,
         opponent_model=opponent_model,
         synergy=synergy,
+        fast=fast,
     )
 
 
@@ -546,12 +622,13 @@ def _search_value_from_branch(
     food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
     opponent_model: SearchOpponentModel | None = None,
     synergy: MechanicSynergyTable | None = None,
+    fast: bool = True,
 ) -> float:
     if opponent_model is None:
         opponent_model = _default_search_opponent_model()
     if depth <= 1 or branch.round_state.game_over:
         return _terminal_planning_value(branch, player_id, horizon, synergy)
-    _play_opponent_turns_in_place(branch, player_id, opponent_model)
+    _play_opponent_turns_in_place(branch, player_id, opponent_model, fast=fast)
     player = _get_player(branch, player_id)
     if (
         branch.round_state.game_over
@@ -567,7 +644,10 @@ def _search_value_from_branch(
         return _terminal_planning_value(branch, player_id, horizon, synergy)
 
     with profiling.node("expand_children"):
-        children = [apply_action(branch, next_action) for next_action in legal_actions]
+        children = [
+            apply_action(branch, next_action, trusted=fast, lean=fast)
+            for next_action in legal_actions
+        ]
     leaf_values = [
         _terminal_planning_value(child, player_id, horizon, synergy) for child in children
     ]
@@ -586,6 +666,7 @@ def _search_value_from_branch(
             food_candidates=food_candidates,
             opponent_model=opponent_model,
             synergy=synergy,
+            fast=fast,
         )
         for _leaf_value, child in ranked
     )
@@ -634,6 +715,8 @@ def _play_opponent_turns_in_place(
     branch: GameState,
     player_id: str,
     opponent_model: SearchOpponentModel | None = None,
+    *,
+    fast: bool = True,
 ) -> None:
     """Advance an owned branch through opponent turns until ``player_id`` acts."""
 
@@ -647,7 +730,7 @@ def _play_opponent_turns_in_place(
         with profiling.node("opponent_select"):
             chosen = opponent_model.select_action(branch, legal_actions)
         with profiling.node("opponent_apply"):
-            apply_action_in_place(branch, chosen)
+            apply_action_in_place(branch, chosen, trusted=fast)
 
 
 def _terminal_planning_value(
@@ -1361,9 +1444,13 @@ def _future_discount(turns_remaining: int) -> float:
     return 1.0
 
 
-def _immediate_score_delta(state: GameState, action: LegalAction, player_id: str) -> float:
+def _immediate_score_delta(
+    state: GameState, action: LegalAction, player_id: str, *, fast: bool = True
+) -> float:
     before_score = score_player(state, player_id).total
-    after_score = score_player(apply_action(state, action), player_id).total
+    after_score = score_player(
+        apply_action(state, action, trusted=fast, lean=fast), player_id
+    ).total
     return float(after_score - before_score)
 
 

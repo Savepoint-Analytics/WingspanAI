@@ -74,6 +74,11 @@ fit <- suppressWarnings(lmer(card_advantage ~ round + (1 | bird) + (1 | pair),
                              data = long, weights = weight, REML = TRUE))
 vc <- as.data.frame(VarCorr(fit))
 print(vc[, c("grp", "sdcor")], row.names = FALSE)
+fe <- fixef(fit)
+cat(sprintf("fixed effects: intercept (round 1) %.3f; round 2 %+.3f; round 3 %+.3f; round 4 %+.3f\n",
+            fe[["(Intercept)"]], fe[["round2"]], fe[["round3"]], fe[["round4"]]))
+write.csv(data.frame(term = names(fe), estimate = unname(fe)),
+          file.path(out_dir, "fixed_effects.csv"), row.names = FALSE)
 
 re <- ranef(fit, condVar = TRUE)
 bird_effects <- as.data.frame(re$bird)

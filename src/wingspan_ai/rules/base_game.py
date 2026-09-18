@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import random
 import re
 from collections import Counter
@@ -302,14 +303,45 @@ def legal_actions_for_player(state: GameState, player_id: str) -> list[LegalActi
     return actions
 
 
-def apply_action(state: GameState, action: LegalAction) -> GameState:
-    """Apply one legal action and advance the turn pointer."""
+def apply_action(
+    state: GameState,
+    action: LegalAction,
+    *,
+    trusted: bool = False,
+    lean: bool = False,
+) -> GameState:
+    """Apply one legal action to a copy of ``state`` and advance the turn pointer.
 
-    next_state = state.model_copy(deep=True)
-    return apply_action_in_place(next_state, action)
+    ``trusted`` skips re-validating the action against a freshly generated
+    legal-action list; callers that took the action from that generator on
+    this exact state (the search) pass it. ``lean`` copies the state without
+    its ``rng_draw_records`` audit trail, which search branches never read
+    and which grows with the game. Both are bit-identical in outcome; the
+    2026-09-17 profile put re-validation at 34% and the copy at 55% of every
+    child expansion, with the audit trail most of the copy late in the game.
+    """
+
+    next_state = copy_game_state(state, lean=lean)
+    return apply_action_in_place(next_state, action, trusted=trusted)
 
 
-def apply_action_in_place(state: GameState, action: LegalAction) -> GameState:
+def copy_game_state(state: GameState, *, lean: bool = False) -> GameState:
+    """Deep-copy a state; ``lean`` drops the RNG audit trail (search branches only)."""
+
+    if not lean:
+        return state.model_copy(deep=True)
+    fields = {
+        name: copy.deepcopy(getattr(state, name))
+        for name in type(state).model_fields
+        if name != "rng_draw_records"
+    }
+    fields["rng_draw_records"] = []
+    return type(state).model_construct(**fields)
+
+
+def apply_action_in_place(
+    state: GameState, action: LegalAction, *, trusted: bool = False
+) -> GameState:
     """Apply one legal action by mutating an isolated state object.
 
     Use this only when the caller already owns a throwaway state branch, such as
@@ -317,11 +349,12 @@ def apply_action_in_place(state: GameState, action: LegalAction) -> GameState:
     ``apply_action`` so the input state remains unchanged.
     """
 
-    legal_actions = legal_actions_for_player(state, action.player_id)
-    resolved_action = _resolve_legal_action(action, legal_actions)
-    if resolved_action is None:
-        raise ValueError(f"illegal action for {action.player_id}: {action.model_dump()}")
-    action = resolved_action
+    if not trusted:
+        legal_actions = legal_actions_for_player(state, action.player_id)
+        resolved_action = _resolve_legal_action(action, legal_actions)
+        if resolved_action is None:
+            raise ValueError(f"illegal action for {action.player_id}: {action.model_dump()}")
+        action = resolved_action
 
     player = _get_player(state, action.player_id)
 

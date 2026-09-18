@@ -169,23 +169,33 @@ This structure should make it easier to adapt the approach to other board games 
 - Identify play styles that are optimal against other play styles.
 - Document dominant, dominated, and situational strategies.
 
+## Where the Project Stands (2026-09-17)
+
+The base-game simulator is complete and replay-validated; every base-game
+bird power is handled; batches are deterministic across processes. The
+champion agent, `potential_points`, searches three own turns ahead on every
+turn over determinized hidden information with a Bayesian opponent
+posterior as its in-search opponent model, and wins ~87% of games against
+the roster. Every change to it is a registered, seed-paired arm read for
+score and latency: `docs/experiments/results_ledger.md`.
+
+Three method rules came out of the research so far and now stand:
+
+- **Pair and register.** Unpaired comparisons produced two false findings;
+  the 80-game paired design resolves ~1.9 points and everything since the
+  search itself has been inside that.
+- **Value per millisecond.** The decision-tree profiler prices every arm in
+  points per second of latency (`docs/architecture/decision_profiling.md`).
+- **Standing holdouts.** Every adopted or dropped switch keeps its losing
+  side alive in 5% of games (`docs/experiments/standing_holdouts.md`).
+
 ## Near-Term Next Steps
 
-1. Define the initial folder/package structure for source code, data, docs, tests, flows, notebooks, and analysis.
-2. Audit `data/raw/wingspan-card-list.xlsx` for usable fields, missing fields, expansion coverage, and fields that need normalization.
-3. Create Pydantic schemas for bird cards, bonus cards, round goals, food, powers, rulesets, and simulation configuration.
-4. Draft the simulator architecture doc, including state, actions, transitions, scoring, observations, and randomness.
-5. Implement base content loading and validation.
-6. Implement base-game setup and state model.
-7. Implement legal-action generation for the first core actions: play bird, gain food, lay eggs, draw cards.
-8. Add first unit tests for setup, legal actions, state transitions, and scoring skeleton.
-9. Define the simulation event taxonomy.
-10. Draft a FastAPI ingestion endpoint and PostgreSQL table design for simulation events.
-11. Implement random legal agent and single-game runner.
-12. Add Prefect flow for running a batch of seeded games.
-13. Add MLflow tracking for run config, agent config, ruleset, seeds, outcomes, and artifacts.
-14. Implement greedy and round-aware baseline agents.
-15. Create the first R/Python analysis notebook for score distributions, action frequencies, and strategy signatures.
+1. Fix the opener's bird/food selection with the K=4 bird values (≥ +2 registered).
+2. `max_decision_time_ms` budget on `potential_points`, degrading K → depth → one-ply, priced by the ledger.
+3. Oracle opponent-type arm to bound what belief modelling can still win at 2p (registered: null).
+4. Beam pre-ranking without expansion; then the draw-choice preference arm.
+5. Case-study body from the results ledger.
 
 ## Current Foundation Artifacts
 
@@ -200,7 +210,9 @@ This structure should make it easier to adapt the approach to other board games 
 - `src/wingspan_ai/agents/random_legal.py`: seeded random legal-action baseline agent.
 - `src/wingspan_ai/agents/setup.py`: opening setup policies for kept birds, bonus cards, and starting food.
 - `src/wingspan_ai/agents/greedy.py`: immediate-score greedy baseline agent with food-choice tiebreaks based on hand needs.
-- `src/wingspan_ai/agents/potential_points.py`: expected-value agent that estimates final-score potential from resources, playable birds, powers, bonus-card progress, round-goal pressure, and endgame conversion, then searches three own turns ahead on every turn over determinized hidden information. Opponent turns inside the search are played from the Bayesian opponent posterior (`agents/search_opponent.py`), with a deterministic 5% of games keeping the greedy opponent model as a standing control.
+- `src/wingspan_ai/agents/potential_points.py`: expected-value agent that estimates final-score potential from resources, playable birds, powers, bonus-card progress, round-goal pressure, and endgame conversion, then searches three own turns ahead on every turn over determinized hidden information. Opponent turns inside the search are played from the Bayesian opponent posterior (`agents/search_opponent.py`), with a deterministic 5% of games keeping the greedy opponent model as a standing control. Search children are expanded on the fast path (`apply_action(trusted=True, lean=True)`), bit-identical to the full path. Every decided switch keeps a 5% holdout (`agents/holdout.py`).
+- `src/wingspan_ai/agents/profiling.py`: game-agnostic decision-tree profiler; `analysis/decision_profile_report.py` turns it into latency percentiles, a node table and points per second against a baseline.
+- `src/wingspan_ai/agents/holdout.py`: deterministic per-field holdouts so adopted and dropped arms stay alive in a minority of games; `analysis/holdout_guardrail.py` reads them.
 - `src/wingspan_ai/agents/net_value.py`: score-margin agent scaffold that estimates next opponent response and shared-resource denial value from public observations plus a first belief heuristic.
 - `src/wingspan_ai/belief/models.py`: Bayesian opponent-type posterior and action-family response distribution.
 - `src/wingspan_ai/content/filters.py`: experiment-level catalog filtering by power implementation status or handler key.

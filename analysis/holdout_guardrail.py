@@ -1,18 +1,21 @@
-"""Standing control: potential_points games that kept the previous search opponent model.
+"""Standing controls: games where a decided switch kept its losing side.
 
-Since 2026-09-16 the default search opponent model is ``belief`` and a
-deterministic 5% of games keep ``greedy`` (see
-``docs/experiments/search_opponent_model_test.md``). Those games accumulate
-across every batch that runs with the default, which turns the adoption into a
-long-run experiment: if the belief model's advantage was a false positive, or
-if a later change (an agent learning from past games, say) drifts in a way
-that only the belief-modelled games see, this report is where it shows up.
+Every arm the project adopts or drops keeps its other side alive in a
+deterministic minority of games (``agents/holdout.py``; the registry is
+``docs/experiments/standing_holdouts.md``). The first was the search opponent
+model (2026-09-16: ``belief`` default, 5% keep ``greedy``); since 2026-09-17
+the mechanism is generic and every ``PotentialPointsSearchConfig`` field can
+carry a holdout. Held-out games accumulate across every batch that runs with
+the defaults, which turns each decision into a long-run experiment: a
+false-positive drop, or a later change (an agent learning from past games,
+say) that drifts in a way only the default sees, shows up here.
 
 The comparison is unpaired — held-out games are different games, not
 re-runs — so it needs many more games than an arm contrast to say anything,
 and it says so. Pool every root you want counted:
 
     python analysis/holdout_guardrail.py artifacts/rr_belief_opp artifacts/rr_next_arm ...
+    python analysis/holdout_guardrail.py artifacts/* --field search_child_expansion
 """
 
 from __future__ import annotations
@@ -38,7 +41,8 @@ def load_games(roots: list[Path]) -> list[dict]:
         for manifest_path in sorted(root.rglob("batch_manifest.json")):
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             for game in manifest.get("games", []):
-                if "search_opponent_models" in game and "player_agent_kinds" in game:
+                has_record = "search_holdouts" in game or "search_opponent_models" in game
+                if has_record and "player_agent_kinds" in game:
                     games.append(game)
     return games
 
@@ -46,22 +50,46 @@ def load_games(roots: list[Path]) -> list[dict]:
 def split_by_model(games: list[dict]) -> dict[str, list[tuple[float, float, str]]]:
     """``{model: [(score, win, opponents), ...]}`` over every potential_points seat."""
 
+    return split_by_field(games, "search_opponent_model")
+
+
+def _seat_entry(game: dict) -> dict | None:
+    """Effective fields and applied holdouts for the potential_points seat, any manifest vintage."""
+
+    holdouts = game.get("search_holdouts") or {}
+    entries = [e for aid, e in holdouts.items() if aid.startswith(AGENT)]
+    if len(entries) == 1:
+        return entries[0]
+    models = game.get("search_opponent_models") or {}
+    legacy = [e for aid, e in models.items() if aid.startswith(AGENT)]
+    if len(legacy) == 1:
+        return {
+            "applied": ["search_opponent_model"] if legacy[0]["holdout"] else [],
+            "effective": {"search_opponent_model": legacy[0]["model"]},
+        }
+    return None
+
+
+def holdout_fields(games: list[dict]) -> list[str]:
+    fields: set[str] = set()
+    for game in games:
+        entry = _seat_entry(game)
+        if entry:
+            fields.update(entry["applied"])
+    return sorted(fields)
+
+
+def split_by_field(games: list[dict], field: str) -> dict[str, list[tuple[float, float, str]]]:
+    """``{value: [(score, win, opponents), ...]}`` by the seat's effective value of ``field``."""
+
     rows: dict[str, list[tuple[float, float, str]]] = defaultdict(list)
     for game in games:
         result = agent_result(game, AGENT)
-        if result is None:
-            continue
-        # One potential_points agent per game in the current designs; a mirror
-        # lineup would need per-seat attribution, which agent_result does not do.
-        models = {
-            entry["model"]
-            for agent_id, entry in game["search_opponent_models"].items()
-            if agent_id.startswith(AGENT)
-        }
-        if len(models) != 1:
+        entry = _seat_entry(game)
+        if result is None or entry is None or field not in entry["effective"]:
             continue
         opponents = "+".join(kind for kind in game["player_agent_kinds"] if kind != AGENT)
-        rows[models.pop()].append((result[0], result[1], opponents))
+        rows[str(entry["effective"][field])].append((result[0], result[1], opponents))
     return rows
 
 
@@ -88,7 +116,7 @@ def detectable_difference(a: list[float], b: list[float]) -> float | None:
 
 
 def report(rows: dict[str, list[tuple[float, float, str]]], preferred: str = "belief") -> str:
-    lines = ["# Search opponent model holdout guardrail", ""]
+    lines = ["Standing control: preferred value versus games held out to the losing side.", ""]
     lines.append("| Model | n | Avg score | Win rate |")
     lines.append("|---|---:|---:|---:|")
     for model in sorted(rows):
@@ -142,13 +170,30 @@ def report(rows: dict[str, list[tuple[float, float, str]]], preferred: str = "be
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("roots", nargs="+", type=Path, help="artifact roots to pool")
-    parser.add_argument("--preferred", default="belief")
+    parser.add_argument(
+        "--field",
+        default=None,
+        help="one held-out field to report; default: every field with a holdout in the roots",
+    )
+    parser.add_argument("--preferred", default=None, help="the default value (inferred if omitted)")
     args = parser.parse_args(argv)
     games = load_games(args.roots)
     if not games:
-        print("No games with search_opponent_models found under the given roots.")
+        print("No games with holdout records found under the given roots.")
         return 1
-    print(report(split_by_model(games), preferred=args.preferred))
+    fields = [args.field] if args.field else holdout_fields(games)
+    if not fields:
+        print("No holdouts applied in these roots.")
+        return 1
+    for field in fields:
+        rows = split_by_field(games, field)
+        # The preferred value is the one the non-held-out games carry.
+        preferred = args.preferred
+        if preferred is None:
+            counts = {value: len(v) for value, v in rows.items()}
+            preferred = max(counts, key=counts.get)
+        print(f"# Holdout field `{field}`\n")
+        print(report(rows, preferred=preferred))
     return 0
 
 

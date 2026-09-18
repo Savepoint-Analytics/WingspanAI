@@ -40,32 +40,59 @@ The project owner is Alex Oswald. Alex is the sole current contributor and final
 
 ## Current phase
 
-The project is in rule-fidelity and smoke-experiment validation.
+_Standing sections refreshed 2026-09-17; the dated updates below are the record._
+
+The simulator is rule-faithful for the base game (every base-game power
+handled, replay-validated, deterministic across processes) and the project
+is in **agent research with a production lens**: every change to the
+champion agent is a registered, seed-paired arm read for both score and
+latency (`docs/experiments/results_ledger.md`).
 
 Current focus:
-1. Tighten the base-game economy loop so simulations are strategically credible.
-2. Expand high-volume bird power handling, bonus-card scoring, and competitive round-goal scoring.
-3. Keep legal actions concrete enough for habitat scaling, optional conversions, rerolls, and agent choice policies.
-4. Preserve deterministic seeded runs, replayable telemetry, and hidden-information boundaries.
-5. Use smoke batches to catch regressions before interpreting tournament results.
-6. Prepare the analysis layer for baseline and heuristic comparisons once rule coverage is sufficient.
+1. The champion is `potential_points`: depth-3 determinized search on every
+   turn (K=4) with the Bayesian opponent posterior as the in-search opponent
+   model. It wins ~0.87 of games against the roster at ~78 points. The only
+   change worth ten points was the search itself; every valuation refinement
+   since has been null or negative at 80 games.
+2. Value per millisecond. A shipped agent has a latency budget; the
+   decision-tree profiler and `decision_profile_report.py` price every arm
+   in points per second, and the fast search-child expansion (2026-09-17)
+   is the first pure cost win.
+3. Standing holdouts. Every adopted or dropped switch keeps its losing side
+   alive in a deterministic 5% of games as a long-run guardrail against
+   false positives and learning bias (`docs/experiments/standing_holdouts.md`).
+4. Card-choice decisions are the next place to spend evidence: the opener's
+   bird/food selection costs ~4 points; bonus-card choice is worth 6.4 and
+   `expected_points` already gets 61% of it.
+5. Keep the reusable template honest: holdouts, profiling, paired arms,
+   replay hashing and the rules/agents/telemetry split know nothing about
+   Wingspan.
 
 ## Current assets
 
-Project root currently includes:
-- `README.md`
-- `AGENTS.md`
-- `CLAUDE.md`
-- `COMPANY_CONTEXT.md`
-- `PROJECT_CONTEXT.md`
-- `data/raw/wingspan-card-list.xlsx`
-- `rulebook_pdfs/WS_Core_Rulebook.pdf`
-- `rulebook_pdfs/WS_European_Rulebook.pdf`
-- `rulebook_pdfs/WS_Oceania_Rulebook.pdf`
-- `rulebook_pdfs/WS_Asia_Rulebook_r9.pdf`
-- `rulebook_pdfs/WS_AE_AutoRulebook_r5.pdf`
+Root: `README.md`, `AGENTS.md`, `CLAUDE.md`, `COMPANY_CONTEXT.md`,
+`PROJECT_CONTEXT.md`, `data/raw/wingspan-card-list.xlsx`, `rulebook_pdfs/`.
 
-The project is a git repository in this directory.
+- `src/wingspan_ai/`: content loader and schemas, `state/` Pydantic game
+  state, `rules/base_game.py` (setup, legal actions, transitions, all
+  base-game powers, scoring, `apply_action(trusted, lean)` fast path),
+  `agents/` (random, greedy, archetypes, Monte Carlo, `potential_points`
+  champion, `net_value`, guardrails, setup policies, `search_opponent`,
+  `holdout`, `profiling`, `forced_play`), `belief/` opponent posterior,
+  `simulation/` runner, replay hashing, tournament, artifacts, `telemetry/`
+  events, FastAPI, PostgreSQL.
+- `flows/`: `simulation_batch.py` (manifests, replay gate, rule audits,
+  per-seat config, holdouts, profiling mode), `round_robin.py`.
+- `analysis/`: `arm_contrast.py`, `decision_profile_report.py`,
+  `holdout_guardrail.py`, bonus-card and synergy instruments, SQL views,
+  `r/` lme4 models.
+- `docs/`: architecture, rules, events, agents (model cards), experiments
+  (plans, results, `results_ledger.md`, `standing_holdouts.md`), decisions
+  (ADRs). Index: `docs/README.md`.
+- `tests/`: 410 tests; `test_default_workbook_path_points_to_raw_data`
+  fails only when `.envrc` sets `WINGSPAN_CARD_WORKBOOK`.
+- `artifacts/`: every arm's manifests, events and outcomes, by root
+  (`rr_belief_opp` is the current baseline for the default agent).
 
 ## Important decisions made
 
@@ -79,6 +106,11 @@ The project is a git repository in this directory.
 | Analytics stack | Use FastAPI, PostgreSQL, Prefect, MLflow, Python, SQL, and R. | Matches Alex's preferred stack and supports reproducible experiments. | Local complexity slows early progress. |
 | ML sequence | Start with baselines and heuristics before RL/deep learning. | Baselines are easier to debug and provide comparison anchors. | A specific research question requires earlier RL setup. |
 | Reusability | Design a board-game AI template alongside Wingspan-specific implementation. | The case study should become reusable for similar games. | Reuse abstractions delay basic simulator completion. |
+| Evidence standard | Every agent change is a registered prediction, then a seed-paired 80-game arm from a clean worktree, read with `arm_contrast` and `decision_profile_report`. | Unpaired and unregistered comparisons produced two false findings (greedy second; seat-3 advantage). | Never; tighten the design when it fails. |
+| Baseline | `artifacts/rr_belief_opp` at `e218d13` is the default agent's baseline (2026-09-16). | Belief opponent model adopted for cost; every later arm pairs against it. | The next adopted change re-baselines. |
+| Standing holdouts | Every adopted or dropped switch keeps its losing side in a deterministic 5% of games (2026-09-17, generalizing the 2026-09-16 opponent-model control). | False positives at n=80; learning bias once agents learn from archived games. | A holdout accrues ≥100 games and agrees with the decision — retire it. |
+| Attribution | K=4 determinization is the standard for any play-attribution run (2026-09-17). | K=0 pair tables were noise (ρ=0.31 with K=4). | Cheaper attribution that matches K=4 ranks. |
+| Cost | Value per millisecond: an agent calculation is kept only if its measured gain justifies its measured latency; otherwise gated, optimized or dropped (2026-09-17). | Production agents must not bore the player. | Alex sets a different latency budget. |
 
 ## Technical architecture direction
 
@@ -203,31 +235,18 @@ The recommended method sequence is intentionally practical:
 
 ## Current recommended next tasks
 
-These tasks are scoped to be founder-manageable and reusable.
+The May 2026 build list is complete; the record is in the dated updates.
+Current tasks, in order (2026-09-17):
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | Define project package structure. | A proposed folder tree exists for `src/`, `data/`, `docs/`, `notebooks/`, `analysis/`, `tests/`, and `flows/`. |
-| 1 | Create machine-readable game content schema. | Pydantic models exist for bird cards, bonus cards, round goals, food, habitats, powers, and ruleset metadata. |
-| 1 | Validate `data/raw/wingspan-card-list.xlsx` fields. | A data audit documents available columns, missing fields, normalization needs, and expansion coverage. |
-| 1 | Build base content loader. | The spreadsheet can be loaded into typed objects with validation errors reported clearly. |
-| 1 | Define base-game state model. | Full game state, player state, public state, private state, decks, tray, birdfeeder, and round state are represented. |
-| 1 | Draft rules-engine design doc. | Setup, legal actions, state transitions, scoring, powers, and randomness boundaries are documented. |
-| 1 | Implement random legal agent. | Agent can select from generated legal actions with seeded randomness. |
-| 1 | Add first rules tests. | Tests cover setup, playing a bird, gaining food, laying eggs, drawing cards, round transition, and final score skeleton. |
-| 2 | Define simulation event schema. | Core events and required fields are documented in `docs/events/`. |
-| 2 | Draft FastAPI ingestion service. | A local endpoint accepts simulation events and validates payloads. |
-| 2 | Create PostgreSQL event table design. | Tables for runs, games, events, agents, and outcomes are documented or migrated. |
-| 2 | Add single-game runner. | A full random-vs-random game can run and emit event logs. |
-| 2 | Add Prefect simulation flow. | A batch of seeded games can be scheduled and summarized. |
-| 2 | Add MLflow tracking skeleton. | Agent config, ruleset, seeds, metrics, and artifacts are logged for a simulation batch. |
-| 2 | Implement greedy baseline. | Greedy agent beats random over a documented evaluation run. |
-| 2 | Create R/Python analysis notebook. | First simulation logs can be summarized by score distribution, action frequency, and game length. |
-| 3 | Implement strategy archetype bots. | At least three archetypes produce distinct telemetry signatures. |
-| 3 | Add tournament runner. | Agents can be evaluated in repeated matches with fixed rulesets and seeds. |
-| 3 | Draft Bayesian belief model plan. | Hidden score, opponent type, and next-action belief variables are defined. |
-| 3 | Build first Monte Carlo rollout agent. | Agent estimates action value through sampled continuations under a compute budget. |
-| 3 | Draft case-study outline. | A document explains problem, architecture, methods, early results, and next research questions. |
+| 1 | Fix `PotentialPointsSetupPolicy` bird/food selection with the K=4 shrunken bird values as the bird scorer. | ≥ +2 on an 80-game paired arm vs `rr_belief_opp` (the v2 opener lost −3.0 with the same bonus choice that is worth +0.85 on its own). |
+| 1 | `max_decision_time_ms` on `potential_points`, degrading K → depth → one-ply, each step priced by the ledger. | A 5 s budget loses < 2 points vs unbudgeted on 80 paired games; p95 latency under budget in every round. |
+| 2 | Oracle opponent-type arm (search plays the opponent's true policy). | Registered prediction: null at 2p (< +1). A positive bounds what belief modelling could still win. |
+| 2 | Beam pre-ranking without expansion (immediate score, no copy), expanding only the beam. | Bit-identical or ≤ −0.5 points; `terminal_value` + `expand_children` share falls below 60%. |
+| 2 | Draw-choice preference from the K=4 bird values, behind a switch. | One 80-game arm; registered ±1 band. |
+| 3 | Keep model on the 322 measured bonus-card deals (hand, round goals, card), held out on the engine-builder deals. | Beats `expected_points` 61% pick rate on held-out deals. |
+| 3 | Case study write-up from `results_ledger.md`. | `docs/experiments/case_study_outline.md` filled with the ledger's numbers and the three method lessons (pairing, registration, holdouts). |
 
 ## Open questions
 
@@ -264,10 +283,14 @@ These tasks are scoped to be founder-manageable and reusable.
 ### AI and modelling
 
 - What is the first strategic question to test after random and greedy baselines?
-- Should Bayesian modelling start with opponent type, hidden score, card draw probabilities, or end-game score distributions? Answer: it should start with with what presumably more important and stronger in terms of signal strength and propensity to which it will impact the final outcome.  
-- What observation encoding should be standard for learning agents?
+  - Answered 2026-09-05: lookahead. Depth-3 search is worth +10; nothing else tried is worth more than ±2.
+- Should Bayesian modelling start with opponent type, hidden score, card draw probabilities, or end-game score distributions? Answer: it should start with with what presumably more important and stronger in terms of signal strength and propensity to which it will impact the final outcome.
+  - Where it stands 2026-09-17: the opponent posterior is in the search loop and is worth ≈0 points at 2p (but −57% latency). Hidden-information peeking is worth −2.4 (determinizing is better). The oracle-type arm will bound what is left.
+- What observation encoding should be standard for learning agents? Open; the `bird_scorecard` and `agent_decision_summary` events are the candidates.
 - What reward shaping avoids teaching agents misleading short-term behavior?
+  - Partly answered: the round horizon (not game horizon) is load-bearing for the evaluator (−12 with the game horizon).
 - What compute budget should a move-level agent be allowed?
+  - Reframed 2026-09-17 as value per millisecond; the budget knob is the next build.
 
 ### Analytics
 
@@ -302,17 +325,15 @@ Important evaluation metrics:
 
 ## Documentation backlog
 
-Recommended docs to add:
-- `docs/architecture/simulator_architecture.md`
-- `docs/architecture/reusable_board_game_ai_template.md`
-- `docs/rules/base_game_scope.md`
-- `docs/rules/expansion_configuration.md`
-- `docs/events/simulation_event_taxonomy.md`
-- `docs/agents/baseline_agents.md`
-- `docs/agents/bayesian_agent_design.md`
-- `docs/experiments/experiment_tracking.md`
-- `docs/experiments/first_tournament_plan.md`
-- `docs/decisions/0001-separate-wingspan-ai-from-savepoint.md`
+Written: architecture, rules scope, event taxonomy, baseline and champion
+agent docs, decision profiling, results ledger, standing holdouts, ADRs
+0001–0004. Still to write:
+- `docs/architecture/reusable_board_game_ai_template.md` — the template as
+  it now exists (state/actions/transition/scoring/policy/belief/holdout/
+  profiling), with what is and is not Wingspan-specific.
+- `docs/rules/expansion_configuration.md` — nothing beyond the base game is
+  encoded yet; the content-pack plus rules-module decision stands.
+- Case study body from the results ledger.
 
 ## Project memory update protocol
 
@@ -587,6 +608,12 @@ Treat human play as a local terminal workflow for now. A richer UI can wait unti
 | 2026-05-04 | Treat archetype bots and Monte Carlo rollouts as experimental baselines, not strategic conclusions. | Current rule fidelity is enough for plumbing and behavioural signatures, but not enough for claims about optimal Wingspan play. |
 | 2026-05-05 | Make initial setup choice an explicit policy boundary. | Opening hand and starting food choices matter strategically, so agents need a hook to control them before advanced modelling. |
 | 2026-05-13 | Represent richer habitat actions as concrete `LegalAction` values. | Agents can now choose scaled food/card/egg outputs, conversion choices, and reroll options through the normal rules boundary. |
+| 2026-08-31 | `random_seed` is the sole RNG key; determinism across processes is a gate on every batch (ADR 0003, 0004). | A cross-process nondeterminism bug invalidated earlier standings. |
+| 2026-09-05 | Depth-3 determinized search on every turn is the champion's core. | +10.4 points; the only large positive result. |
+| 2026-09-16 | Belief posterior is the search's opponent model; `rr_belief_opp` is the baseline; 5% of games keep greedy. | Null on score, half the latency. |
+| 2026-09-16 | `expected_points` bonus-card choice adopted; the v2 opener as a whole is not (bird/food selection is a defect). | +0.85 on the choice, −3.0 on the whole opener. |
+| 2026-09-17 | K=4 is the standard for attribution runs; the synergy evaluator term stays off; card-choice decisions get the synergy evidence next. | K=0 tables were noise; −4.5 / +1.3 n.s. for the term. |
+| 2026-09-17 | Every decided switch keeps a 5% holdout; value per millisecond is the production yardstick; fast search-child expansion adopted. | Alex's guardrail rule; bit-identical decisions at half the per-child cost. |
 
 ## Things to avoid repeating
 
@@ -598,6 +625,9 @@ The following points are already established unless changed:
 - Bayesian game theory is a major research direction, especially for partial information and opponent modelling.
 - Simulation telemetry is central, not an afterthought.
 - Use small tasks with clear success criteria.
+- Register the prediction before the arm; pair by seed; launch from a clean worktree; read score and latency together.
+- Do not adopt or drop a switch without adding its `Holdout`.
+- Do not read an unpaired or sub-detection-limit contrast as a finding; the 80-game limit is ~1.9 points.
 
 ## Files that should exist near this file
 
@@ -2839,3 +2869,65 @@ Opponent model 3%. Latency by round: 1.8 → 5.9 → 10.5 → 15.7 s mean.
    by the ledger.
 3. Read every future arm through `decision_profile_report.py --value-against`
    as well as `arm_contrast`.
+
+## Update: 2026-09-17 - Fast search-child expansion (−50% latency, bit-identical); every decided arm now has a 5% holdout
+
+### What changed
+- **Fast expansion.** The profiler's 73% in `expand_children` was split by a
+  single-state probe: per child 0.66 ms = deep copy 0.33 + re-validation of
+  the action 0.21 + transition 0.07. `apply_action(trusted=True, lean=True)`
+  skips re-validation (the search took the action from the generator on this
+  exact state) and copies without the `rng_draw_records` audit trail, which
+  grows with the game and which no branch reads. Switch
+  `PotentialPointsSearchConfig.search_child_expansion = "fast" | "copy"`,
+  default `fast`. **Bit-identical**: 104 decisions of four archived
+  `rr_belief_opp` games reproduced action for action; every child of a
+  fresh state hashes identically with the trail restored. Back-to-back
+  probe (four games, no holdouts): mean decision **5,187 → 2,588 ms
+  (×0.50)**, p95 26.0 → 11.7 s, per game 135 → 67 s, identical scores.
+  `expand_children` 73% → 53%; `terminal_value` is now a third of the
+  decision and the next target. `docs/architecture/decision_profiling.md`.
+- **Generalized holdouts (Alex's rule).** `agents/holdout.py`:
+  `Holdout(field, value, share)`; `PotentialPointsSearchConfig.holdouts`
+  and `resolve_effective(seed, lineup, position)`; `_make_agent` builds the
+  agent from the effective fields; manifests record
+  `games[].search_holdouts[agent_id] = {effective, applied}`. Each field
+  draws independently by SHA-256 over `(field, seed, lineup, position)`, so
+  arms stay paired and seat rotations hold out together. The opponent-model
+  holdout keeps its 2026-09-16 key. Standing holdouts now:
+  `search_opponent_model → greedy`, `mechanic_synergy → True` (board-only),
+  `search_child_expansion → copy`, 5% each; with three, ~14% of games
+  deviate somewhere, identically on both sides of every pair.
+  `analysis/holdout_guardrail.py` reports every field (`--field`,
+  `--preferred`); registry, retirement rule and reading guide in
+  `docs/experiments/standing_holdouts.md`. Pooled state: belief −1.34 vs
+  greedy, p=0.51, 19 held-out games — unreadable by design yet.
+- **Standing docs refreshed**: `PROJECT_CONTEXT.md` phase, assets,
+  decisions, next tasks, open questions, backlog; `README.md` status and
+  next steps; new `docs/experiments/results_ledger.md` (one row per arm
+  with score, p, latency, points per second, decision).
+- Tests: `tests/test_holdout.py` (draw independence, legacy key stability,
+  fast/copy child agreement, identical agent decisions); 415 pass.
+
+### Registered arm (3): measured opener, `potential_points_setup_v3_keep3`
+The v2 opener lost −3.0 with a bonus choice worth +0.85, so bird/food
+selection costs ~4. Diagnosis on 120 dealt hands: the heuristic keeps
+**five birds and no food in 119 of 120** (the plain opener keeps three and
+two food). The fix under test changes only *which* birds: each bird's
+measured round-1 play value from the K=4 counterfactual fit
+(`configs/bird_values/bird_play_values_k4.json`, written by
+`analysis/bird_play_values.py`: lme4 shrunken effect + round-1 intercept
+4.62; 173 birds), paid greedily from the starting food with a 0.5 discount
+when unaffordable; keep count held at the plain opener's three so the arm
+reads the bird values alone (`bird_scoring="measured"`,
+`target_keep_count=3`; policy id `potential_points_setup_v3_keep3`; the
+flow accepts a concrete opener id in `setup_policy_overrides`). On the 120
+hands it keeps birds worth 16.9 measured points per deal against the plain
+opener's 14.4 (+2.5 at full realization; 1.9 of 3 birds shared).
+**Prediction: +1 to +3 vs `rr_belief_opp`; success ≥ +2 (Alex's
+criterion); below +1 the values are not causal at keep time and the food
+price floats next.** Design: 80 paired games, `setup_policy_kinds=["control"]`
+with the study agent on `potential_points_setup_v3_keep3`, four lineup
+runners, clean worktree. Note the standing holdouts run inside this arm and
+not in the 2026-09-16 baseline; at 5% per field that is ≤ 4 deviating
+games per field, all bit-identical for `search_child_expansion`.

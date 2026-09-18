@@ -1,0 +1,1052 @@
+{
+  "version": "bird_play_values_k4",
+  "source": "analysis/r/play_attribution_hierarchical.R on 2,698 counterfactual plays (K=4 continuations, 302 archived potential_points games), 2026-09-17",
+  "generated_at": "2026-09-18T06:45:51+00:00",
+  "unit": "final-score points from playing the bird in round 1 (K=4 counterfactual, lme4 shrunken bird effect + round-1 intercept); unlisted birds take the intercept",
+  "intercept_round1": 4.615,
+  "round_offsets": {
+    "round3": -1.885,
+    "round4": -1.615,
+    "round2": -0.4
+  },
+  "values": {
+    "Barn Swallow": {
+      "value": 11.193,
+      "effect": 6.577,
+      "cond_sd": 0.648,
+      "n": 25
+    },
+    "Turkey Vulture": {
+      "value": 11.141,
+      "effect": 6.526,
+      "cond_sd": 0.622,
+      "n": 30
+    },
+    "Black Vulture": {
+      "value": 10.731,
+      "effect": 6.116,
+      "cond_sd": 0.63,
+      "n": 26
+    },
+    "Black-Billed Magpie": {
+      "value": 10.662,
+      "effect": 6.046,
+      "cond_sd": 0.672,
+      "n": 23
+    },
+    "Broad-Winged Hawk": {
+      "value": 8.498,
+      "effect": 3.883,
+      "cond_sd": 0.63,
+      "n": 27
+    },
+    "Chipping Sparrow": {
+      "value": 8.22,
+      "effect": 3.605,
+      "cond_sd": 1.434,
+      "n": 3
+    },
+    "Brewer's Blackbird": {
+      "value": 7.932,
+      "effect": 3.317,
+      "cond_sd": 0.595,
+      "n": 30
+    },
+    "Juniper Titmouse": {
+      "value": 7.664,
+      "effect": 3.048,
+      "cond_sd": 0.892,
+      "n": 13
+    },
+    "American Kestrel": {
+      "value": 7.624,
+      "effect": 3.009,
+      "cond_sd": 0.665,
+      "n": 23
+    },
+    "Golden Eagle": {
+      "value": 7.409,
+      "effect": 2.794,
+      "cond_sd": 1.05,
+      "n": 7
+    },
+    "Ferruginous Hawk": {
+      "value": 7.349,
+      "effect": 2.734,
+      "cond_sd": 0.656,
+      "n": 24
+    },
+    "Burrowing Owl": {
+      "value": 7.19,
+      "effect": 2.575,
+      "cond_sd": 0.531,
+      "n": 46
+    },
+    "Bushtit": {
+      "value": 7.166,
+      "effect": 2.551,
+      "cond_sd": 0.675,
+      "n": 23
+    },
+    "Baltimore Oriole": {
+      "value": 7.052,
+      "effect": 2.437,
+      "cond_sd": 0.6,
+      "n": 31
+    },
+    "Peregrine Falcon": {
+      "value": 7.006,
+      "effect": 2.39,
+      "cond_sd": 0.822,
+      "n": 14
+    },
+    "Chimney Swift": {
+      "value": 6.974,
+      "effect": 2.359,
+      "cond_sd": 1.311,
+      "n": 4
+    },
+    "Bald Eagle": {
+      "value": 6.925,
+      "effect": 2.309,
+      "cond_sd": 0.687,
+      "n": 21
+    },
+    "Mountain Bluebird": {
+      "value": 6.908,
+      "effect": 2.292,
+      "cond_sd": 0.822,
+      "n": 14
+    },
+    "Pileated Woodpecker": {
+      "value": 6.697,
+      "effect": 2.082,
+      "cond_sd": 0.814,
+      "n": 15
+    },
+    "House Finch": {
+      "value": 6.695,
+      "effect": 2.079,
+      "cond_sd": 0.854,
+      "n": 12
+    },
+    "Dickcissel": {
+      "value": 6.686,
+      "effect": 2.071,
+      "cond_sd": 0.886,
+      "n": 11
+    },
+    "Hermit Thrush": {
+      "value": 6.624,
+      "effect": 2.009,
+      "cond_sd": 0.745,
+      "n": 18
+    },
+    "Black-Chinned Hummingbird": {
+      "value": 6.614,
+      "effect": 1.998,
+      "cond_sd": 0.504,
+      "n": 51
+    },
+    "Anna's Hummingbird": {
+      "value": 6.597,
+      "effect": 1.982,
+      "cond_sd": 0.486,
+      "n": 69
+    },
+    "Pygmy Nuthatch": {
+      "value": 6.581,
+      "effect": 1.966,
+      "cond_sd": 1.144,
+      "n": 6
+    },
+    "Red-Tailed Hawk": {
+      "value": 6.564,
+      "effect": 1.949,
+      "cond_sd": 1.586,
+      "n": 2
+    },
+    "Purple Martin": {
+      "value": 6.504,
+      "effect": 1.889,
+      "cond_sd": 0.626,
+      "n": 26
+    },
+    "Blue-Winged Warbler": {
+      "value": 6.254,
+      "effect": 1.639,
+      "cond_sd": 0.458,
+      "n": 63
+    },
+    "Yellow-Headed Blackbird": {
+      "value": 6.227,
+      "effect": 1.612,
+      "cond_sd": 0.745,
+      "n": 17
+    },
+    "Clark's Grebe": {
+      "value": 6.18,
+      "effect": 1.565,
+      "cond_sd": 0.572,
+      "n": 45
+    },
+    "Barred Owl": {
+      "value": 6.162,
+      "effect": 1.547,
+      "cond_sd": 0.792,
+      "n": 15
+    },
+    "Northern Bobwhite": {
+      "value": 6.113,
+      "effect": 1.498,
+      "cond_sd": 0.898,
+      "n": 11
+    },
+    "Yellow-Breasted Chat": {
+      "value": 6.097,
+      "effect": 1.482,
+      "cond_sd": 0.898,
+      "n": 11
+    },
+    "Prothonotary Warbler": {
+      "value": 6.015,
+      "effect": 1.4,
+      "cond_sd": 0.764,
+      "n": 16
+    },
+    "Yellow-Billed Cuckoo": {
+      "value": 5.978,
+      "effect": 1.363,
+      "cond_sd": 1.119,
+      "n": 6
+    },
+    "Great Egret": {
+      "value": 5.976,
+      "effect": 1.361,
+      "cond_sd": 0.912,
+      "n": 11
+    },
+    "Barn Owl": {
+      "value": 5.971,
+      "effect": 1.356,
+      "cond_sd": 0.806,
+      "n": 14
+    },
+    "Common Grackle": {
+      "value": 5.95,
+      "effect": 1.335,
+      "cond_sd": 0.76,
+      "n": 16
+    },
+    "Bell's Vireo": {
+      "value": 5.9,
+      "effect": 1.285,
+      "cond_sd": 0.581,
+      "n": 32
+    },
+    "Ruby-Throated Hummingbird": {
+      "value": 5.9,
+      "effect": 1.285,
+      "cond_sd": 0.632,
+      "n": 31
+    },
+    "Blue Grosbeak": {
+      "value": 5.897,
+      "effect": 1.282,
+      "cond_sd": 1.854,
+      "n": 1
+    },
+    "Common Merganser": {
+      "value": 5.889,
+      "effect": 1.274,
+      "cond_sd": 0.523,
+      "n": 44
+    },
+    "Painted Whitestart": {
+      "value": 5.883,
+      "effect": 1.268,
+      "cond_sd": 0.777,
+      "n": 18
+    },
+    "Red-Shouldered Hawk": {
+      "value": 5.883,
+      "effect": 1.268,
+      "cond_sd": 0.871,
+      "n": 12
+    },
+    "Wood Stork": {
+      "value": 5.872,
+      "effect": 1.257,
+      "cond_sd": 0.529,
+      "n": 40
+    },
+    "Osprey": {
+      "value": 5.864,
+      "effect": 1.248,
+      "cond_sd": 0.606,
+      "n": 29
+    },
+    "Red-Winged Blackbird": {
+      "value": 5.836,
+      "effect": 1.221,
+      "cond_sd": 0.613,
+      "n": 31
+    },
+    "Dark-Eyed Junco": {
+      "value": 5.801,
+      "effect": 1.186,
+      "cond_sd": 0.831,
+      "n": 13
+    },
+    "Red-Breasted Nuthatch": {
+      "value": 5.753,
+      "effect": 1.138,
+      "cond_sd": 1.866,
+      "n": 1
+    },
+    "Blue Jay": {
+      "value": 5.75,
+      "effect": 1.135,
+      "cond_sd": 0.97,
+      "n": 9
+    },
+    "Greater Roadrunner": {
+      "value": 5.748,
+      "effect": 1.133,
+      "cond_sd": 0.624,
+      "n": 27
+    },
+    "Eastern Screech-Owl": {
+      "value": 5.746,
+      "effect": 1.13,
+      "cond_sd": 1.287,
+      "n": 4
+    },
+    "Scissor-Tailed Flycatcher": {
+      "value": 5.737,
+      "effect": 1.121,
+      "cond_sd": 0.858,
+      "n": 12
+    },
+    "Lazuli Bunting": {
+      "value": 5.735,
+      "effect": 1.12,
+      "cond_sd": 0.837,
+      "n": 13
+    },
+    "Trumpeter Swan": {
+      "value": 5.692,
+      "effect": 1.077,
+      "cond_sd": 0.562,
+      "n": 35
+    },
+    "American Robin": {
+      "value": 5.646,
+      "effect": 1.031,
+      "cond_sd": 1.055,
+      "n": 7
+    },
+    "American Redstart": {
+      "value": 5.606,
+      "effect": 0.991,
+      "cond_sd": 0.9,
+      "n": 11
+    },
+    "Atlantic Puffin": {
+      "value": 5.552,
+      "effect": 0.937,
+      "cond_sd": 0.66,
+      "n": 23
+    },
+    "Painted Bunting": {
+      "value": 5.507,
+      "effect": 0.892,
+      "cond_sd": 1.004,
+      "n": 8
+    },
+    "Rose-Breasted Grosbeak": {
+      "value": 5.503,
+      "effect": 0.887,
+      "cond_sd": 0.818,
+      "n": 14
+    },
+    "Black-Necked Stilt": {
+      "value": 5.439,
+      "effect": 0.824,
+      "cond_sd": 1.073,
+      "n": 7
+    },
+    "Roseate Spoonbill": {
+      "value": 5.435,
+      "effect": 0.82,
+      "cond_sd": 0.696,
+      "n": 20
+    },
+    "Wild Turkey": {
+      "value": 5.339,
+      "effect": 0.724,
+      "cond_sd": 0.605,
+      "n": 30
+    },
+    "American Goldfinch": {
+      "value": 5.336,
+      "effect": 0.721,
+      "cond_sd": 1.207,
+      "n": 5
+    },
+    "Mourning Dove": {
+      "value": 5.315,
+      "effect": 0.699,
+      "cond_sd": 1.017,
+      "n": 8
+    },
+    "Pine Siskin": {
+      "value": 5.306,
+      "effect": 0.691,
+      "cond_sd": 1.29,
+      "n": 4
+    },
+    "Western Meadowlark": {
+      "value": 5.303,
+      "effect": 0.688,
+      "cond_sd": 1.293,
+      "n": 4
+    },
+    "American Crow": {
+      "value": 5.292,
+      "effect": 0.677,
+      "cond_sd": 0.556,
+      "n": 45
+    },
+    "Northern Shoveler": {
+      "value": 5.267,
+      "effect": 0.652,
+      "cond_sd": 0.755,
+      "n": 17
+    },
+    "Say's Phoebe": {
+      "value": 5.214,
+      "effect": 0.599,
+      "cond_sd": 1.199,
+      "n": 5
+    },
+    "American Woodcock": {
+      "value": 5.2,
+      "effect": 0.585,
+      "cond_sd": 0.632,
+      "n": 26
+    },
+    "House Wren": {
+      "value": 5.2,
+      "effect": 0.585,
+      "cond_sd": 0.871,
+      "n": 14
+    },
+    "White-Throated Swift": {
+      "value": 5.099,
+      "effect": 0.483,
+      "cond_sd": 0.646,
+      "n": 25
+    },
+    "Eastern Phoebe": {
+      "value": 4.967,
+      "effect": 0.352,
+      "cond_sd": 0.781,
+      "n": 16
+    },
+    "Cerulean Warbler": {
+      "value": 4.966,
+      "effect": 0.351,
+      "cond_sd": 0.682,
+      "n": 21
+    },
+    "White-Faced Ibis": {
+      "value": 4.96,
+      "effect": 0.345,
+      "cond_sd": 0.595,
+      "n": 30
+    },
+    "Chestnut-Collared Longspur": {
+      "value": 4.918,
+      "effect": 0.303,
+      "cond_sd": 0.657,
+      "n": 23
+    },
+    "American Bittern": {
+      "value": 4.866,
+      "effect": 0.251,
+      "cond_sd": 0.96,
+      "n": 9
+    },
+    "Lincoln's Sparrow": {
+      "value": 4.841,
+      "effect": 0.226,
+      "cond_sd": 1.213,
+      "n": 5
+    },
+    "Cassin's Sparrow": {
+      "value": 4.818,
+      "effect": 0.203,
+      "cond_sd": 0.708,
+      "n": 22
+    },
+    "Red-Cockaded Woodpecker": {
+      "value": 4.786,
+      "effect": 0.171,
+      "cond_sd": 0.85,
+      "n": 12
+    },
+    "Scaled Quail": {
+      "value": 4.78,
+      "effect": 0.165,
+      "cond_sd": 0.722,
+      "n": 25
+    },
+    "Mississippi Kite": {
+      "value": 4.752,
+      "effect": 0.137,
+      "cond_sd": 1.116,
+      "n": 6
+    },
+    "Northern Harrier": {
+      "value": 4.738,
+      "effect": 0.123,
+      "cond_sd": 0.607,
+      "n": 36
+    },
+    "Savannah Sparrow": {
+      "value": 4.731,
+      "effect": 0.116,
+      "cond_sd": 1.43,
+      "n": 3
+    },
+    "Cassin's Finch": {
+      "value": 4.727,
+      "effect": 0.112,
+      "cond_sd": 0.653,
+      "n": 24
+    },
+    "Red-Eyed Vireo": {
+      "value": 4.692,
+      "effect": 0.077,
+      "cond_sd": 1.216,
+      "n": 5
+    },
+    "Bronzed Cowbird": {
+      "value": 4.609,
+      "effect": -0.006,
+      "cond_sd": 1.191,
+      "n": 5
+    },
+    "Greater Prairie-Chicken": {
+      "value": 4.607,
+      "effect": -0.009,
+      "cond_sd": 0.849,
+      "n": 12
+    },
+    "Tufted Titmouse": {
+      "value": 4.562,
+      "effect": -0.054,
+      "cond_sd": 1.853,
+      "n": 1
+    },
+    "Black Skimmer": {
+      "value": 4.498,
+      "effect": -0.117,
+      "cond_sd": 0.751,
+      "n": 17
+    },
+    "Inca Dove": {
+      "value": 4.474,
+      "effect": -0.141,
+      "cond_sd": 1.061,
+      "n": 7
+    },
+    "Fish Crow": {
+      "value": 4.472,
+      "effect": -0.143,
+      "cond_sd": 0.64,
+      "n": 28
+    },
+    "Brant": {
+      "value": 4.322,
+      "effect": -0.293,
+      "cond_sd": 1.03,
+      "n": 8
+    },
+    "Brown Pelican": {
+      "value": 4.311,
+      "effect": -0.305,
+      "cond_sd": 0.875,
+      "n": 12
+    },
+    "Indigo Bunting": {
+      "value": 4.31,
+      "effect": -0.305,
+      "cond_sd": 0.882,
+      "n": 12
+    },
+    "Acorn Woodpecker": {
+      "value": 4.291,
+      "effect": -0.324,
+      "cond_sd": 1.436,
+      "n": 3
+    },
+    "Red Crossbill": {
+      "value": 4.287,
+      "effect": -0.328,
+      "cond_sd": 0.792,
+      "n": 15
+    },
+    "Green Heron": {
+      "value": 4.287,
+      "effect": -0.328,
+      "cond_sd": 1.332,
+      "n": 4
+    },
+    "Western Tanager": {
+      "value": 4.285,
+      "effect": -0.33,
+      "cond_sd": 1.291,
+      "n": 4
+    },
+    "Great Horned Owl": {
+      "value": 4.233,
+      "effect": -0.382,
+      "cond_sd": 1.115,
+      "n": 6
+    },
+    "Violet-Green Swallow": {
+      "value": 4.215,
+      "effect": -0.4,
+      "cond_sd": 1.132,
+      "n": 6
+    },
+    "Common Raven": {
+      "value": 4.178,
+      "effect": -0.437,
+      "cond_sd": 0.765,
+      "n": 16
+    },
+    "Purple Gallinule": {
+      "value": 4.17,
+      "effect": -0.445,
+      "cond_sd": 0.585,
+      "n": 31
+    },
+    "Ring-Billed Gull": {
+      "value": 4.133,
+      "effect": -0.482,
+      "cond_sd": 0.667,
+      "n": 22
+    },
+    "Great Blue Heron": {
+      "value": 4.079,
+      "effect": -0.536,
+      "cond_sd": 0.888,
+      "n": 11
+    },
+    "Ruby-Crowned Kinglet": {
+      "value": 4.061,
+      "effect": -0.554,
+      "cond_sd": 1.414,
+      "n": 3
+    },
+    "Swainson's Hawk": {
+      "value": 4.037,
+      "effect": -0.578,
+      "cond_sd": 0.772,
+      "n": 17
+    },
+    "Bobolink": {
+      "value": 4.036,
+      "effect": -0.58,
+      "cond_sd": 1.594,
+      "n": 2
+    },
+    "King Rail": {
+      "value": 4.011,
+      "effect": -0.604,
+      "cond_sd": 0.762,
+      "n": 16
+    },
+    "California Condor": {
+      "value": 3.995,
+      "effect": -0.62,
+      "cond_sd": 0.573,
+      "n": 33
+    },
+    "Ash-Throated Flycatcher": {
+      "value": 3.947,
+      "effect": -0.668,
+      "cond_sd": 0.906,
+      "n": 12
+    },
+    "Hooded Warbler": {
+      "value": 3.924,
+      "effect": -0.691,
+      "cond_sd": 0.639,
+      "n": 25
+    },
+    "American Avocet": {
+      "value": 3.922,
+      "effect": -0.693,
+      "cond_sd": 0.915,
+      "n": 10
+    },
+    "Song Sparrow": {
+      "value": 3.887,
+      "effect": -0.728,
+      "cond_sd": 1.852,
+      "n": 1
+    },
+    "Spotted Sandpiper": {
+      "value": 3.879,
+      "effect": -0.736,
+      "cond_sd": 0.604,
+      "n": 32
+    },
+    "Grasshopper Sparrow": {
+      "value": 3.874,
+      "effect": -0.741,
+      "cond_sd": 1.196,
+      "n": 5
+    },
+    "California Quail": {
+      "value": 3.849,
+      "effect": -0.766,
+      "cond_sd": 1.602,
+      "n": 2
+    },
+    "Horned Lark": {
+      "value": 3.836,
+      "effect": -0.779,
+      "cond_sd": 0.812,
+      "n": 15
+    },
+    "Cedar Waxwing": {
+      "value": 3.825,
+      "effect": -0.79,
+      "cond_sd": 1.588,
+      "n": 2
+    },
+    "Blue-Gray Gnatcatcher": {
+      "value": 3.795,
+      "effect": -0.821,
+      "cond_sd": 0.706,
+      "n": 28
+    },
+    "Northern Flicker": {
+      "value": 3.77,
+      "effect": -0.846,
+      "cond_sd": 1.862,
+      "n": 1
+    },
+    "Vaux's Swift": {
+      "value": 3.752,
+      "effect": -0.863,
+      "cond_sd": 0.582,
+      "n": 32
+    },
+    "Tree Swallow": {
+      "value": 3.75,
+      "effect": -0.865,
+      "cond_sd": 1.002,
+      "n": 8
+    },
+    "Whooping Crane": {
+      "value": 3.713,
+      "effect": -0.903,
+      "cond_sd": 0.591,
+      "n": 30
+    },
+    "Steller's Jay": {
+      "value": 3.683,
+      "effect": -0.933,
+      "cond_sd": 0.955,
+      "n": 9
+    },
+    "Clark's Nutcracker": {
+      "value": 3.648,
+      "effect": -0.967,
+      "cond_sd": 0.765,
+      "n": 16
+    },
+    "Baird's Sparrow": {
+      "value": 3.643,
+      "effect": -0.972,
+      "cond_sd": 1.062,
+      "n": 7
+    },
+    "Gray Catbird": {
+      "value": 3.593,
+      "effect": -1.022,
+      "cond_sd": 0.739,
+      "n": 18
+    },
+    "Sprague's Pipit": {
+      "value": 3.583,
+      "effect": -1.032,
+      "cond_sd": 0.886,
+      "n": 11
+    },
+    "Killdeer": {
+      "value": 3.492,
+      "effect": -1.123,
+      "cond_sd": 1.631,
+      "n": 2
+    },
+    "Red-Headed Woodpecker": {
+      "value": 3.484,
+      "effect": -1.131,
+      "cond_sd": 0.829,
+      "n": 13
+    },
+    "Black-Bellied Whistling-Duck": {
+      "value": 3.477,
+      "effect": -1.139,
+      "cond_sd": 1.151,
+      "n": 6
+    },
+    "Sandhill Crane": {
+      "value": 3.289,
+      "effect": -1.326,
+      "cond_sd": 0.885,
+      "n": 12
+    },
+    "Black Tern": {
+      "value": 3.224,
+      "effect": -1.391,
+      "cond_sd": 1.102,
+      "n": 7
+    },
+    "Great Crested Flycatcher": {
+      "value": 3.174,
+      "effect": -1.441,
+      "cond_sd": 0.724,
+      "n": 19
+    },
+    "Snowy Egret": {
+      "value": 3.166,
+      "effect": -1.449,
+      "cond_sd": 1.585,
+      "n": 2
+    },
+    "Black-Crowned Night-Heron": {
+      "value": 3.103,
+      "effect": -1.512,
+      "cond_sd": 0.484,
+      "n": 55
+    },
+    "Common Loon": {
+      "value": 3.084,
+      "effect": -1.532,
+      "cond_sd": 0.645,
+      "n": 27
+    },
+    "Ruddy Duck": {
+      "value": 3.03,
+      "effect": -1.586,
+      "cond_sd": 1.628,
+      "n": 2
+    },
+    "Chihuahuan Raven": {
+      "value": 3.019,
+      "effect": -1.596,
+      "cond_sd": 1.293,
+      "n": 4
+    },
+    "Canvasback": {
+      "value": 3.008,
+      "effect": -1.607,
+      "cond_sd": 0.683,
+      "n": 25
+    },
+    "Bewick's Wren": {
+      "value": 2.934,
+      "effect": -1.681,
+      "cond_sd": 1.591,
+      "n": 2
+    },
+    "Hooded Merganser": {
+      "value": 2.917,
+      "effect": -1.698,
+      "cond_sd": 0.829,
+      "n": 13
+    },
+    "Willet": {
+      "value": 2.914,
+      "effect": -1.702,
+      "cond_sd": 1.586,
+      "n": 2
+    },
+    "Northern Cardinal": {
+      "value": 2.844,
+      "effect": -1.771,
+      "cond_sd": 1.064,
+      "n": 7
+    },
+    "Barrow's Goldeneye": {
+      "value": 2.705,
+      "effect": -1.91,
+      "cond_sd": 1.009,
+      "n": 8
+    },
+    "Anhinga": {
+      "value": 2.643,
+      "effect": -1.972,
+      "cond_sd": 0.641,
+      "n": 27
+    },
+    "Cooper's Hawk": {
+      "value": 2.491,
+      "effect": -2.124,
+      "cond_sd": 0.894,
+      "n": 11
+    },
+    "White-Breasted Nuthatch": {
+      "value": 2.41,
+      "effect": -2.205,
+      "cond_sd": 1.596,
+      "n": 2
+    },
+    "Double-Crested Cormorant": {
+      "value": 2.352,
+      "effect": -2.263,
+      "cond_sd": 1.123,
+      "n": 6
+    },
+    "Yellow-Bellied Sapsucker": {
+      "value": 2.339,
+      "effect": -2.276,
+      "cond_sd": 1.325,
+      "n": 4
+    },
+    "American White Pelican": {
+      "value": 2.196,
+      "effect": -2.419,
+      "cond_sd": 0.899,
+      "n": 11
+    },
+    "White-Crowned Sparrow": {
+      "value": 2.164,
+      "effect": -2.451,
+      "cond_sd": 0.919,
+      "n": 11
+    },
+    "Brown-Headed Cowbird": {
+      "value": 2.078,
+      "effect": -2.537,
+      "cond_sd": 0.891,
+      "n": 11
+    },
+    "Spotted Owl": {
+      "value": 2.05,
+      "effect": -2.565,
+      "cond_sd": 0.884,
+      "n": 11
+    },
+    "Loggerhead Shrike": {
+      "value": 1.959,
+      "effect": -2.656,
+      "cond_sd": 0.833,
+      "n": 15
+    },
+    "Canada Goose": {
+      "value": 1.951,
+      "effect": -2.664,
+      "cond_sd": 1.229,
+      "n": 5
+    },
+    "Eastern Bluebird": {
+      "value": 1.91,
+      "effect": -2.705,
+      "cond_sd": 0.954,
+      "n": 10
+    },
+    "Mountain Chickadee": {
+      "value": 1.748,
+      "effect": -2.867,
+      "cond_sd": 1.598,
+      "n": 2
+    },
+    "Forster's Tern": {
+      "value": 1.706,
+      "effect": -2.91,
+      "cond_sd": 1.29,
+      "n": 4
+    },
+    "Franklin's Gull": {
+      "value": 1.572,
+      "effect": -3.044,
+      "cond_sd": 1.435,
+      "n": 3
+    },
+    "Northern Mockingbird": {
+      "value": 1.507,
+      "effect": -3.108,
+      "cond_sd": 1.207,
+      "n": 5
+    },
+    "Belted Kingfisher": {
+      "value": 1.346,
+      "effect": -3.269,
+      "cond_sd": 0.669,
+      "n": 23
+    },
+    "American Oystercatcher": {
+      "value": 1.313,
+      "effect": -3.302,
+      "cond_sd": 0.936,
+      "n": 10
+    },
+    "Yellow-Rumped Warbler": {
+      "value": 0.848,
+      "effect": -3.767,
+      "cond_sd": 1.856,
+      "n": 1
+    },
+    "Common Nighthawk": {
+      "value": 0.764,
+      "effect": -3.851,
+      "cond_sd": 1.303,
+      "n": 4
+    },
+    "Eastern Kingbird": {
+      "value": 0.728,
+      "effect": -3.888,
+      "cond_sd": 1.588,
+      "n": 2
+    },
+    "American Coot": {
+      "value": 0.614,
+      "effect": -4.002,
+      "cond_sd": 0.669,
+      "n": 23
+    },
+    "Wilson's Snipe": {
+      "value": 0.311,
+      "effect": -4.305,
+      "cond_sd": 0.557,
+      "n": 41
+    },
+    "Red-Breasted Merganser": {
+      "value": 0.304,
+      "effect": -4.311,
+      "cond_sd": 1.206,
+      "n": 5
+    },
+    "Mallard": {
+      "value": -2.592,
+      "effect": -7.207,
+      "cond_sd": 1.683,
+      "n": 2
+    },
+    "Common Yellowthroat": {
+      "value": -2.603,
+      "effect": -7.218,
+      "cond_sd": 1.077,
+      "n": 7
+    }
+  }
+}

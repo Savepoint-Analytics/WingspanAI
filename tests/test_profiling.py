@@ -42,8 +42,9 @@ class ProfilerTests(TestCase):
         summary = profiler.finish().summary_payload()
         outer, inner = summary["nodes"]["outer"], summary["nodes"]["inner"]
         self.assertGreater(outer["elapsed_ms"], inner["elapsed_ms"])
+        # Each figure is rounded to 3 decimals independently, so allow one unit.
         self.assertAlmostEqual(
-            outer["self_ms"], outer["elapsed_ms"] - inner["elapsed_ms"], places=3
+            outer["self_ms"], outer["elapsed_ms"] - inner["elapsed_ms"], delta=0.002
         )
         accounted = sum(n["self_ms"] for n in summary["nodes"].values()) + summary["unprofiled_ms"]
         self.assertAlmostEqual(accounted, summary["total_ms"], places=2)

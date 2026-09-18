@@ -30,6 +30,8 @@ from wingspan_ai.agents.setup import (
     ForcedBonusCardSetupPolicy,
     NetValueSetupPolicy,
     PotentialPointsSetupPolicy,
+    is_potential_points_setup_policy_id,
+    potential_points_setup_policy,
 )
 from wingspan_ai.config import database_url_from_env, load_dotenv, object_storage_config_from_env
 from wingspan_ai.content.filters import filter_catalog_by_power_status
@@ -302,6 +304,9 @@ def run_seeded_game(
         "search_opponent_models": _search_opponent_models(
             lineup_agents, potential_points_search or PotentialPointsSearchConfig()
         ),
+        "search_holdouts": _search_holdouts(
+            lineup_agents, potential_points_search or PotentialPointsSearchConfig()
+        ),
         "forced_bonus_choice": dict(forced_bonus_choice) if forced_bonus_choice else None,
         "setup_policy_overrides": dict(setup_policy_overrides) if setup_policy_overrides else None,
         "opening_hand_overrides": dict(opening_hand_overrides) if opening_hand_overrides else None,
@@ -404,6 +409,7 @@ def run_seeded_game(
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "search_opponent_models": batch_metadata["search_opponent_models"],
+        "search_holdouts": batch_metadata["search_holdouts"],
         "forced_bonus_choice": batch_metadata["forced_bonus_choice"],
         "setup_policy_overrides": batch_metadata["setup_policy_overrides"],
         "opening_hand_overrides": batch_metadata["opening_hand_overrides"],
@@ -463,6 +469,11 @@ def _apply_setup_policy(agent, agent_kind: PlayerTwoAgentKind, setup_policy_kind
     if setup_policy_kind == "control":
         agent.setup_policy = DefaultSetupPolicy()
         return agent
+    if is_potential_points_setup_policy_id(setup_policy_kind):
+        # A concrete opener variant (e.g. ``potential_points_setup_v3_keep3``)
+        # for an arm on the opener itself.
+        agent.setup_policy = potential_points_setup_policy(setup_policy_kind)
+        return agent
     if agent_kind.startswith("archetype_"):
         agent.setup_policy = ArchetypeSetupPolicy(agent_kind.removeprefix("archetype_"))
     elif agent_kind == "net_value_response":
@@ -484,6 +495,21 @@ def _search_opponent_models(agents, search: PotentialPointsSearchConfig) -> dict
             "holdout": effective != search.search_opponent_model,
         }
     return models
+
+
+def _search_holdouts(agents, search: PotentialPointsSearchConfig) -> dict[str, dict]:
+    """Per potential_points seat: the effective search fields and the holdouts applied."""
+
+    out: dict[str, dict] = {}
+    for agent in agents:
+        base = getattr(agent, "base_agent", agent)
+        if not hasattr(base, "search_child_expansion"):
+            continue
+        out[agent.agent_id] = {
+            "applied": list(getattr(base, "holdouts_applied", [])),
+            "effective": {name: getattr(base, name) for name in search.AGENT_FIELDS},
+        }
+    return out
 
 
 def _search_payload(config: PotentialPointsSearchConfig | None) -> dict | None:
@@ -535,26 +561,15 @@ def _make_agent(
         agent = RandomLegalAgent(agent_id=f"random_legal_{seat}", random_seed=agent_random_seed)
     elif agent_kind == "potential_points":
         search = potential_points_search or PotentialPointsSearchConfig()
-        # The holdout is keyed on the game's seed and the agent's lineup
-        # position, so seed-matched arms and seat rotations agree on it.
-        opponent_model, _is_holdout = search.resolve_opponent_model(
+        # Holdouts are keyed on the game's seed and the agent's lineup
+        # position, so seed-matched arms and seat rotations agree on them.
+        effective, applied = search.resolve_effective(
             random_seed=random_seed,
             lineup=lineup or (agent_kind,),
             lineup_position=max(seat_ordinal - 1, 0),
         )
-        agent = PotentialPointsAgent(
-            agent_id=f"potential_points_{seat}",
-            search_depth=search.search_depth,
-            final_search_turns=search.final_search_turns,
-            search_beam_width=search.search_beam_width,
-            determinization_samples=search.determinization_samples,
-            planning_horizon=search.planning_horizon,
-            search_food_candidates=search.search_food_candidates,
-            search_opponent_model=opponent_model,
-            mechanic_synergy=search.mechanic_synergy,
-            mechanic_synergy_hand=search.mechanic_synergy_hand,
-            mechanic_synergy_weight=search.mechanic_synergy_weight,
-        )
+        agent = PotentialPointsAgent(agent_id=f"potential_points_{seat}", **effective)
+        agent.holdouts_applied = applied  # type: ignore[attr-defined]
     elif agent_kind == "net_value_response":
         agent = NetValueOpponentResponseAgent(
             agent_id=f"net_value_response_{seat}",
@@ -634,6 +649,8 @@ def _resolve_agent_lineup(
 
 
 def _validate_setup_policy_kind(setup_policy_kind: str) -> SetupPolicyKind:
+    if is_potential_points_setup_policy_id(setup_policy_kind):
+        return setup_policy_kind  # type: ignore[return-value]
     if setup_policy_kind not in VALID_SETUP_POLICY_KINDS:
         allowed = ", ".join(sorted(VALID_SETUP_POLICY_KINDS))
         raise ValueError(f"setup_policy_kind must be one of: {allowed}")
@@ -762,6 +779,7 @@ def _write_batch_manifest(
                     "net_value_max_opponent_response_actions"
                 ],
                 "search_opponent_models": result.get("search_opponent_models", {}),
+                "search_holdouts": result.get("search_holdouts", {}),
                 "forced_bonus_choice": result.get("forced_bonus_choice"),
                 "setup_policy_overrides": result.get("setup_policy_overrides"),
                 "opening_hand_overrides": result.get("opening_hand_overrides"),

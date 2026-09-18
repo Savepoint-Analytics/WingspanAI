@@ -14,7 +14,7 @@ Analysis layer:
 - `analysis/sql/analysis_views.sql`: reproducible metric definitions over simulation telemetry.
 - `analysis/apply_sql_views.py`: applies and probes the analysis views.
 - `analysis/arm_contrast.py`: paired contrast of experimental arms against a baseline.
-- `analysis/holdout_guardrail.py`: the standing 5% greedy-opponent control, pooled across batches.
+- `analysis/holdout_guardrail.py`: the standing 5% controls (every decided switch keeps its losing side; registry in `experiments/standing_holdouts.md`), pooled across batches.
 - `analysis/decision_profile_report.py`: latency percentiles, node breakdown, cache hit rates and value per second against a baseline.
 - `analysis/card_structure.py`: static synergy tables — what the deck supplies each bonus card, and what each bird carries.
 - `analysis/bonus_card_seed_coverage.py` and `analysis/bonus_card_keep_contrast.py`: seed selection and the per-card paired contrast for the forced-keep study.
@@ -40,6 +40,8 @@ Key rules docs:
 - `events/simulation_event_taxonomy.md`: current simulation telemetry envelope and emitted event names.
 - `events/postgresql_event_table_design.md`: draft event-log database tables and indexes.
 - `experiments/case_study_outline.md`: public case-study narrative outline.
+- `experiments/results_ledger.md`: one row per registered arm and study — score delta, p, latency, points per second, decision — and the round-robin and card-study headlines.
+- `experiments/standing_holdouts.md`: registry of every decided switch kept alive at 5% as a long-run guardrail, how the draw works, how to read and retire one.
 - `experiments/lookahead_compute_profile.md`: `apply_action` deep-copy profile and budgeted lookahead-agent probes.
 - `experiments/baseline_matrix10_v2.md`: 10-seed baseline matrix on the corrected simulator.
 - `experiments/potential_points_matrix10_smoke.md`: (superseded) 10-seed baseline matrix findings, decision timing, and current interpretation caveats.

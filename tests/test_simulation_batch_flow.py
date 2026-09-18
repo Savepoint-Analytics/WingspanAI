@@ -130,6 +130,11 @@ class SimulationBatchFlowTests(TestCase):
                     "mechanic_synergy": False,
                     "mechanic_synergy_hand": True,
                     "mechanic_synergy_weight": 1.0,
+                    "search_child_expansion": "fast",
+                    "holdouts": [
+                        {"field": "mechanic_synergy", "value": True, "share": 0.05},
+                        {"field": "search_child_expansion", "value": "copy", "share": 0.05},
+                    ],
                 },
             )
             self.assertEqual(results[0]["player_two_agent_id"], "potential_points_p2")
@@ -171,6 +176,24 @@ class SimulationBatchFlowTests(TestCase):
                 )
 
                 self.assertEqual(agent.agent_id, expected_agent_id)
+
+    def test_setup_policy_override_accepts_a_concrete_opener_id(self) -> None:
+        agent = simulation_batch._make_player_two_agent(
+            "potential_points",
+            random_seed=11,
+            setup_policy_kind="control",
+            setup_policy_overrides={"potential_points": "potential_points_setup_v3_keep3"},
+        )
+        self.assertEqual(agent.setup_policy.policy_id, "potential_points_setup_v3_keep3")
+        other = simulation_batch._make_player_two_agent(
+            "greedy_immediate",
+            random_seed=11,
+            setup_policy_kind="control",
+            setup_policy_overrides={"potential_points": "potential_points_setup_v3_keep3"},
+        )
+        self.assertEqual(other.setup_policy.policy_id, "default_setup_v1")
+        with self.assertRaises(ValueError):
+            simulation_batch._validate_setup_policy_kind("potential_points_setup_v9")
 
     def test_simulation_batch_records_monte_carlo_budget_controls(self) -> None:
         with TemporaryDirectory() as tmp_dir:

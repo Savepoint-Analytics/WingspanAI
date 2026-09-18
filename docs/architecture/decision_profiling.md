@@ -92,6 +92,7 @@ so ratios are indicative and back-to-back probes are the clean measure.
 | search depth 3 every turn vs depth 1 (K=4 both) | +10.43 | <0.001 | 121 → 9,366 | +1.13 per s extra | **optimize** |
 | gain-food pruning (6 candidates) vs none | −0.99 | 0.074 | 21,202 → 17,466 | +0.26 per s saved | cost neutral |
 | belief opponent model vs greedy | +0.31 | 0.73 | 17,466 → 7,577 | ≈0 per s saved | **keep (cheaper)** |
+| fast search-child expansion vs copy | 0.00 (bit-identical) | — | 5,187 → 2,588 (probe) | ∞ | **keep (cheaper)** |
 | board-only synergy term vs none | +1.31 | 0.17 | 7,577 → 8,419 | +1.56 per s extra | cost neutral |
 | full synergy term (hand) vs none | −4.51 | 0.001 | 7,577 → 10,066 | −1.81 per s extra | **drop** |
 | v2 opener (agent_default) vs control | −3.00 | 0.022 | 7,577 → 5,668 | — | **drop** |
@@ -124,9 +125,10 @@ at 12.5 ms per call, while `opponent_apply` applies one in place at 0.17 ms.
 The copy is ~98% of expanding a child. The opponent model, 40% of a decision
 a week ago, is now 3%. The optimization targets are therefore:
 
-1. **State copies** (73%). Incremental apply/undo on one working state, or
-   copy-on-write of the parts an action touches, attacks the copy directly.
-   Expected: most of the 3.3 s per decision.
+1. **State copies** (73%). Done in part on 2026-09-17 (next section): the
+   fast expansion halves the decision. Incremental apply/undo on one working
+   state would take the rest of the copy, at the cost of an undo log for
+   every mutation in the rules engine; not started.
 2. **Leaf evaluations** (19%). 4,677 per decision at 0.18 ms. Children are
    all expanded and evaluated before the beam keeps four; a cheap pre-ranking
    (immediate score, no copy) that expands only the beam cuts both nodes.
@@ -135,6 +137,45 @@ a week ago, is now 3%. The optimization targets are therefore:
    fewer samples, then shallower depth, then the one-ply evaluator — is the
    production knob, and the ledger says what each step costs in points:
    depth 3 → 1 is −10.4 at −99% latency; K=4 → 0 is unmeasured on its own.
+
+## First optimization: the fast search-child expansion (2026-09-17)
+
+The profile said a child expansion was mostly the copy, so the copy was
+split with a single-state probe (`apply_action` on one mid-game state, 200
+repetitions): **0.66 ms per child = deep copy 0.33 + re-validation of the
+action against a fresh legal-action list 0.21 + the transition itself 0.07**
+(+0.05 unaccounted). The copy is dominated late in the game by
+`rng_draw_records`, the RNG audit trail, which grows by one record per draw
+and which no search branch ever reads.
+
+`apply_action(state, action, trusted=True, lean=True)` skips the
+re-validation (the search took the action from the generator on this exact
+state) and copies without the audit trail. The search passes both on every
+child; the runner, replay and every other caller keep the full path.
+Switch: `PotentialPointsSearchConfig.search_child_expansion = "fast" | "copy"`
+(default `fast`, with a 5% `copy` holdout).
+
+Verification: 104 decisions of four archived `rr_belief_opp` games
+reproduced action for action (`/tmp/bit_identity_check.py`, observing every
+recorded action and comparing `select_action` to the record), and every
+child of a fresh state hashes identically once the audit trail is put back.
+
+Back-to-back probe, four games each vs `archetype_engine_builder`, no
+holdouts, `artifacts/profile_expansion_copy` / `_fast`:
+
+| | copy | fast | |
+|---|---:|---:|---|
+| mean decision | 5,187 ms | **2,588 ms** | ×0.50 |
+| p95 | 25,994 ms | 11,724 ms | ×0.45 |
+| per game | 135 s | 67 s | |
+| `expand_children` per call | 15.9 ms | 5.8 ms | 240 calls/decision |
+| `expand_children` share | 73.5% | 53.3% | |
+| `terminal_value` share | 16.8% | 32.9% | unchanged in ms |
+| score | identical | identical | 4/4 games bit-identical |
+
+Class: **keep (cheaper, no loss)**. The next target is now the leaf
+evaluator: 4,087 `terminal_value` calls per decision at 0.21 ms, a third of
+the remaining time, which a beam pre-ranking without expansion attacks.
 
 ## Latency by round (production shape)
 
