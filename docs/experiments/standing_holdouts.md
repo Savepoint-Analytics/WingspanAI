@@ -26,7 +26,11 @@ long-run A/B test with a guardrail instead of a one-shot verdict.
 Holdout(field="mechanic_synergy", value=True, share=0.05)
 ```
 
-`PotentialPointsSearchConfig.holdouts` is a tuple of these.
+`PotentialPointsSearchConfig.holdouts` is a tuple of these. Fields that
+name an agent constructor argument are resolved by `resolve_effective`; the
+one non-agent field, `setup_policy`, is resolved by the flow against the
+opener the seat would otherwise use (`flows/simulation_batch.py::_make_agent`)
+and recorded in the same manifest entry.
 `resolve_effective(random_seed, lineup, lineup_position)` returns the
 effective agent fields for one seat in one game plus the list of fields
 that were held out; `flows/simulation_batch.py::_make_agent` builds the
@@ -64,16 +68,17 @@ runs, bit-identity checks); leave the defaults on for every arm.
 | `search_opponent_model` | `belief` | `greedy` | 5% | 2026-09-16 | belief model +0.31 n.s. at −57% latency, adopted | `holdout_guardrail.py` |
 | `mechanic_synergy` | `False` | `True` (board-only, weight 1.0) | 5% | 2026-09-17 | board-only synergy term +1.31 p=0.17, not adopted | `holdout_guardrail.py` |
 | `search_child_expansion` | `fast` | `copy` | 5% | 2026-09-17 | fast child expansion bit-identical at −53% per child, adopted | `holdout_guardrail.py` |
+| `setup_policy` (flow-resolved) | seat's opener (`default_setup_v1` in round robins) | `potential_points_setup_v3_keep3` | 5% | 2026-09-18 | measured opener −1.90 p=0.13, not adopted | `holdout_guardrail.py --field setup_policy` |
 
 Decisions **not** guarded by a holdout, and why:
 
 - Full synergy term (hand included), −4.5 at p=0.001: the board-only
   holdout covers the mechanism; the hand term's loss was large and its
   cause is understood (the agent keeps cards for the term).
-- `expected_points` opener as default (`potential_points_setup_v2`), which
-  lost the re-baseline: the setup policy is chosen per seat by the flow, not
-  a search field, so the holdout would live in `setup_policy_overrides`.
-  Worth adding when the opener is fixed under follow-up (3) of 2026-09-17.
+- `expected_points` opener as a whole (`potential_points_setup_v2`), which
+  lost the re-baseline −3.0: its bird selection is the known defect and the
+  `setup_policy` holdout above covers the opener slot; a second opener
+  holdout would double the deviating games for a decision already explained.
 - Search depth, beam, K, food candidates: these are cost knobs priced by
   the ledger, not adopt/drop decisions. Their contrasts are re-run when the
   agent changes.

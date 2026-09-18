@@ -192,9 +192,14 @@ SEARCH_CHILD_EXPANSIONS = ("copy", "fast")
 #: Standing holdouts (``agents/holdout.py``): every decided switch keeps its
 #: losing side alive in a deterministic 5% of games. ``search_opponent_model``
 #: has its own legacy holdout fields below and is not repeated here.
+#: ``setup_policy`` is not an agent field: the flow resolves it against the
+#: opener the seat would otherwise use (``flows/simulation_batch.py``).
+SETUP_POLICY_HOLDOUT_FIELD = "setup_policy"
 DEFAULT_HOLDOUTS: tuple[Holdout, ...] = (
     Holdout("mechanic_synergy", True),  # the dropped full synergy term
     Holdout("search_child_expansion", "copy"),  # correctness canary for the fast path
+    # The measured opener, −1.9 n.s. vs the plain opener on 2026-09-18.
+    Holdout(SETUP_POLICY_HOLDOUT_FIELD, "potential_points_setup_v3_keep3"),
 )
 
 

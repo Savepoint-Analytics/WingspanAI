@@ -494,6 +494,11 @@ class EndgameSearchDepthTests(TestCase):
                 "holdouts": [
                     {"field": "mechanic_synergy", "value": True, "share": 0.05},
                     {"field": "search_child_expansion", "value": "copy", "share": 0.05},
+                    {
+                        "field": "setup_policy",
+                        "value": "potential_points_setup_v3_keep3",
+                        "share": 0.05,
+                    },
                 ],
             },
         )

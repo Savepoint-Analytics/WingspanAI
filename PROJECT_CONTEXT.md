@@ -2975,3 +2975,39 @@ Compute is the constraint (one laptop, four runners saturate it). Order:
 opener arm (running) → oracle arm → budget arm. Launch scripts for the
 next two are prepared under `artifacts/<root>/launch/` and start when the
 previous arm's `GROUP COMPLETE` lines appear.
+
+## Update: 2026-09-18 - Measured opener: −1.9 (n.s.); observed play value is not keep value
+
+### Result (arm 3)
+`artifacts/rr_opener_v3` vs `rr_belief_opp`, 80 paired games at `70aa484`,
+clean: `potential_points` **78.41 → 76.51 (−1.90, p=0.13)**, win 0.875 →
+0.938 (+0.06, p=0.14); by opponent −3.35 / +1.25 / −1.85 / −3.65, none
+significant. Registered +1 to +3: failed. Not adopted; the plain opener
+stays the champion's opener in round robins. `analysis/arm_contrast.py`
+output in `artifacts/rr_opener_v3/launch/arm_contrast.txt`.
+
+### Why
+The measured opener kept birds worth 5.7 measured points (plain opener
+4.9) and then played **64% of them instead of 72%, later (round 1.39 vs
+1.29), and 6.9 birds a game instead of 7.35**. The K=4 play value is
+conditional on the searching agent having chosen to play the bird — in
+context, with the food already in hand. Kept at setup, a high-value bird
+that costs three food waits for two gain-food actions; the plain opener's
+cheapest-cost rule buys the tempo instead, and the 0.5 unaffordability
+discount did not price that. Same lesson as the synergy programme:
+observed value is not causal value at the decision where it is applied.
+
+### Decision and holdout
+Per the standing rule the dropped variant keeps a 5% holdout: a
+`setup_policy` entry in `DEFAULT_HOLDOUTS`, resolved by the flow against
+the opener the seat would otherwise use and recorded in
+`games[].search_holdouts` (registry updated). The opener question is
+parked: the plain opener is within 2 points of every variant tried, the
+search is worth 10, and the causal keep value would need a forced-keep
+study (layer 3) that the evidence does not yet justify. Floating the keep
+count on the same values is not the next move.
+
+### Queue
+Oracle arm launched automatically at 00:39 (`rr_oracle_opp`); budget arm
+follows. The opener arm took 45 min on four runners with the fast path
+(the 2026-09-16 belief arm took 1 h 15 min).

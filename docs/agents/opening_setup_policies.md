@@ -57,7 +57,28 @@ Enumerates legal keep-count choices and starting-food combinations, then scores 
 - Bonus-card alignment.
 - First round-goal alignment.
 
-This is the default opening policy for `PotentialPointsAgent`.
+This is the default opening policy for `PotentialPointsAgent` — and it is
+worse than `DefaultSetupPolicy`: on 120 dealt hands it keeps five birds and
+no food in 119, and it lost −3.0 (p=0.022) to the plain opener on
+2026-09-16 with a bonus choice that is worth +0.85 on its own. Round robins
+run the champion under `control` for that reason.
+
+**`bird_scoring="measured"`** (`potential_points_setup_v3`, or
+`..._v3_keep3` with `target_keep_count=3`) replaces the hand-written bird
+score with each bird's measured round-1 play value from the K=4
+counterfactual attribution (`configs/bird_values/bird_play_values_k4.json`,
+`agents/bird_values.py`), paid greedily from the starting food with a 0.5
+discount when unaffordable, plus a food price when the keep count floats.
+The `_keep3` variant holds the plain opener's three-birds-two-food shape
+and changes only which birds. **Arm 2026-09-18 (`rr_opener_v3`, 80 paired
+games vs the plain opener): −1.90 (p=0.13), win +0.06 (p=0.14). Not
+adopted.** It kept birds worth 5.7 measured points against the plain
+opener's 4.9, then played 64% of them (vs 72%), later (round 1.39 vs 1.29),
+and 6.9 birds a game instead of 7.35: the plain opener's cheapest-cost rule
+buys tempo that a play value conditional on having been played does not
+see. Observed play value is not keep value — the synergy programme's lesson
+again. The variant stays available and is the `setup_policy` standing
+holdout (5% of default-agent games).
 
 ### `ArchetypeSetupPolicy`
 

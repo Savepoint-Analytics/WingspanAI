@@ -84,6 +84,51 @@ class HoldoutResolutionTests(TestCase):
         self.assertEqual(held, [10])
 
 
+class SetupPolicyHoldoutTests(TestCase):
+    def test_flow_reverts_a_minority_of_games_to_the_held_out_opener(self) -> None:
+        from flows import simulation_batch
+        from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
+
+        config = PotentialPointsSearchConfig(
+            holdouts=(Holdout("setup_policy", "potential_points_setup_v3_keep3", 1.0),)
+        )
+        agent = simulation_batch._make_agent(
+            "potential_points",
+            seat="p1",
+            setup_policy_kind="control",
+            random_seed=4,
+            potential_points_search=config,
+            lineup=("potential_points", "greedy_immediate"),
+        )
+        self.assertEqual(agent.setup_policy.policy_id, "potential_points_setup_v3_keep3")
+        self.assertEqual(agent.holdouts_applied, ["setup_policy"])
+        recorded = simulation_batch._search_holdouts([agent], config)
+        self.assertEqual(
+            recorded[agent.agent_id]["effective"]["setup_policy"],
+            "potential_points_setup_v3_keep3",
+        )
+        # Share 0 never reverts; the effective opener is still recorded.
+        config = PotentialPointsSearchConfig(
+            holdouts=(Holdout("setup_policy", "potential_points_setup_v3_keep3", 0.0),)
+        )
+        agent = simulation_batch._make_agent(
+            "potential_points",
+            seat="p1",
+            setup_policy_kind="control",
+            random_seed=4,
+            potential_points_search=config,
+            lineup=("potential_points", "greedy_immediate"),
+        )
+        self.assertEqual(agent.setup_policy.policy_id, "default_setup_v1")
+        self.assertEqual(agent.holdouts_applied, [])
+        self.assertEqual(
+            simulation_batch._search_holdouts([agent], config)[agent.agent_id]["effective"][
+                "setup_policy"
+            ],
+            "default_setup_v1",
+        )
+
+
 @skipIf(not DEFAULT_WORKBOOK_PATH.exists(), "workbook required")
 class FastExpansionTests(TestCase):
     def test_fast_and_copy_paths_agree_on_every_child(self) -> None:

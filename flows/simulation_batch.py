@@ -22,7 +22,11 @@ from wingspan_ai.agents import (
     load_guardrail_config,
 )
 from wingspan_ai.agents.forced_play import ForcedPlayAgent
-from wingspan_ai.agents.potential_points import PotentialPointsSearchConfig
+from wingspan_ai.agents.holdout import resolve_holdouts
+from wingspan_ai.agents.potential_points import (
+    SETUP_POLICY_HOLDOUT_FIELD,
+    PotentialPointsSearchConfig,
+)
 from wingspan_ai.agents.profiling import DEFAULT_PROFILE_MODE
 from wingspan_ai.agents.setup import (
     ArchetypeSetupPolicy,
@@ -505,9 +509,13 @@ def _search_holdouts(agents, search: PotentialPointsSearchConfig) -> dict[str, d
         base = getattr(agent, "base_agent", agent)
         if not hasattr(base, "search_child_expansion"):
             continue
+        effective = {name: getattr(base, name) for name in search.AGENT_FIELDS}
+        setup_policy = getattr(base, "setup_policy", None)
+        if setup_policy is not None:
+            effective[SETUP_POLICY_HOLDOUT_FIELD] = setup_policy.policy_id
         out[agent.agent_id] = {
             "applied": list(getattr(base, "holdouts_applied", [])),
-            "effective": {name: getattr(base, name) for name in search.AGENT_FIELDS},
+            "effective": effective,
         }
     return out
 
@@ -602,6 +610,24 @@ def _make_agent(
     agent = _apply_setup_policy(
         agent, agent_kind, _validate_setup_policy_kind(effective_setup_kind)
     )
+    if agent_kind == "potential_points":
+        # The opener holdout (a ``setup_policy`` entry in the search config's
+        # holdouts) reverts a deterministic minority of games to a dropped
+        # opener variant, keyed like every other holdout.
+        search = potential_points_search or PotentialPointsSearchConfig()
+        setup_holdouts = [h for h in search.holdouts if h.field == SETUP_POLICY_HOLDOUT_FIELD]
+        effective_setup, applied_setup = resolve_holdouts(
+            {SETUP_POLICY_HOLDOUT_FIELD: agent.setup_policy.policy_id},
+            setup_holdouts,
+            random_seed=random_seed,
+            lineup=lineup or (agent_kind,),
+            lineup_position=max(seat_ordinal - 1, 0),
+        )
+        if applied_setup:
+            agent.setup_policy = potential_points_setup_policy(
+                effective_setup[SETUP_POLICY_HOLDOUT_FIELD]
+            )
+            agent.holdouts_applied = [*agent.holdouts_applied, *applied_setup]
     if forced_bonus_choice and agent_kind in forced_bonus_choice:
         # Forced-keep study: this agent keeps the dealt bonus card at the given
         # index, choosing birds and food around it with its usual policy.
