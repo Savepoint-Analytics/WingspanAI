@@ -262,16 +262,14 @@ def _audit_bird_domains(path: Path, sheet_audit: SheetAudit, issues: list[FieldI
                         field=column,
                         value=value,
                         message=(
-                            "unexpected domain value; add normalization mapping "
-                            "or review source"
+                            "unexpected domain value; add normalization mapping or review source"
                         ),
                     )
                 )
 
         for column, message in {
             "Color": (
-                "blank power color; normalize to none only after confirming "
-                "the card has no power"
+                "blank power color; normalize to none only after confirming the card has no power"
             ),
             "Nest type": "blank nest type; normalize to explicit special/non-nesting category",
         }.items():
@@ -363,8 +361,7 @@ def format_markdown_report(audit: WorkbookAudit) -> str:
         missing = ", ".join(str(value) for value in sheet.missing_columns) or "None"
         extra = ", ".join(str(value) for value in sheet.extra_columns) or "None"
         lines.append(
-            f"| {sheet.name} | {sheet.row_count} | {sheet.column_count} | "
-            f"{missing} | {extra} |"
+            f"| {sheet.name} | {sheet.row_count} | {sheet.column_count} | {missing} | {extra} |"
         )
 
     lines.extend(["", "Ignored workbook artifact sheets: " + ", ".join(audit.ignored_sheets), ""])

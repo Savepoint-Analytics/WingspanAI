@@ -164,7 +164,6 @@ rules:
             summary["legal_action_count"],
         )
 
-
     def test_runner_emits_guardrail_decision_summary(self) -> None:
         config = GuardrailConfig(
             name="runner_telemetry_test",
@@ -205,4 +204,3 @@ rules:
             guardrail_events[0].payload["guardrail_config_name"],
             "runner_telemetry_test",
         )
-

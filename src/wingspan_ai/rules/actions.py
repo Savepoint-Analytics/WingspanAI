@@ -50,18 +50,14 @@ def render_action(action: LegalAction) -> str:
         return f"Play {bird}{habitat}"
 
     if action.action_type == ActionType.GAIN_FOOD:
-        selected_food = action.food_types or (
-            (action.food_type,) if action.food_type else ()
-        )
+        selected_food = action.food_types or ((action.food_type,) if action.food_type else ())
         foods = _format_foods(selected_food)
         parts = [f"Gain {foods or 'food'}"]
         if action.reroll_birdfeeder:
             parts.append("if rolled, after rerolling the birdfeeder")
         if action.spend_card_for_extra_food:
             discarded = (
-                f" ({action.discard_card_common_name})"
-                if action.discard_card_common_name
-                else ""
+                f" ({action.discard_card_common_name})" if action.discard_card_common_name else ""
             )
             parts.append(f"by discarding a card{discarded}")
         return " ".join(parts)

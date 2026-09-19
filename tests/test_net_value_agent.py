@@ -131,9 +131,7 @@ class OpponentAwareDenialTests(TestCase):
     def _denial(self, card_name: str, turns: int) -> float:
         self.opponent.action_cubes_available = turns
         public_state = to_public_state(self.state)
-        public_opponent = next(
-            p for p in public_state.players if p.player_id == "player_2"
-        )
+        public_opponent = next(p for p in public_state.players if p.player_id == "player_2")
         return _opponent_card_value(self.by_name[card_name], public_state, public_opponent)
 
     def test_repeatable_brown_engine_outvalues_a_one_shot_white_power(self) -> None:

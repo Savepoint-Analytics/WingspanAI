@@ -31,9 +31,7 @@ def make_sample_catalog(card_count: int = 80) -> ContentCatalog:
                 scientific_name=f"Testus seedus {index}",
                 content_pack=ContentPack.CORE,
                 habitats={Habitat.FOREST, Habitat.GRASSLAND, Habitat.WETLAND},
-                food_cost=FoodCost(
-                    fixed={FoodType.SEED: 1} if index % 2 == 0 else {}
-                ),
+                food_cost=FoodCost(fixed={FoodType.SEED: 1} if index % 2 == 0 else {}),
                 victory_points=1 + (index % 5),
                 nest_type=NestType.BOWL,
                 egg_limit=3,
@@ -45,8 +43,7 @@ def make_sample_catalog(card_count: int = 80) -> ContentCatalog:
                 # the workbook does: seed eaters satisfy Bird Feeder, bowl
                 # nests satisfy Wildlife Gardener.
                 bonus_card_tags=(
-                    ({"Bird Feeder"} if index % 2 == 0 else set())
-                    | {"Wildlife Gardener"}
+                    ({"Bird Feeder"} if index % 2 == 0 else set()) | {"Wildlife Gardener"}
                 ),
                 power=Power(
                     color=PowerColor.NONE,

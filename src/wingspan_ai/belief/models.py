@@ -146,9 +146,7 @@ def _tilted_prior(favoured: ActionType, weight: float = 0.45) -> dict[ActionType
     """Prior that favours one family while keeping the rest plausible."""
 
     remainder = (1.0 - weight) / (len(ACTION_FAMILIES) - 1)
-    return {
-        family: weight if family == favoured else remainder for family in ACTION_FAMILIES
-    }
+    return {family: weight if family == favoured else remainder for family in ACTION_FAMILIES}
 
 
 DEFAULT_PROFILE_MODELS: dict[OpponentProfile, ProfileResponseModel] = {

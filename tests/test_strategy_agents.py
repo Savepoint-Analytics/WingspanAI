@@ -114,8 +114,7 @@ class ArchetypeDistinctnessTests(TestCase):
 
         for archetype in StrategyArchetype:
             scored = [
-                _score_action_for_archetype(state, action, archetype, before)
-                for action in actions
+                _score_action_for_archetype(state, action, archetype, before) for action in actions
             ]
             # A zero for every non-play-bird action is the exact degeneracy that
             # made two archetypes indistinguishable.
@@ -206,8 +205,7 @@ class ArchetypeDistinctnessTests(TestCase):
 
         state = self._state()
         state.round_goals = [
-            RoundGoal(name="[egg] in [bowl]", content_pack=ContentPack.CORE)
-            for _ in range(4)
+            RoundGoal(name="[egg] in [bowl]", content_pack=ContentPack.CORE) for _ in range(4)
         ]
         lay_action = LegalAction(
             action_type=ActionType.LAY_EGGS,

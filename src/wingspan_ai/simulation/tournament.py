@@ -99,9 +99,7 @@ def summarize_tournament(
     return TournamentSummary(
         games_played=games_played,
         win_counts=win_counts,
-        win_rates={
-            agent_id: wins / games_played for agent_id, wins in sorted(win_counts.items())
-        },
+        win_rates={agent_id: wins / games_played for agent_id, wins in sorted(win_counts.items())},
         mean_scores={
             agent_id: score_totals[agent_id] / score_counts[agent_id]
             for agent_id in sorted(score_totals)

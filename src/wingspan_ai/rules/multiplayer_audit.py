@@ -221,8 +221,9 @@ def _check_action_cubes() -> RuleCheck:
 def _check_green_goal_tiers() -> RuleCheck:
     from wingspan_ai.rules.base_game import ROUND_GOAL_GREEN_SCORES
 
-    actual = {round_number: tuple(scores) for round_number, scores in
-              ROUND_GOAL_GREEN_SCORES.items()}
+    actual = {
+        round_number: tuple(scores) for round_number, scores in ROUND_GOAL_GREEN_SCORES.items()
+    }
     return RuleCheck(
         check_id="green_goal_placement_scores",
         passed=actual == EXPECTED_GREEN_GOAL_SCORES,
@@ -253,9 +254,7 @@ def _check_unbounded_supplies() -> list[RuleCheck]:
     game_fields = set(GameState.model_fields)
     player_fields = set(PlayerState.model_fields)
     supply_fields = {
-        name
-        for name in game_fields | player_fields
-        if "supply" in name and name != "food_tokens"
+        name for name in game_fields | player_fields if "supply" in name and name != "food_tokens"
     }
     return [
         RuleCheck(
@@ -267,8 +266,8 @@ def _check_unbounded_supplies() -> list[RuleCheck]:
             rulebook_page=8,
             source_section="Managing egg tokens",
             detail=(
-                "\"There is no limit to the egg supply. In the unlikely event that "
-                "no eggs remain in the supply, use a temporary substitute.\" The box "
+                '"There is no limit to the egg supply. In the unlikely event that '
+                'no eggs remain in the supply, use a temporary substitute." The box '
                 f"ships {EGG_MINIATURE_COUNTS['core']} egg miniatures "
                 "(European +15, Oceania +15, Asia +30), but that is a component "
                 "count, not a rule. An unbounded simulated supply is correct."
@@ -283,8 +282,8 @@ def _check_unbounded_supplies() -> list[RuleCheck]:
             rulebook_page=7,
             source_section="Gain Food / supply",
             detail=(
-                "\"In the unlikely event that any type of food token is unavailable "
-                "in the supply, use a temporary substitute.\" Component counts are "
+                '"In the unlikely event that any type of food token is unavailable '
+                'in the supply, use a temporary substitute." Component counts are '
                 "not a game limit."
             ),
         ),
@@ -398,15 +397,11 @@ def _score_with_forest_counts(
     for index, count in enumerate(forest_counts):
         player = PlayerState(player_id=f"player_{index + 1}")
         player.habitats[Habitat.FOREST] = [
-            BirdSlot(card=_audit_bird(f"Audit Bird {index}_{slot}"))
-            for slot in range(count)
+            BirdSlot(card=_audit_bird(f"Audit Bird {index}_{slot}")) for slot in range(count)
         ]
         players.append(player)
 
-    goals = [
-        RoundGoal(name="[bird] in [forest]", content_pack=ContentPack.CORE)
-        for _ in range(4)
-    ]
+    goals = [RoundGoal(name="[bird] in [forest]", content_pack=ContentPack.CORE) for _ in range(4)]
     state = GameState(
         game_id="multiplayer_rule_audit",
         ruleset=_audit_ruleset(len(forest_counts)),

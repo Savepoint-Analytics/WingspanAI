@@ -222,8 +222,7 @@ POWER_HANDLER_REGISTRY: dict[str, PowerHandlerMetadata] = {
         module_path="wingspan_ai.rules.base_game",
         test_reference="tests/test_base_game_rules.py",
         notes=(
-            "Draws/reveals the top deck card and tucks it if it satisfies "
-            "the wingspan threshold."
+            "Draws/reveals the top deck card and tucks it if it satisfies the wingspan threshold."
         ),
     ),
     "discard_egg_draw_cards": PowerHandlerMetadata(

@@ -19,9 +19,7 @@ from flows.round_robin import (
 def make_game(*seat_scores: int, valid: bool = True) -> dict:
     return {
         "outcome": {
-            "scores": {
-                f"player_{index + 1}": score for index, score in enumerate(seat_scores)
-            }
+            "scores": {f"player_{index + 1}": score for index, score in enumerate(seat_scores)}
         },
         "replay_validation": {"is_valid": valid},
     }
@@ -209,8 +207,9 @@ class SummaryTests(TestCase):
 
     def test_setup_policy_effect_contrasts_control_and_strategic(self) -> None:
         cells = build_matchup_cells(["alpha", "beta"], ["control", "strategic"])
-        by_label = {(cell.setup_policy_kind, cell.seat_rotation): index
-                    for index, cell in enumerate(cells)}
+        by_label = {
+            (cell.setup_policy_kind, cell.seat_rotation): index for index, cell in enumerate(cells)
+        }
         results = [None] * len(cells)
         # alpha loses both control rotations and wins both strategic rotations.
         results[by_label[("control", 0)]] = [make_game(20, 50)]
@@ -294,9 +293,7 @@ class GuardrailedRosterTests(TestCase):
             "guardrailed:potential_points", seat="p1", setup_policy_kind="strategic"
         )
 
-        self.assertEqual(
-            guarded.base_agent.setup_policy.policy_id, "potential_points_setup_v2"
-        )
+        self.assertEqual(guarded.base_agent.setup_policy.policy_id, "potential_points_setup_v2")
 
     def test_guardrailed_cell_labels_are_path_safe(self) -> None:
         """The `guardrailed:` colon is not a legal path segment character."""

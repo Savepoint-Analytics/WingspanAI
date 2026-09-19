@@ -139,9 +139,7 @@ class WorkbookBonusCardTests(TestCase):
             target = rule.high_threshold or 5
             player = self._board(pool[:target])
 
-            self.assertGreater(
-                score_bonus_card(bonus, player), 0, f"{name} still scores zero"
-            )
+            self.assertGreater(score_bonus_card(bonus, player), 0, f"{name} still scores zero")
 
     def test_board_state_counters_read_the_right_signal(self) -> None:
         bird = next(b for b in self.catalog.birds if b.egg_limit >= 4)
@@ -151,9 +149,7 @@ class WorkbookBonusCardTests(TestCase):
         player.hand = list(self.catalog.birds[:6])
 
         def bonus(name: str) -> BonusCard:
-            return next(
-                b for b in self.catalog.bonus_cards if normalize_bonus_name(b.name) == name
-            )
+            return next(b for b in self.catalog.bonus_cards if normalize_bonus_name(b.name) == name)
 
         self.assertEqual(qualifying_count(bonus("Breeding Manager"), player), 3)
         self.assertEqual(qualifying_count(bonus("Oologist"), player), 3)

@@ -196,9 +196,7 @@ class MoveBirdHabitatTests(PowerHandlerTestCase):
 
 class RepeatBrownPowerTests(PowerHandlerTestCase):
     def test_repeats_the_nearest_other_brown_power(self) -> None:
-        self.place(
-            make_bird("Supply Bird", "Gain 1 [fruit] from the supply.", PowerColor.BROWN)
-        )
+        self.place(make_bird("Supply Bird", "Gain 1 [fruit] from the supply.", PowerColor.BROWN))
         self.place(
             make_bird(
                 "Mockingbird Test",
@@ -281,9 +279,7 @@ class DrawBonusCardsKeepOneTests(PowerHandlerTestCase):
         # workbook, so the board must be tagged rather than merely flocking.
         for index in range(2):
             bird = make_bird(f"Flocker {index}", None, PowerColor.NONE)
-            bird = bird.model_copy(
-                update={"flocking": True, "bonus_card_tags": {"Bird Counter"}}
-            )
+            bird = bird.model_copy(update={"flocking": True, "bonus_card_tags": {"Bird Counter"}})
             self.place(bird)
         self.state.decks.bonus_deck = [
             BonusCard(
@@ -309,8 +305,9 @@ class DrawBonusCardsKeepOneTests(PowerHandlerTestCase):
         resolve_played_bird_power(self.player, played, self.state, habitat=Habitat.FOREST)
 
         self.assertEqual([card.name for card in self.player.bonus_cards], ["Bird Counter"])
-        self.assertEqual([card.name for card in self.state.decks.bonus_discard[-1:]],
-                         ["Visionary Leader"])
+        self.assertEqual(
+            [card.name for card in self.state.decks.bonus_discard[-1:]], ["Visionary Leader"]
+        )
 
 
 class DrawTrayCardsTests(PowerHandlerTestCase):
@@ -509,8 +506,7 @@ class MultiPlayerPowerTests(PowerHandlerTestCase):
         self.place(
             make_bird(
                 "Hermit Thrush Test",
-                "Player(s) with the fewest birds in their [forest] gain 1 [die] "
-                "from birdfeeder.",
+                "Player(s) with the fewest birds in their [forest] gain 1 [die] from birdfeeder.",
                 PowerColor.BROWN,
             )
         )
@@ -534,9 +530,7 @@ class CountedTemplateTests(PowerHandlerTestCase):
         self.assertEqual(self.player.food_tokens[FoodType.FISH], fish_before + 3)
 
     def test_draw_card_honours_multi_card_counts(self) -> None:
-        played = BirdSlot(
-            card=make_bird("Carolina Test", "Draw 2 [card].", PowerColor.WHITE)
-        )
+        played = BirdSlot(card=make_bird("Carolina Test", "Draw 2 [card].", PowerColor.WHITE))
         self.player.habitats[Habitat.FOREST].append(played)
         hand_before = len(self.player.hand)
 

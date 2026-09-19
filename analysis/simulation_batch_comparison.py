@@ -22,25 +22,13 @@ def compare_batch_manifests(paths: list[str | Path]) -> dict[str, Any]:
 
     manifests = [load_batch_manifest(path) for path in paths]
     batch_summaries = [_summarize_manifest(manifest) for manifest in manifests]
-    action_rows = [
-        row
-        for manifest in manifests
-        for row in _action_frequency_rows(manifest)
-    ]
+    action_rows = [row for manifest in manifests for row in _action_frequency_rows(manifest)]
     action_by_round_rows = [
-        row
-        for manifest in manifests
-        for row in _action_frequency_by_round_rows(manifest)
+        row for manifest in manifests for row in _action_frequency_by_round_rows(manifest)
     ]
-    decision_rows = [
-        row
-        for manifest in manifests
-        for row in _decision_summary_rows(manifest)
-    ]
+    decision_rows = [row for manifest in manifests for row in _decision_summary_rows(manifest)]
     score_breakdown_rows = [
-        row
-        for manifest in manifests
-        for row in _score_breakdown_rows(manifest)
+        row for manifest in manifests for row in _score_breakdown_rows(manifest)
     ]
     return {
         "batch_count": len(manifests),

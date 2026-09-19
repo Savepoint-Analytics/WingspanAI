@@ -55,10 +55,7 @@ def database_url_from_env() -> str | None:
 
     port = os.getenv("SAVEPOINT_PG_PORT") or os.getenv("PGPORT") or "5432"
     database = (
-        os.getenv("SAVEPOINT_PG_DB")
-        or os.getenv("PGDATABASE")
-        or os.getenv("POSTGRES_DB")
-        or user
+        os.getenv("SAVEPOINT_PG_DB") or os.getenv("PGDATABASE") or os.getenv("POSTGRES_DB") or user
     )
     return (
         f"postgresql://{quote_plus(user)}:{quote_plus(password)}@"
@@ -91,9 +88,7 @@ def object_storage_config_from_env() -> ObjectStorageConfig | None:
         access_key_id=access_key,
         secret_access_key=secret_key,
         bucket_name=(
-            os.getenv("SAVEPOINT_LOCAL_MINIO_BUCKET")
-            or os.getenv("MINIO_BUCKET")
-            or "wingspan-ai"
+            os.getenv("SAVEPOINT_LOCAL_MINIO_BUCKET") or os.getenv("MINIO_BUCKET") or "wingspan-ai"
         ),
         prefix=(
             os.getenv("SAVEPOINT_LOCAL_MINIO_PREFIX")

@@ -11,6 +11,7 @@ class EventRepository(Protocol):
     def insert_events(self, events: list[SimulationEvent]) -> int:
         """Persist a validated event batch."""
 
+
 EVENT_STORE: list[SimulationEvent] = []
 
 

@@ -139,8 +139,7 @@ def render(integrity: dict[str, Any], composition: dict[str, Any]) -> str:
         f"- Player-game rows: {integrity['rows']}",
         f"- Categories sum to reported total: **{integrity['rows'] - integrity['sum_mismatches']}"
         f"/{integrity['rows']}**",
-        f"- Categories never scored by anyone: "
-        f"{integrity['never_scored_categories'] or 'none'}",
+        f"- Categories never scored by anyone: {integrity['never_scored_categories'] or 'none'}",
         f"- **{status}**",
         "",
     ]
@@ -197,9 +196,7 @@ def main() -> int:
         print(f"| Agent | n | Avg total | {header} |")
         print("|---|---:|---:|" + "---:|" * len(CATEGORIES))
         for agent, block in composition["by_agent"].items():
-            cells = " | ".join(
-                f"{block['categories'][c]['avg_points']:.1f}" for c in CATEGORIES
-            )
+            cells = " | ".join(f"{block['categories'][c]['avg_points']:.1f}" for c in CATEGORIES)
             print(f"| `{agent}` | {block['n']} | {block['avg_total']:.1f} | {cells} |")
         print()
 

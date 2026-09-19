@@ -31,8 +31,10 @@ class RulebookConstantTests(TestCase):
         # Core rulebook page 11 goal board: 1st 4/5/6/7, 2nd 1/2/3/4,
         # 3rd 0/1/2/3, 4th-5th 0.
         self.assertEqual(
-            {round_number: tuple(scores) for round_number, scores in
-             ROUND_GOAL_GREEN_SCORES.items()},
+            {
+                round_number: tuple(scores)
+                for round_number, scores in ROUND_GOAL_GREEN_SCORES.items()
+            },
             EXPECTED_GREEN_GOAL_SCORES,
         )
 

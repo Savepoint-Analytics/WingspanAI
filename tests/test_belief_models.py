@@ -129,8 +129,7 @@ class BeliefStateTests(TestCase):
         # favoured family, so those two explanations should dominate while a
         # random opponent becomes implausible.
         self.assertGreater(
-            posterior[OpponentProfile.VALUE_MAXIMIZING]
-            + posterior[OpponentProfile.ENGINE_BUILDER],
+            posterior[OpponentProfile.VALUE_MAXIMIZING] + posterior[OpponentProfile.ENGINE_BUILDER],
             0.95,
         )
         self.assertLess(posterior[OpponentProfile.RANDOM_LEGAL], 0.01)
@@ -169,9 +168,7 @@ class BeliefStateTests(TestCase):
         self.assertEqual(payload["opponent_id"], "player_1")
         self.assertIn("family_probabilities", payload)
         self.assertIn("profile_posterior", payload)
-        self.assertTrue(
-            all(isinstance(key, str) for key in payload["family_probabilities"])
-        )
+        self.assertTrue(all(isinstance(key, str) for key in payload["family_probabilities"]))
 
 
 class CalibrationMetricTests(TestCase):

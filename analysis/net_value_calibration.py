@@ -26,10 +26,9 @@ def collect_calibration_rows(paths: list[str | Path]) -> list[dict[str, Any]]:
         for game in manifest.get("games", []):
             events = list(_iter_game_events(game))
             outcome = game.get("outcome", {})
-            score_margin = (
-                outcome.get("scores", {}).get("player_2", 0)
-                - outcome.get("scores", {}).get("player_1", 0)
-            )
+            score_margin = outcome.get("scores", {}).get("player_2", 0) - outcome.get(
+                "scores", {}
+            ).get("player_1", 0)
             for event_index, event in enumerate(events):
                 if event.get("event_name") != "agent_decision_summary":
                     continue
@@ -129,9 +128,7 @@ def summarize_calibration(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "matched_observation_count": len(matched_rows),
         **_probabilistic_scores(probability_rows),
         "exact_match_count": len(exact_matches),
-        "exact_match_rate": len(exact_matches) / len(matched_rows)
-        if matched_rows
-        else None,
+        "exact_match_rate": len(exact_matches) / len(matched_rows) if matched_rows else None,
         "observed_in_candidate_set_count": len(observed_in_candidates),
         "observed_in_candidate_set_rate": len(observed_in_candidates) / len(matched_rows)
         if matched_rows
@@ -172,8 +169,7 @@ def render_markdown_report(calibration: dict[str, Any]) -> str:
         f"| Matched observations | {summary['matched_observation_count']} |",
         f"| Exact action-family matches | {summary['exact_match_count']} |",
         f"| Exact match rate | {_format_optional(summary['exact_match_rate'], 3)} |",
-        "| Probabilistic predictions | "
-        f"{summary['probabilistic_prediction_count']} |",
+        f"| Probabilistic predictions | {summary['probabilistic_prediction_count']} |",
         f"| Mean log loss | {_format_optional(summary['mean_log_loss'], 4)} |",
         f"| Uniform-guess log loss | {_format_optional(summary['uniform_log_loss'], 4)} |",
         "| Log loss improvement vs uniform | "
@@ -327,8 +323,7 @@ def _probabilistic_scores(rows: list[dict[str, Any]]) -> dict[str, Any]:
         families = set(probabilities) | {observed}
         brier_scores.append(
             sum(
-                (float(probabilities.get(family, 0.0)) - (1.0 if family == observed else 0.0))
-                ** 2
+                (float(probabilities.get(family, 0.0)) - (1.0 if family == observed else 0.0)) ** 2
                 for family in families
             )
         )

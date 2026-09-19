@@ -75,9 +75,7 @@ class ViewParsingTests(TestCase):
 class ViewQualityGateTests(TestCase):
     def test_claim_grade_gate_requires_replay_validity_and_coverage(self) -> None:
         statement = next(
-            view.statement
-            for view in load_view_statements()
-            if view.view_name == "v_run_quality"
+            view.statement for view in load_view_statements() if view.view_name == "v_run_quality"
         ).lower()
 
         self.assertIn("replay_invalid", statement)
@@ -88,9 +86,7 @@ class ViewQualityGateTests(TestCase):
     def test_performance_views_exclude_invalid_replays(self) -> None:
         for view_name in ("v_agent_performance", "v_head_to_head_summary"):
             statement = next(
-                view.statement
-                for view in load_view_statements()
-                if view.view_name == view_name
+                view.statement for view in load_view_statements() if view.view_name == view_name
             ).lower()
 
             self.assertIn("replay_is_valid is not false", statement, view_name)

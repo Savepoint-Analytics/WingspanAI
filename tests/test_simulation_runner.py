@@ -95,9 +95,7 @@ class SimulationRunnerTests(TestCase):
         self.assertIn(EventName.SETUP_SELECTION_APPLIED, event_names)
         self.assertIn(EventName.AGENT_DECISION_SUMMARY, event_names)
         decision_event = next(
-            event
-            for event in result.events
-            if event.event_name == EventName.AGENT_DECISION_SUMMARY
+            event for event in result.events if event.event_name == EventName.AGENT_DECISION_SUMMARY
         )
         self.assertIn("action_selection_elapsed_ms", decision_event.payload)
         self.assertIn("decision_summary_elapsed_ms", decision_event.payload)
@@ -245,9 +243,7 @@ class ScoreIntegrityTests(TestCase):
             ended = next(e for e in result.events if e.event_name == "game_ended")
             scores = ended.payload["outcome"]["scores"]
             for player_id, breakdown in ended.payload["score_breakdowns"].items():
-                category_sum = sum(
-                    value for key, value in breakdown.items() if key != "player_id"
-                )
+                category_sum = sum(value for key, value in breakdown.items() if key != "player_id")
                 self.assertEqual(category_sum, scores[player_id], player_id)
 
     def _categories_ever_scored(self, catalog, seeds) -> set[str]:

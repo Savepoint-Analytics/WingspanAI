@@ -36,9 +36,7 @@ class TrayBlindnessTests(TestCase):
         cls.catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
 
     def _tray_draws(self, seed: int):
-        state = setup_base_game(
-            self.catalog, player_ids=["player_1", "player_2"], random_seed=seed
-        )
+        state = setup_base_game(self.catalog, player_ids=["player_1", "player_2"], random_seed=seed)
         draws = [
             action
             for action in legal_actions_for_current_player(state)
@@ -94,9 +92,7 @@ class TrayBlindnessTests(TestCase):
             chosen = {
                 max(
                     draws,
-                    key=lambda a, arc=archetype: _score_action_for_archetype(
-                        state, a, arc, before
-                    ),
+                    key=lambda a, arc=archetype: _score_action_for_archetype(state, a, arc, before),
                 ).tray_indices
                 for archetype in StrategyArchetype
             }
@@ -112,15 +108,11 @@ class AffinityTests(TestCase):
     )
     def test_unplayable_card_scores_zero(self) -> None:
         catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
-        state = setup_base_game(
-            catalog, player_ids=["player_1", "player_2"], random_seed=1
-        )
+        state = setup_base_game(catalog, player_ids=["player_1", "player_2"], random_seed=1)
         player = state.players[0]
         card = catalog.birds[0]
         for habitat in card.habitats:
-            player.habitats[habitat] = [
-                BirdSlot(card=catalog.birds[1]) for _ in range(5)
-            ]
+            player.habitats[habitat] = [BirdSlot(card=catalog.birds[1]) for _ in range(5)]
 
         self.assertEqual(base_card_affinity(card, player), 0.0)
 
@@ -130,29 +122,26 @@ class AffinityTests(TestCase):
     )
     def test_egg_focus_prefers_higher_egg_capacity(self) -> None:
         catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
-        state = setup_base_game(
-            catalog, player_ids=["player_1", "player_2"], random_seed=1
-        )
+        state = setup_base_game(catalog, player_ids=["player_1", "player_2"], random_seed=1)
         player = state.players[0]
         player.food_tokens = {food: 5 for food in player.food_tokens}
-        low, high = sorted(
-            (b for b in catalog.birds if b.egg_limit in (1, 5)),
-            key=lambda b: b.egg_limit,
-        )[:1] + sorted(
-            (b for b in catalog.birds if b.egg_limit == 5), key=lambda b: b.common_name
-        )[:1]
-
-        self.assertGreater(
-            egg_focus_affinity(high, player), egg_focus_affinity(low, player)
+        low, high = (
+            sorted(
+                (b for b in catalog.birds if b.egg_limit in (1, 5)),
+                key=lambda b: b.egg_limit,
+            )[:1]
+            + sorted((b for b in catalog.birds if b.egg_limit == 5), key=lambda b: b.common_name)[
+                :1
+            ]
         )
+
+        self.assertGreater(egg_focus_affinity(high, player), egg_focus_affinity(low, player))
 
     def test_drawn_tray_cards_ignores_deck_draws(self) -> None:
         from wingspan_ai.rules.actions import LegalAction
 
         catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
-        state = setup_base_game(
-            catalog, player_ids=["player_1", "player_2"], random_seed=1
-        )
+        state = setup_base_game(catalog, player_ids=["player_1", "player_2"], random_seed=1)
         deck_only = LegalAction(
             action_type=ActionType.DRAW_CARDS,
             player_id="player_1",
@@ -166,9 +155,7 @@ class AffinityTests(TestCase):
         from wingspan_ai.content.schemas import FoodCost, FoodType
 
         catalog = load_base_game_content_catalog(DEFAULT_WORKBOOK_PATH)
-        state = setup_base_game(
-            catalog, player_ids=["player_1", "player_2"], random_seed=1
-        )
+        state = setup_base_game(catalog, player_ids=["player_1", "player_2"], random_seed=1)
         player = state.players[0]
         player.food_tokens = {food: 0 for food in player.food_tokens}
         player.food_tokens[FoodType.SEED] = 2

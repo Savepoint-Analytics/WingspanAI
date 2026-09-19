@@ -41,9 +41,7 @@ class PosteriorInferenceTests(TestCase):
         return [BirdSlot(card=bird) for bird in birds]
 
     def test_bowl_nest_board_infers_the_bowl_nest_bonus_card(self) -> None:
-        board = self._board(
-            lambda b: b.nest_type is not None and b.nest_type.value == "bowl"
-        )
+        board = self._board(lambda b: b.nest_type is not None and b.nest_type.value == "bowl")
 
         posterior = estimate_bonus_card_posterior(board, bonus_card_count=1)
         top = max(posterior, key=posterior.get)
@@ -64,9 +62,7 @@ class PosteriorInferenceTests(TestCase):
     def test_bonus_fit_rewards_a_niche_card_matching_a_likely_held_card(self) -> None:
         """The case intrinsic card-strength scoring misses entirely."""
 
-        board = self._board(
-            lambda b: b.nest_type is not None and b.nest_type.value == "bowl"
-        )
+        board = self._board(lambda b: b.nest_type is not None and b.nest_type.value == "bowl")
         posterior = estimate_bonus_card_posterior(board, bonus_card_count=1)
 
         niche_bowl = min(
@@ -78,11 +74,7 @@ class PosteriorInferenceTests(TestCase):
             key=lambda b: b.victory_points,
         )
         high_vp_other = max(
-            (
-                b
-                for b in self.catalog.birds
-                if b.nest_type is None or b.nest_type.value != "bowl"
-            ),
+            (b for b in self.catalog.birds if b.nest_type is None or b.nest_type.value != "bowl"),
             key=lambda b: b.victory_points,
         )
 

@@ -76,9 +76,7 @@ def estimate_bonus_card_posterior(
 
     # Expected number of held cards is known, so distribute that mass.
     scale = min(bonus_card_count, len(weights))
-    return {
-        name: min(1.0, scale * weight / total_weight) for name, weight in weights.items()
-    }
+    return {name: min(1.0, scale * weight / total_weight) for name, weight in weights.items()}
 
 
 def bonus_fit_value(
@@ -95,6 +93,4 @@ def bonus_fit_value(
 
     if not posterior:
         return 0.0
-    return sum(
-        posterior.get(normalize_bonus_name(tag), 0.0) for tag in card.bonus_card_tags
-    )
+    return sum(posterior.get(normalize_bonus_name(tag), 0.0) for tag in card.bonus_card_tags)
