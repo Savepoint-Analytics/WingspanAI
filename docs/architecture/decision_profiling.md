@@ -267,6 +267,26 @@ that runs the deepest level with one sample first and adds samples with the
 time left, with the in-level abort. Registered target for v2: ≤ 1 point
 lost at 5 s with p95 under the cap in every round.
 
+### The price of K (2026-09-18)
+
+`artifacts/rr_k1` vs `rr_belief_opp`: depth 3 with one hidden-information
+sample instead of four, 80 paired games at `ad7526a`: `potential_points`
+**78.41 → 76.42 (−1.99, p=0.080)**, win −0.013 (p=0.80); by opponent −2.9
+/ +0.95 / −1.55 / −4.45. Mean decision 7,577 → 1,521 ms (×0.20), per game
+197 → 40 s: **+0.33 points per second saved**. Inside the registered band
+(−1 to −3). The knob table the ladder needs:
+
+| Knob | change | Δ score | latency | points per doubling of time |
+|---|---|---:|---:|---:|
+| search depth | 3 → 1 (K=4) | −10.4 | ×0.013 (÷77) | ≈ 1.7 |
+| samples K | 4 → 1 (depth 3) | −2.0 | ×0.20 (÷5) | ≈ 0.9 |
+| v1 ladder at 5 s | K first, then depth | −2.0 | ×0.36 | dominated by K=1 alone |
+
+Depth is the better buy per unit of time, which is what ladder v2 assumes;
+and the v1 ladder was strictly dominated — K=1 alone loses the same two
+points at half the time. K=4 stays the default (no switch was decided, so
+no holdout); the budget ladder is where fewer samples are spent.
+
 ### Ladder v2 (built 2026-09-18)
 
 One-ply first; then deepen one ply at a time on a **single** sample, with

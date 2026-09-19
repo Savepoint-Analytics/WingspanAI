@@ -3095,3 +3095,29 @@ decides. **Registered: `beam_leaf` vs `rr_belief_opp`, ≤ −0.5 acceptable
 → adopt with the `none` holdout; below −0.5 fall back to `beam` only if it
 shows a latency gain in the arm's own profile, else drop both.** Queued
 behind the budget v2 arm.
+
+## Update: 2026-09-18 - K priced: K=1 costs 2.0 points for −80% latency; the v1 ladder was dominated
+
+`artifacts/rr_k1` vs `rr_belief_opp` (80 paired games, `ad7526a`, clean):
+depth 3 with K=1 **78.41 → 76.42 (−1.99, p=0.080)**, win −0.013; mean
+decision 7,577 → 1,521 ms (×0.20), per game 197 → 40 s, **+0.33 points
+per second saved**. Inside the registered band. Per doubling of time,
+depth buys ≈ 1.7 points and samples ≈ 0.9, so ladder v2's depth-first
+order is the right one; and the v1 ladder (−2.0 at ×0.36) was strictly
+dominated by K=1 alone (−2.0 at ×0.20). K=4 stays the default; no switch
+decided, no holdout. Knob table in `docs/architecture/decision_profiling.md`.
+Budget v2 arm launched by the queue at 17:54; pre-ranking arm and the 3p
+opponent-model study (belief / greedy / oracle, six lineups × 3 rotations
+× 5 seeds = 90 games each, registered below) queued behind it.
+
+### 3p opponent-model study (registered)
+At two players three opponent models tie. At three, each search ply
+carries two modelled opponent turns and the seat-order study found real
+seat interaction, so the family the imagined opponents play could matter.
+Design: `player_count=3`, roster `potential_points` + every pair of
+{engine_builder, bonus_card_focus, net_value_response, greedy_immediate},
+all three rotations, seeds 1–5, `control` openers; three roots
+`artifacts/rr3p_opp/{belief,greedy,oracle}` paired game for game.
+**Predictions: belief − greedy 0 to +2; oracle − belief 0 to +1; belief
+cheaper than greedy by more than at 2p.** Below +1 for both, the
+opponent-model question is closed at every player count the project runs.
