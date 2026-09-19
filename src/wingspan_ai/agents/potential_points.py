@@ -159,7 +159,9 @@ DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
 #: ``"oracle"`` is the belief model seeded with each opponent kind's converged
 #: posterior from turn one (reads the seat's agent id: an experimental bound
 #: on type inference, never a production model).
-SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle")
+#: ``"belief_apply"`` predicts the family with the posterior and picks inside
+#: it by applying (greedy's accuracy where the search goes; registered 2026-09-18).
+SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle", "belief_apply")
 #: Beam pre-ranking (2026-09-18). Below the root the search expands every
 #: candidate action, evaluates every child and keeps the ``beam_width`` best;
 #: 13 of ~17 expansions and all 17 evaluations at a beamed ply rank children

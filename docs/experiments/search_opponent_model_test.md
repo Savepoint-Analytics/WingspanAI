@@ -370,5 +370,15 @@ obvious hybrid: **predict the family with the posterior, then pick within
 the family by applying** — greedy's accuracy inside the one family that
 matters, at roughly a quarter of greedy's cost. Registered:
 `search_opponent_model="belief_apply"`, 3p design as above, prediction
-+1 to +2 over `belief` at +20–40% decision time; and a 2p check that it
-does not lose there.
++1 to +2 over `belief`; and a 2p check that it does not lose there.
+
+Built the same day (`BeliefApplySearchOpponentModel`). Single-state 2p
+probe, K=1, three mid-game states: decision 563 / 455 / 437 ms with
+`belief`, **850 / 645 / 749 ms** with `belief_apply`, 1,050 / 973 / 882 ms
+with `greedy` — the opponent turns cost 24, 200–370 and 400–440 ms
+respectively. Restricting to one family halves greedy's opponent cost
+rather than quartering it (the gain-food family alone can be most of the
+legal list), so the price is +40–70% of a belief decision, not the
++20–40% first guessed. The 3p arm decides whether +2 points is worth it;
+at 0.31 points per second it would be about break-even with the fourth
+determinization sample.

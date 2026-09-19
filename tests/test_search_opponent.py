@@ -265,6 +265,32 @@ class OracleTypeSearchOpponentModelTests(TestCase):
         self.assertIn(agent.select_action(state, legal_actions), legal_actions)
 
 
+class BeliefApplySearchOpponentModelTests(TestCase):
+    def test_picks_greedily_inside_the_predicted_family(self) -> None:
+        from wingspan_ai.agents.search_opponent import BeliefApplySearchOpponentModel
+
+        catalog = make_sample_catalog()
+        model = build_search_opponent_model("belief_apply", owner_agent_id="pp")
+        self.assertIsInstance(model, BeliefApplySearchOpponentModel)
+        branch = _opponent_turn_state(catalog)
+        legal = legal_actions_for_current_player(branch)
+        chosen = model.select_action(branch, legal)
+        family = model.predict_family(branch, branch.active_player.player_id)
+        ranked = [f for f, _ in family.ranked_families() if f in {a.action_type for a in legal}]
+        self.assertEqual(chosen.action_type, ranked[0])
+        pool = [a for a in legal if a.action_type == ranked[0]]
+        self.assertEqual(chosen, GreedyBaselineAgent(agent_id="g").select_action(branch, pool))
+        agent = PotentialPointsAgent(
+            search_depth=2,
+            final_search_turns=8,
+            determinization_samples=0,
+            search_opponent_model="belief_apply",
+        )
+        state = setup_base_game(catalog, player_ids=["p1", "p2"], random_seed=7)
+        actions = legal_actions_for_current_player(state)
+        self.assertIn(agent.select_action(state, actions), actions)
+
+
 class SearchOpponentConfigTests(TestCase):
     def test_config_and_manifest_carry_the_switch(self) -> None:
         payload = PotentialPointsSearchConfig().as_manifest_payload()

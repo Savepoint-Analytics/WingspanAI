@@ -54,7 +54,7 @@ from wingspan_ai.state.models import GameState, to_public_state
 
 _PUBLIC_MODEL = PublicOpponentBeliefModel()
 
-SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle")
+SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle", "belief_apply")
 #: Where the oracle-type model reads each opponent kind's converged posterior
 #: (written by ``analysis/oracle_type_posteriors.py``).
 DEFAULT_ORACLE_TYPE_POSTERIORS = "configs/belief/oracle_type_posteriors.json"
@@ -240,6 +240,40 @@ class BeliefSearchOpponentModel:
 
 
 @dataclass
+class BeliefApplySearchOpponentModel(BeliefSearchOpponentModel):
+    """Family from the posterior, then greedy's real pick inside that family.
+
+    Registered 2026-09-18 after the three-player study: the belief model's
+    within-family proxy (which ignores what a power does) cost about two
+    points against greedy at 3p, where two opponent turns are modelled per
+    ply. Applying only the predicted family's actions keeps greedy's
+    accuracy where the search will actually go, at a fraction of its cost.
+    """
+
+    model_id: str = "belief_apply"
+    _greedy: GreedyBaselineAgent = field(
+        default_factory=lambda: GreedyBaselineAgent(agent_id="search_opponent_model"),
+        init=False,
+        repr=False,
+        compare=False,
+    )
+
+    def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
+        if not legal_actions:
+            raise ValueError("BeliefApplySearchOpponentModel cannot select from an empty list")
+        with profiling.node("belief_predict_family"):
+            distribution = self.predict_family(state, state.active_player.player_id)
+        available = {action.action_type for action in legal_actions}
+        pool = legal_actions
+        for family, _probability in distribution.ranked_families():
+            if family in available:
+                pool = [action for action in legal_actions if action.action_type == family]
+                break
+        with profiling.node("belief_within_family_apply", candidate_count=len(pool)):
+            return self._greedy.select_action(state, pool)
+
+
+@dataclass
 class OracleTypeSearchOpponentModel(BeliefSearchOpponentModel):
     """The belief model with perfect type knowledge from turn one.
 
@@ -333,6 +367,8 @@ def build_search_opponent_model(kind: str, *, owner_agent_id: str) -> SearchOppo
         return BeliefSearchOpponentModel(owner_agent_id=owner_agent_id)
     if kind == "oracle":
         return OracleTypeSearchOpponentModel(owner_agent_id=owner_agent_id)
+    if kind == "belief_apply":
+        return BeliefApplySearchOpponentModel(owner_agent_id=owner_agent_id)
     raise ValueError(
         f"unknown search opponent model: {kind!r}; expected one of {SEARCH_OPPONENT_MODELS}"
     )
