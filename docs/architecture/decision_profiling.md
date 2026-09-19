@@ -301,6 +301,27 @@ could (v1: 37%), four samples in 49 of 52, one level abandoned. The v1
 ladder is gone; its arm result above stands as the price of buying
 samples first.
 
+**Arm result (2026-09-18).** `artifacts/rr_budget_v2` vs `rr_belief_opp`,
+80 paired games at `f434b40`, four runners: `potential_points` **78.41 →
+76.95 (−1.46, p=0.12)**, win −0.037 (p=0.38); by opponent −4.20 (bonus-card
+focus, p=0.028) / −1.85 / −0.20 / +0.40. Mean decision 7,577 → 2,359 ms
+(×0.31), per game 197 → 61 s, +0.28 points per second saved. p95 by round
+**4.55 / 4.97 / 4.99 / 5.02 s**, max 6.1 s, five overruns above 5.5 s (v1:
+51). Of 2,080 decisions 45% were cut (v1: 56%); with depth 3 available it
+was kept in **54%** (v1: 37%) and four samples in 79%; 73 levels
+abandoned at the deadline. The registered target (≥ −1, p95 under the cap
+every round) was missed narrowly on both: −1.46 is not distinguishable
+from −1 or from v1's −2.0 at this sample, and round 4's p95 is 17 ms over.
+**Not yet the production configuration.** The loss sits where v1's did —
+against `bonus_card_focus`, the opponent whose late-game bonus scoring the
+search has to see to block — which says the cut plies are the ones that
+matter and the cap is simply binding: an unbudgeted decision under this
+load averages ~4.4 s with a p95 near 12 s. The way through is to make a
+full decision cheaper rather than to cut it better: the beam pre-ranking
+arm (~−60% per decision in the probe) is running, and the production
+candidate is **pre-ranking + ladder v2 at 5 s**, registered ≥ −1 vs the
+unbudgeted baseline once the pre-ranking arm has its own price.
+
 ## Latency by round (production shape)
 
 Default agent over 2,080 decisions: round 1 ≈ 1.8 s mean (p95 5.4 s), round 2

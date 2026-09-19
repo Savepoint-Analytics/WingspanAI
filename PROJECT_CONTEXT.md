@@ -3121,3 +3121,19 @@ all three rotations, seeds 1–5, `control` openers; three roots
 **Predictions: belief − greedy 0 to +2; oracle − belief 0 to +1; belief
 cheaper than greedy by more than at 2p.** Below +1 for both, the
 opponent-model question is closed at every player count the project runs.
+
+## Update: 2026-09-18 - Ladder v2 at 5 s: −1.5 (n.s.) for −69% latency; cap binds, so make the decision cheaper first
+
+`artifacts/rr_budget_v2` vs `rr_belief_opp` (80 paired, `f434b40`):
+**−1.46 (p=0.12)**, win −0.037; mean decision 7,577 → 2,359 ms, p95 by
+round 4.55 / 4.97 / 4.99 / 5.02 s, max 6.1 s, five overruns (v1: 51). Depth
+3 kept in 54% of eligible decisions (v1: 37%), four samples in 79%; 45%
+of decisions still cut because an unbudgeted decision under four-runner
+load averages ~4.4 s with p95 near 12 s — the cap binds. Target (≥ −1,
+p95 under cap) missed narrowly on both; −1.46 is not distinguishable from
+−1 or from v1's −2.0 at n=80. Not production yet. Loss again concentrated
+against `bonus_card_focus` (−4.2, p=0.03): the cut late plies are the ones
+that see its bonus scoring. **Decision: keep ladder v2 as the ladder; the
+production candidate is pre-ranking + ladder v2 at 5 s, registered ≥ −1
+vs the unbudgeted baseline, to run once the pre-ranking arm (in flight)
+has its own price.** Details in `docs/architecture/decision_profiling.md`.

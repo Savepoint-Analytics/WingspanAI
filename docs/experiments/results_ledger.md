@@ -34,6 +34,7 @@ losing side alive at 5% (`docs/experiments/standing_holdouts.md`).
 | 2026-09-18 | oracle-type opponent model (converged posterior known from turn one) | rr_belief_opp | +0.24 | 0.83 | +0.03 | ≈ belief | ≈0 | null; opponent-model family closed at 2p |
 | 2026-09-18 | `max_decision_time_ms=5000` (anytime ladder: K, then depth, then one-ply) | rr_belief_opp | **−2.01** | 0.047 | −0.04 | 7,577 → 2,727 | +0.41 saved | not production yet; ladder spent the cap on samples not depth; v2 registered |
 | 2026-09-18 | K=1 vs K=4 (depth 3) | rr_belief_opp | −1.99 | 0.080 | −0.01 | 7,577 → 1,521 | +0.33 saved | priced: a sample doubling ≈ 1 point; K=4 stays |
+| 2026-09-18 | `max_decision_time_ms=5000`, ladder v2 (depth before samples, deadline abort) | rr_belief_opp | −1.46 | 0.12 | −0.04 | 7,577 → 2,359 | +0.28 saved | cap binds (45% cut); production candidate is pre-ranking + v2 |
 
 Earlier nulls on the pre-search agent (2026-09-01 to 09-04), all inside a
 ±1.9-point detection limit at n=200: seat-3 advantage at 3p did not
