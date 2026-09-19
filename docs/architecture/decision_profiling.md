@@ -355,6 +355,37 @@ every legal action and pre-ranking does not touch it. A root cut by the
 same cheap score (keep the best ~20) is the next free lever if the
 production arm's p95 is still over the cap.
 
+## The production configuration (2026-09-18)
+
+`artifacts/rr_prod_5s`: `search_prerank="beam_leaf"` + ladder v2 at
+`max_decision_time_ms=5000`, 80 paired games vs `rr_belief_opp` at
+`f89045c`, four runners:
+
+| | unbudgeted baseline | production |
+|---|---:|---:|
+| score | 78.41 | 77.83 (**−0.59**, p=0.63) |
+| win rate | 0.875 | **0.919** (+0.04, p=0.34) |
+| mean decision | 7,577 ms | **1,105 ms** (×0.15) |
+| p95 by round | 5.4 / 15 / 31 / 52 s (archive) | **1.3 / 3.1 / 3.8 / 4.2 s** |
+| max decision | 8 min | 5,021 ms |
+| per game | 197 s | 29 s |
+| decisions cut | — | 91 of 2,080 (4%); depth 3 kept in 97% of eligible, four samples in 98% |
+
+The registered target (≥ −1 with p95 under the cap in every round) is
+met with room. **This is the production configuration**
+(`PRODUCTION_SEARCH_OVERRIDES` in `agents/potential_points.py`): the
+agent a human would play against, at a pace a human will wait for, giving
+up nothing measurable. It is not the research baseline: a wall-clock
+budget makes the decision depend on machine load, so two runs of the same
+seed can diverge, and the paired-arm method needs the deterministic agent
+(ADR 0004). Research arms keep running unbudgeted; the production
+configuration gets its own 80-game check whenever the search changes, and
+when it is deployed the unbudgeted agent is the 5% held-out side.
+
+Two years of price list in one line: the search is worth +10.4 points
+over one-ply and, in production form, costs 1.1 s a decision instead of
+9.4.
+
 ## Latency by round (production shape)
 
 Default agent over 2,080 decisions: round 1 ≈ 1.8 s mean (p95 5.4 s), round 2

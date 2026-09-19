@@ -3196,3 +3196,21 @@ posterior, pick within it by applying — +1 to +2 over belief at 3p for
 `docs/experiments/search_opponent_model_test.md`. The 3p study took 4 h 52
 min for 270 games on six runners. Production arm launched by the queue at
 23:31.
+
+## Update: 2026-09-19 - Production configuration adopted: pre-ranking + ladder v2 at 5 s, −0.6 (n.s.), 1.1 s a decision
+
+`artifacts/rr_prod_5s` vs `rr_belief_opp` (80 paired, `f89045c`):
+`potential_points` **78.41 → 77.83 (−0.59, p=0.63), win 0.875 → 0.919**;
+mean decision **7,577 → 1,105 ms**, p95 by round 1.3 / 3.1 / 3.8 / 4.2 s,
+max 5,021 ms, 4% of decisions cut, depth 3 kept in 97% of eligible
+decisions, four samples in 98%. Registered target (≥ −1, p95 under the cap
+every round) met with room. **Adopted as the production configuration**
+(`PRODUCTION_SEARCH_OVERRIDES = {max_decision_time_ms: 5000,
+search_prerank: "beam_leaf"}`). Not the research baseline: a wall-clock
+budget makes decisions depend on machine load and breaks the
+cross-process determinism paired arms need (ADR 0004); research arms stay
+unbudgeted, the production config gets its own 80-game check whenever the
+search changes, and on deployment the unbudgeted agent is the 5% held-out
+side. The price list closes: the search is +10.4 over one-ply and, in
+production form, costs 1.1 s a decision instead of 9.4. Case study and
+ledger updated. In flight: `rr3p_belief_apply` then `rr_belief_apply`.

@@ -112,7 +112,10 @@ points and milliseconds:
 | Belief opponent model (vs greedy) | +0.3 n.s. | −57% | adopted |
 | Fast child expansion (no re-validation, no audit trail) | 0.0, bit-identical | −50% | adopted |
 | One sample instead of four | −2.0 | −80% | priced: ≈ 0.9 points per doubling of time |
-| 5 s decision cap, ladder v1 | −2.0 | −64% | dominated; ladder v2 in test |
+| 5 s decision cap, ladder v1 (samples first) | −2.0 | −64% | dominated by K=1 alone |
+| 5 s cap, ladder v2 (depth first, deadline abort) | −1.5 n.s. | −69% | cap still bound on 45% of decisions |
+| beam pre-ranking (cheap score picks beam and leaves) | −0.7 n.s. | −58% | the lever that unbinds the cap |
+| **pre-ranking + ladder v2 at 5 s** | **−0.6 n.s., win +0.04** | **−85%** | **production configuration** |
 
 Depth buys about 1.7 points per doubling of thinking time, samples about
 0.9. That single table is what a production budget needs: it says which
@@ -123,9 +126,12 @@ paired arms that report both numbers.
 
 Against a roster of scripted archetypes, a greedy baseline and the
 Bayesian response agent, the champion wins **87.5% of two-player games at
-a +22-point margin** (78.4 vs 56.1). Under a five-second decision cap it
-wins 84% at +20. Its losses are to the engine-builder archetype, the only
-opponent that punishes a lost ply of search. Against an opponent as strong
+a +22-point margin** (78.4 vs 56.1), thinking 7.6 s a decision. In its
+production configuration — pre-ranked search under a five-second cap — it
+wins **92% at +21, thinking 1.1 s a decision** (p95 under 4.2 s in every
+round), a difference from the unbudgeted agent inside the noise. At three
+players it wins 76% with the belief opponent model and 83% with the
+greedy one; the opponent model starts to matter there. Against an opponent as strong
 as itself, the margin model (Φ(margin/20)) says each point of mean score is
 worth about two win-rate points — the number that makes the cost work
 matter.
@@ -173,7 +179,9 @@ interfaces those rules were enforced through.
 ## What is next
 
 The production question — how much strength survives a five-second clock —
-is being answered by the ladder-v2 budget arm and the beam pre-ranking arm.
-The research question moves to three players. A self-play or human-trace
+is answered: essentially all of it, once the search is pre-ranked. The
+research question has moved to three players, where the opponent model is
+worth about two points and a hybrid (belief for the family, greedy inside
+it) is in test. A self-play or human-trace
 opponent is the only way to learn whether "the opponent barely matters" is
 a property of the game or of the roster.

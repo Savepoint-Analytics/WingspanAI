@@ -222,6 +222,17 @@ DEFAULT_HOLDOUTS: tuple[Holdout, ...] = (
 )
 
 
+#: The production configuration (2026-09-18): beam pre-ranking plus the v2
+#: ladder at a five-second cap. Against the unbudgeted agent on the standard
+#: 80 paired games: −0.6 points (p=0.63), win +0.04, mean decision 7.6 →
+#: 1.1 s, p95 under 4.2 s in every round, 4% of decisions cut. It is what
+#: ships; it is not the research baseline, because a wall-clock budget makes
+#: decisions depend on machine load and so breaks the cross-process
+#: determinism (ADR 0004) that paired arms rely on. Build it with
+#: ``PotentialPointsSearchConfig(**PRODUCTION_SEARCH_OVERRIDES)``.
+PRODUCTION_SEARCH_OVERRIDES: dict = {"max_decision_time_ms": 5000.0, "search_prerank": "beam_leaf"}
+
+
 @dataclass(frozen=True)
 class PotentialPointsSearchConfig:
     """Endgame-search settings, threaded through batch flows and manifests."""
