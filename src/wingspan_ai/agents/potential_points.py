@@ -214,6 +214,9 @@ DEFAULT_HOLDOUTS: tuple[Holdout, ...] = (
     Holdout("search_child_expansion", "copy"),  # correctness canary for the fast path
     # The measured opener, −1.9 n.s. vs the plain opener on 2026-09-18.
     Holdout(SETUP_POLICY_HOLDOUT_FIELD, "potential_points_setup_v3_keep3"),
+    # Beam pre-ranking, −0.7 n.s. for −58% latency on 2026-09-18; not the
+    # unbudgeted default, the budgeted production candidate.
+    Holdout("search_prerank", "beam_leaf"),
 )
 
 

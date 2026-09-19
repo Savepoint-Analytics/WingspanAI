@@ -322,6 +322,39 @@ arm (~−60% per decision in the probe) is running, and the production
 candidate is **pre-ranking + ladder v2 at 5 s**, registered ≥ −1 vs the
 unbudgeted baseline once the pre-ranking arm has its own price.
 
+## Beam pre-ranking (2026-09-18)
+
+`search_prerank = "none" | "beam" | "beam_leaf"`. A cheap immediate score
+(printed points less egg cost +1 for a bird, eggs laid, demand-weighted
+expected food, cards drawn — nothing applied) ranks a ply's candidates;
+`beam` expands only the beam at beamed plies, `beam_leaf` also evaluates
+only the `search_leaf_candidates=6` best leaves. Probe on three mid-game
+states: `beam` alone removes ~23% of leaf evaluations and no measurable
+time (the middle ply is a fifth of the tree); `beam_leaf` removes ~65% of
+evaluations and ~60% of time.
+
+**Arm.** `artifacts/rr_prerank` (`beam_leaf`) vs `rr_belief_opp`, 80 paired
+games at `5a3e7d5`: `potential_points` **78.41 → 77.69 (−0.72, p=0.55)**,
+win **+0.037**; by opponent −2.6 / +0.7 / −1.25 / +0.25. Mean decision
+7,577 → 1,836 ms (×0.24 vs the copy-path baseline; ×0.42 against the fast
+unbudgeted agent under the same load); `terminal_value` 4,087 → 1,425
+calls per decision, `expand_children` 240 → 290 calls at 2.3 ms each
+(15.9 before). The registered band was ≤ −0.5: the point estimate is just
+outside it and the 80-game design cannot resolve half a point (limit
+~1.9), so by the registration it is **not the unbudgeted default** and
+keeps a 5% `beam_leaf` holdout. Its job was never the unbudgeted agent:
+under a cap, a −58% decision is what stops the cap from binding, and the
+production candidate — **`beam_leaf` + ladder v2 at 5 s**, registered ≥ −1
+vs the unbudgeted baseline with p95 under the cap in every round — is
+queued.
+
+One more thing the arm exposed: 220 of 2,080 decisions had roots of 40+
+legal actions (gain-food preference actions on a dry feeder) and averaged
+4.9 s against 1.5 s for the rest, with a worst of 65 s. The root scores
+every legal action and pre-ranking does not touch it. A root cut by the
+same cheap score (keep the best ~20) is the next free lever if the
+production arm's p95 is still over the cap.
+
 ## Latency by round (production shape)
 
 Default agent over 2,080 decisions: round 1 ≈ 1.8 s mean (p95 5.4 s), round 2

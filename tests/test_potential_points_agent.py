@@ -501,6 +501,7 @@ class EndgameSearchDepthTests(TestCase):
                         "value": "potential_points_setup_v3_keep3",
                         "share": 0.05,
                     },
+                    {"field": "search_prerank", "value": "beam_leaf", "share": 0.05},
                 ],
             },
         )

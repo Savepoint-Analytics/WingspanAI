@@ -3137,3 +3137,19 @@ that see its bonus scoring. **Decision: keep ladder v2 as the ladder; the
 production candidate is pre-ranking + ladder v2 at 5 s, registered ≥ −1
 vs the unbudgeted baseline, to run once the pre-ranking arm (in flight)
 has its own price.** Details in `docs/architecture/decision_profiling.md`.
+
+## Update: 2026-09-18 - Beam pre-ranking: −0.7 (n.s.) for −58% latency; production candidate queued
+
+`artifacts/rr_prerank` (`search_prerank="beam_leaf"`) vs `rr_belief_opp`
+(80 paired, `5a3e7d5`): **−0.72 (p=0.55)**, win **+0.037**; mean decision
+7,577 → 1,836 ms (×0.42 against the fast unbudgeted agent under the same
+load); leaf evaluations 4,087 → 1,425 per decision. Registered ≤ −0.5: the
+point estimate sits just outside a band the design cannot resolve, so by
+the registration it is not the unbudgeted default and keeps a 5%
+`beam_leaf` holdout. Its purpose is the budgeted agent: **production
+candidate `beam_leaf` + ladder v2 at 5 s, registered ≥ −1 vs
+`rr_belief_opp` with p95 under the cap in every round**, queued behind the
+3p study (belief root launched 18:39). Also found: 220 of 2,080 decisions
+had 40+-action roots (dry-feeder preference actions) averaging 4.9 s
+(worst 65 s); the root is never pruned. A cheap-score root cut is the next
+lever if the production arm's p95 is still over the cap.
