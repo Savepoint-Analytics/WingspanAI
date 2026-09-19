@@ -1,6 +1,6 @@
 # Wingspan AI Case Study Outline
 
-Status: initial outline, 2026-05-04
+Status: initial outline, 2026-05-04. Superseded by the full draft in `case_study.md` (2026-09-18); kept for the record.
 
 ## Working Title
 
