@@ -3177,3 +3177,22 @@ queueing), `analysis/compact_artifacts.py` (8.5 GB recovered, 14 → 6.6 GB;
 snapshots are read by nothing), a format-only commit over 27 drifted
 files, and the workbook-path test made environment-independent — the suite
 has no standing failures.
+
+## Update: 2026-09-18 - Three players: the greedy opponent model beats belief by 2.1 (p=0.07); question open, priced
+
+`artifacts/rr3p_opp/{belief,greedy,oracle}`, 90 paired 3p games each at
+`5a3e7d5`: **greedy − belief +2.12 (p=0.073)**, win +0.067; **oracle −
+belief +1.36 (p=0.18)**. The registered sign for belief − greedy (0 to +2)
+was wrong: at three players the within-family proxy's error (it ignores
+power activations) compounds over two modelled opponent turns per ply and
+costs about two points; perfect type knowledge recovers about 1.4 of it.
+The champion at 3p: 74.2 points, win 0.76 (seat 3 the hardest: 72.5 /
+0.67). Cost: greedy 15.6 s a decision vs belief 8.8 s — +0.31 points per
+second, the same rate as the fourth determinization sample. Decision:
+`belief` stays the default (the cost case is stronger at 3p), greedy
+holdout keeps watching; **registered next: `belief_apply`, family from the
+posterior, pick within it by applying — +1 to +2 over belief at 3p for
++20–40% time, and no loss at 2p.** Write-up in
+`docs/experiments/search_opponent_model_test.md`. The 3p study took 4 h 52
+min for 270 games on six runners. Production arm launched by the queue at
+23:31.

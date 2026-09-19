@@ -328,3 +328,47 @@ cost, keep the 5% greedy holdout watching, and take the question to three
 and four players where the seat-order study found real interaction.
 Refitting the profile priors to the roster is not worth an arm on this
 evidence — the oracle already supplies what a perfect refit would learn.
+
+## Three players (2026-09-18): the opponent model is not free any more
+
+Design (registered above): `player_count=3`, `potential_points` with every
+pair of {engine_builder, bonus_card_focus, net_value_response,
+greedy_immediate}, all three rotations, seeds 1–5 — 90 games per root,
+paired game for game across `artifacts/rr3p_opp/{belief,greedy,oracle}`,
+at `5a3e7d5`, six runners.
+
+| Contrast | Δ score | p | Δ win | PP mean decision |
+|---|---:|---:|---:|---:|
+| greedy − belief | **+2.12** | 0.073 | +0.067 | 15.6 s vs 8.8 s |
+| oracle − belief | +1.36 | 0.18 | +0.033 | 6.1 s (ran alone) vs 8.8 s |
+
+`potential_points` at three players: 74.2 points, win 0.76 with the belief
+model (2p: 78.4, 0.875); 76.3 / 0.83 with greedy; 75.5 / 0.79 with the
+oracle. By seat with belief: 76.2 / 73.8 / 72.5 and win 0.83 / 0.77 / 0.67
+from seat 1 to 3 — the third seat is the hard one for the searching agent,
+the reverse of the 3p seat-order study's finding for the roster as a whole.
+
+**Reading.** The registered predictions were belief − greedy 0 to +2 and
+oracle − belief 0 to +1. The first came out with the opposite sign: at
+three players the greedy model, which applies every candidate action on
+the real branch, beats the belief model's family-then-proxy pick by about
+two points (p=0.07), and knowing the type from turn one recovers about
+1.4 of that. Neither is significant at 90 games (detection limit ≈ 2), but
+the direction is consistent across both contrasts and across seats 1 and
+3, and it is what two modelled opponent turns per ply should do: the
+approximation error of the within-family proxy (it ignores what a power
+does on activation) compounds. At two players the same approximation was
+worth ≈0; at three it costs ≈2. So the opponent-model question is **not
+closed at three players**; it is priced: greedy's +2.1 costs +6.8 s a
+decision, 0.31 points per second, the same rate as the fourth
+determinization sample.
+
+**Decision.** `belief` stays the default at every player count (the cost
+argument that adopted it is stronger at 3p, where greedy averages 15.6 s a
+decision), the greedy holdout keeps watching, and the next arm is the
+obvious hybrid: **predict the family with the posterior, then pick within
+the family by applying** — greedy's accuracy inside the one family that
+matters, at roughly a quarter of greedy's cost. Registered:
+`search_opponent_model="belief_apply"`, 3p design as above, prediction
++1 to +2 over `belief` at +20–40% decision time; and a 2p check that it
+does not lose there.
