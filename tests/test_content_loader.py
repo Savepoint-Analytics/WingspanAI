@@ -1,5 +1,7 @@
+import os
 from pathlib import Path
 from unittest import TestCase, skipIf
+from unittest.mock import patch
 
 from wingspan_ai.content.loader import (
     DEFAULT_WORKBOOK_PATH,
@@ -15,7 +17,12 @@ WORKBOOK_PATH = DEFAULT_WORKBOOK_PATH
 @skipIf(not WORKBOOK_PATH.exists(), f"{WORKBOOK_PATH} is not present")
 class ContentLoaderTests(TestCase):
     def test_default_workbook_path_points_to_raw_data(self) -> None:
-        self.assertEqual(resolve_workbook_path(), Path("data/raw/wingspan-card-list.xlsx"))
+        # The env var (set by .envrc on Alex's machine) wins when present; the
+        # default is what applies without it.
+        with patch.dict(os.environ, {"WINGSPAN_CARD_WORKBOOK": ""}):
+            self.assertEqual(resolve_workbook_path(), Path("data/raw/wingspan-card-list.xlsx"))
+        with patch.dict(os.environ, {"WINGSPAN_CARD_WORKBOOK": "/elsewhere/cards.xlsx"}):
+            self.assertEqual(resolve_workbook_path(), Path("/elsewhere/cards.xlsx"))
 
     def test_loads_core_workbook_content_into_typed_catalog(self) -> None:
         catalog = load_base_game_content_catalog(WORKBOOK_PATH)
