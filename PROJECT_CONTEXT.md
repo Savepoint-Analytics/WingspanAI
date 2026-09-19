@@ -3062,3 +3062,36 @@ runners; the fast path made a same-day arm cycle routine.
    the time left, deadline check between root actions that abandons a
    level. Prediction at 5 s: ≥ −1 with p95 under the cap in every round →
    production configuration, holdout on the unbudgeted agent.
+
+## Update: 2026-09-18 - K arm launched; ladder v2 built; beam pre-ranking built and registered
+
+### In flight
+- `artifacts/rr_k1`: depth 3 with K=1 vs the K=4 baseline (registered −1 to
+  −3), four runners at `ad7526a`.
+- `artifacts/rr_budget_v2`: 5 s budget on ladder v2, queued behind it at
+  `f434b40` (registered ≥ −1 with p95 under the cap every round →
+  production configuration, unbudgeted agent held out at 5%).
+
+### Ladder v2
+Depth before samples: one-ply, then one ply at a time on a single sample
+(next level predicted from the measured ratio, or the root's candidate
+count capped at 12 for the first deepening), abandoned at the deadline
+between root actions, then the other samples at the deepest depth reached.
+Two-game probe at 5 s: cap held to 5,003 ms; depth 3 kept in 29 of 36
+eligible decisions (v1: 37%).
+
+### Beam pre-ranking (registered)
+`search_prerank`: `"none"` (historic), `"beam"` (a cheap immediate score —
+printed points less egg cost +1 for a bird, eggs laid, demand-weighted
+expected food, cards drawn — picks the beam at a beamed ply before anything
+is expanded), `"beam_leaf"` (also evaluates only the
+`search_leaf_candidates=6` cheapest-ranked leaves). Single-state probe,
+K=1, three mid-game states: `beam` alone removes ~23% of leaf evaluations
+and no measurable time (the middle ply is a fifth of the tree);
+`beam_leaf` removes ~65% of leaf evaluations and **~60% of decision time**
+(880/786/742 → 502/295/282 ms), agreeing with the full search on 9 of 15
+archived decisions (`beam`: 11 of 15). Disagreement is not loss; the arm
+decides. **Registered: `beam_leaf` vs `rr_belief_opp`, ≤ −0.5 acceptable
+→ adopt with the `none` holdout; below −0.5 fall back to `beam` only if it
+shows a latency gain in the arm's own profile, else drop both.** Queued
+behind the budget v2 arm.

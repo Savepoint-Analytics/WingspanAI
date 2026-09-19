@@ -491,6 +491,8 @@ class EndgameSearchDepthTests(TestCase):
                 "mechanic_synergy_weight": 1.0,
                 "search_child_expansion": "fast",
                 "max_decision_time_ms": None,
+                "search_prerank": "none",
+                "search_leaf_candidates": 6,
                 "holdouts": [
                     {"field": "mechanic_synergy", "value": True, "share": 0.05},
                     {"field": "search_child_expansion", "value": "copy", "share": 0.05},

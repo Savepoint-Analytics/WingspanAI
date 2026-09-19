@@ -160,6 +160,19 @@ DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
 #: posterior from turn one (reads the seat's agent id: an experimental bound
 #: on type inference, never a production model).
 SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle")
+#: Beam pre-ranking (2026-09-18). Below the root the search expands every
+#: candidate action, evaluates every child and keeps the ``beam_width`` best;
+#: 13 of ~17 expansions and all 17 evaluations at a beamed ply rank children
+#: that are then discarded. ``"none"`` is that historic path. ``"beam"`` ranks
+#: the candidates of a beamed ply by a cheap immediate score that applies
+#: nothing (``_cheap_action_score``) and expands only the beam — safe, about
+#: a fifth of expansions. ``"beam_leaf"`` also ranks the leaf ply the same
+#: way and evaluates only the ``search_leaf_candidates`` best, which is where
+#: most of a decision's expansions and evaluations are and where a sleeper
+#: move the cheap score cannot see can be lost. Registered ≤ −0.5.
+SEARCH_PRERANKS = ("none", "beam", "beam_leaf")
+DEFAULT_SEARCH_PRERANK = "none"
+DEFAULT_SEARCH_LEAF_CANDIDATES: int | None = 6
 #: Wall-clock budget per decision, in milliseconds; ``None`` is unbudgeted.
 #: With a budget the decision is anytime (ladder v2): the one-ply evaluator
 #: answers first; the search deepens one ply at a time on one hidden-
@@ -235,6 +248,9 @@ class PotentialPointsSearchConfig:
     search_child_expansion: str = DEFAULT_SEARCH_CHILD_EXPANSION
     #: Per-decision wall-clock budget; see ``DEFAULT_MAX_DECISION_TIME_MS``.
     max_decision_time_ms: float | None = DEFAULT_MAX_DECISION_TIME_MS
+    #: ``"none"``, ``"beam"`` or ``"beam_leaf"``; see ``SEARCH_PRERANKS``.
+    search_prerank: str = DEFAULT_SEARCH_PRERANK
+    search_leaf_candidates: int | None = DEFAULT_SEARCH_LEAF_CANDIDATES
     #: Standing holdouts applied per game on top of the legacy opponent-model
     #: holdout; see ``DEFAULT_HOLDOUTS``.
     holdouts: tuple[Holdout, ...] = DEFAULT_HOLDOUTS
@@ -253,6 +269,8 @@ class PotentialPointsSearchConfig:
         "mechanic_synergy_weight",
         "search_child_expansion",
         "max_decision_time_ms",
+        "search_prerank",
+        "search_leaf_candidates",
     )
 
     def as_manifest_payload(self) -> dict:
@@ -338,6 +356,9 @@ class PotentialPointsAgent(SetupPolicyMixin):
     search_child_expansion: str = DEFAULT_SEARCH_CHILD_EXPANSION
     #: Per-decision wall-clock budget; see ``DEFAULT_MAX_DECISION_TIME_MS``.
     max_decision_time_ms: float | None = DEFAULT_MAX_DECISION_TIME_MS
+    #: ``"none"``, ``"beam"`` or ``"beam_leaf"``; see ``SEARCH_PRERANKS``.
+    search_prerank: str = DEFAULT_SEARCH_PRERANK
+    search_leaf_candidates: int | None = DEFAULT_SEARCH_LEAF_CANDIDATES
     top_alternatives: int = 5
     #: What the last budgeted decision managed: depth and samples used, ms
     #: spent, whether the budget cut it short. ``None`` when unbudgeted.
@@ -369,6 +390,13 @@ class PotentialPointsAgent(SetupPolicyMixin):
             )
         if self.max_decision_time_ms is not None and self.max_decision_time_ms <= 0:
             raise ValueError("max_decision_time_ms must be positive or None")
+        if self.search_prerank not in SEARCH_PRERANKS:
+            raise ValueError(
+                f"unknown search_prerank: {self.search_prerank!r}; expected one of "
+                f"{SEARCH_PRERANKS}"
+            )
+        if self.search_leaf_candidates is not None and self.search_leaf_candidates < 1:
+            raise ValueError("search_leaf_candidates must be at least 1 or None")
         self._opponent_model = build_search_opponent_model(
             self.search_opponent_model, owner_agent_id=self.agent_id
         )
@@ -589,6 +617,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
                         opponent_model=self._opponent_model,
                         synergy=self._synergy,
                         fast=self.search_child_expansion == "fast",
+                        prerank=self.search_prerank,
+                        leaf_candidates=self.search_leaf_candidates,
                     )
                 with profiling.node("immediate_delta"):
                     tie_break = _immediate_score_delta(
@@ -674,6 +704,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "search_child_expansion": self.search_child_expansion,
             "max_decision_time_ms": self.max_decision_time_ms,
             "budget": self.last_budget_report,
+            "search_prerank": self.search_prerank,
+            "search_leaf_candidates": self.search_leaf_candidates,
             # Module-level ablation switches are not in the manifest, so record
             # them where the artifacts can prove which arm a game belongs to.
             "ablation_flags": {
@@ -751,6 +783,8 @@ def _search_action_value(
     opponent_model: SearchOpponentModel | None = None,
     synergy: MechanicSynergyTable | None = None,
     fast: bool = True,
+    prerank: str = DEFAULT_SEARCH_PRERANK,
+    leaf_candidates: int | None = DEFAULT_SEARCH_LEAF_CANDIDATES,
 ) -> float:
     """Best planning value reachable from ``action`` within ``depth`` own turns.
 
@@ -774,6 +808,8 @@ def _search_action_value(
         opponent_model=opponent_model,
         synergy=synergy,
         fast=fast,
+        prerank=prerank,
+        leaf_candidates=leaf_candidates,
     )
 
 
@@ -787,6 +823,8 @@ def _search_value_from_branch(
     opponent_model: SearchOpponentModel | None = None,
     synergy: MechanicSynergyTable | None = None,
     fast: bool = True,
+    prerank: str = DEFAULT_SEARCH_PRERANK,
+    leaf_candidates: int | None = DEFAULT_SEARCH_LEAF_CANDIDATES,
 ) -> float:
     if opponent_model is None:
         opponent_model = _default_search_opponent_model()
@@ -807,19 +845,44 @@ def _search_value_from_branch(
     if not legal_actions:
         return _terminal_planning_value(branch, player_id, horizon, synergy)
 
+    at_leaf = depth - 1 <= 1
+    # Pre-ranking: cut the candidate list by a cheap score before anything is
+    # applied, so only the survivors are expanded and evaluated.
+    keep = None
+    if at_leaf and prerank == "beam_leaf":
+        keep = leaf_candidates
+    elif not at_leaf and prerank in ("beam", "beam_leaf"):
+        keep = beam_width
+    if keep is not None and len(legal_actions) > keep:
+        with profiling.node("prerank_children", input_count=len(legal_actions), output_count=keep):
+            demand = _food_demand(player)
+            order = sorted(
+                range(len(legal_actions)),
+                key=lambda i: -_cheap_action_score(branch, player, legal_actions[i], demand),
+            )
+            legal_actions = [legal_actions[i] for i in order[:keep]]
+
     with profiling.node("expand_children"):
         children = [
             apply_action(branch, next_action, trusted=fast, lean=fast)
             for next_action in legal_actions
         ]
-    leaf_values = [
-        _terminal_planning_value(child, player_id, horizon, synergy) for child in children
-    ]
-    if depth - 1 <= 1:
-        return max(leaf_values)
-    ranked = sorted(zip(leaf_values, children, strict=True), key=lambda item: item[0], reverse=True)
-    if beam_width is not None:
-        ranked = ranked[:beam_width]
+    if at_leaf:
+        return max(
+            _terminal_planning_value(child, player_id, horizon, synergy) for child in children
+        )
+    if keep is None:
+        leaf_values = [
+            _terminal_planning_value(child, player_id, horizon, synergy) for child in children
+        ]
+        ranked = sorted(
+            zip(leaf_values, children, strict=True), key=lambda item: item[0], reverse=True
+        )
+        if beam_width is not None:
+            ranked = ranked[:beam_width]
+        beam = [child for _leaf_value, child in ranked]
+    else:
+        beam = children  # already cut to the beam by the cheap score
     return max(
         _search_value_from_branch(
             child,
@@ -831,9 +894,44 @@ def _search_value_from_branch(
             opponent_model=opponent_model,
             synergy=synergy,
             fast=fast,
+            prerank=prerank,
+            leaf_candidates=leaf_candidates,
         )
-        for _leaf_value, child in ranked
+        for child in beam
     )
+
+
+def _cheap_action_score(
+    state: GameState, player: PlayerState, action: LegalAction, demand: Counter[FoodType]
+) -> float:
+    """Rank a candidate without applying it: immediate points plus a resource proxy.
+
+    Play-bird: printed points less the slot's egg cost, plus one for the
+    activations a placed bird adds. Lay-eggs: the eggs. Gain-food: expected
+    demand-weighted food (the pruning score). Draw-cards: cards drawn. These
+    are the same quantities the evaluator turns into potential, without the
+    board copy; what the proxy misses is everything a power does.
+    """
+
+    if action.action_type == ActionType.PLAY_BIRD and action.habitat is not None:
+        card = next(c for c in player.hand if c.common_name == action.bird_common_name)
+        return (
+            float(card.victory_points)
+            - egg_cost_for_slot(len(player.habitats[action.habitat]))
+            + 1.0
+        )
+    if action.action_type == ActionType.LAY_EGGS:
+        return float(action.egg_count or 0)
+    if action.action_type == ActionType.GAIN_FOOD:
+        return _expected_food_value(state, action, demand)
+    if action.action_type == ActionType.DRAW_CARDS:
+        return float(
+            len(action.tray_indices)
+            + (action.tray_index is not None)
+            + action.draw_from_deck_count
+            + action.draw_from_deck
+        )
+    return 0.0
 
 
 def _search_candidate_actions(

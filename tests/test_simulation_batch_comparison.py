@@ -26,13 +26,9 @@ class SimulationBatchComparisonTests(TestCase):
             decision = comparison["decision_summaries"][0]
             score_mix = comparison["score_breakdowns"][0]
             action_rounds = {
-                row["round_number"]: row
-                for row in comparison["action_frequency_by_round"]
+                row["round_number"]: row for row in comparison["action_frequency_by_round"]
             }
-            actions = {
-                row["action_type"]: row
-                for row in comparison["action_frequency"]
-            }
+            actions = {row["action_type"]: row for row in comparison["action_frequency"]}
 
             self.assertEqual(summary["player_two_agent_id"], "potential_points_p2")
             self.assertEqual(summary["player_two_wins"], 1.5)
