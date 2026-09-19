@@ -382,3 +382,30 @@ legal list), so the price is +40–70% of a belief decision, not the
 +20–40% first guessed. The 3p arm decides whether +2 points is worth it;
 at 0.31 points per second it would be about break-even with the fourth
 determinization sample.
+
+**Result (2026-09-19).** `rr3p_belief_apply` vs `rr3p_opp/belief`: **−0.48
+(p=0.21)**, win −0.011, **76 of 90 games identical**; 2p `rr_belief_apply`
+vs `rr_belief_opp`: −0.61 (p=0.26), 63 of 80 identical, decision ×0.57 of
+the old copy-path baseline. The registered +1 to +2 failed, and the way
+it failed is the finding: applying inside the predicted family almost
+never changes the pick — the proxy and greedy agree within a family. So
+greedy's +2.1 at 3p does not come from *how* the opponent plays a family
+but from *which* family the search assumes; the belief model's family
+prediction is what costs the two points, exactly where the calibration
+section above said the model is weak (its response likelihoods were never
+fitted to the roster and classify action mix, not type). Not adopted; no
+separate holdout (it would replay the belief model's game in 84% of
+cases; the greedy holdout already guards the slot).
+
+**Where this leaves the opponent model.** Ordered by what the arms say:
+the family the search assumes matters at 3p (≈2 points), the type it
+infers matters less (≈1.4 with an oracle), the pick inside the family not
+at all. The fix is therefore the response model, not the inference:
+refit `P(family | profile, candidate values)` to the roster from the
+archive (about 6,000 recorded opponent decisions at 2p and 3p with public
+candidate values), score it by log loss against the current hand-set
+priors, and run one 3p arm with the fitted model. Registered prediction:
++1 to +2 over `belief` at 3p at no extra cost, closing most of the gap to
+greedy; a null there means the family a scripted opponent plays is simply
+not predictable from public values, and greedy's edge is the price of
+applying — which the 5 s production cap could afford at 2p but not at 3p.

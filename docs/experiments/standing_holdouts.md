@@ -88,6 +88,9 @@ Decisions **not** guarded by a holdout, and why:
   not a default; nothing changed for the batches, so no holdout until a
   budget becomes the shipped configuration (then the unbudgeted agent is
   the held-out side).
+- `belief_apply` (−0.5 / −0.6 n.s., 2026-09-19): produces the belief model's
+  game in 84% of cases, so a holdout would mostly replay the default; the
+  greedy holdout already guards the opponent-model slot.
 - Search depth, beam, K, food candidates: these are cost knobs priced by
   the ledger, not adopt/drop decisions. Their contrasts are re-run when the
   agent changes.

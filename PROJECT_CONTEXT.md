@@ -3214,3 +3214,16 @@ search changes, and on deployment the unbudgeted agent is the 5% held-out
 side. The price list closes: the search is +10.4 over one-ply and, in
 production form, costs 1.1 s a decision instead of 9.4. Case study and
 ledger updated. In flight: `rr3p_belief_apply` then `rr_belief_apply`.
+
+## Update: 2026-09-19 - belief_apply: null at both player counts, and 84% of games identical — the family prediction is the gap
+
+`rr3p_belief_apply` vs `rr3p_opp/belief`: **−0.48 (p=0.21)**, 76 of 90
+games identical; 2p: −0.61 (p=0.26), 63 of 80 identical. Registered +1 to
++2 failed in the informative way: applying inside the predicted family
+almost never changes the pick, so greedy's +2.1 at 3p comes from *which
+family* the search assumes, not how it plays it. The belief model's
+response likelihoods (hand-set, never fitted to the roster) are the weak
+part. Not adopted; no holdout (see registry). **Registered next: refit
+`P(family | profile, candidate values)` to the archive (~6,000 opponent
+decisions), score by log loss vs the current priors, one 3p arm;
+prediction +1 to +2 over belief at no extra cost.** Worktrees removed.

@@ -38,6 +38,8 @@ losing side alive at 5% (`docs/experiments/standing_holdouts.md`).
 | 2026-09-18 | **production config**: `beam_leaf` + ladder v2 at 5 s | rr_belief_opp | −0.59 | 0.63 | +0.04 | 7,577 → 1,105 | +0.09 saved | **adopted as the production configuration**; research baseline stays unbudgeted (determinism) |
 | 2026-09-18 | 3p: greedy opponent model vs belief (90 paired 3p games) | rr3p_opp/belief | **+2.12** | 0.073 | +0.07 | 8.8 → 15.6 s | +0.31 | opponent modelling matters at 3p; belief kept for cost; hybrid registered |
 | 2026-09-18 | 3p: oracle-type vs belief | rr3p_opp/belief | +1.36 | 0.18 | +0.03 | ≈ | — | consistent with the greedy result |
+| 2026-09-19 | 3p: `belief_apply` (family from posterior, greedy pick inside it) vs belief | rr3p_opp/belief | −0.48 | 0.21 | −0.01 | ≈ | — | 76/90 games identical: the family prediction is what costs, not the pick |
+| 2026-09-19 | 2p: `belief_apply` vs belief | rr_belief_opp | −0.61 | 0.26 | −0.01 | 7,577 → 4,330 | — | 63/80 identical; not adopted |
 | 2026-09-18 | beam pre-ranking `beam_leaf` (cheap score picks the beam and the six leaves to evaluate) | rr_belief_opp | −0.72 | 0.55 | +0.04 | 7,577 → 1,836 | +0.13 saved | not the unbudgeted default **(H)**; goes into the production candidate |
 
 Earlier nulls on the pre-search agent (2026-09-01 to 09-04), all inside a
