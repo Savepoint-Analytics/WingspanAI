@@ -366,6 +366,15 @@ class PotentialPointsAgent(SetupPolicyMixin):
     #: What the last budgeted decision managed: depth and samples used, ms
     #: spent, whether the budget cut it short. ``None`` when unbudgeted.
     last_budget_report: dict | None = field(init=False, repr=False, compare=False, default=None)
+    #: The root ranking the last ``select_action`` actually chose from:
+    #: ``(action, primary, tie_break)`` per legal action, plus its basis
+    #: (``"search"`` inside the search window, ``"evaluator"`` outside it).
+    #: ``summarize_decision`` records the top of it so a game viewer can show
+    #: why an action was chosen rather than the one-ply evaluator's opinion.
+    last_root_ranking: list[tuple[LegalAction, float, float]] | None = field(
+        init=False, repr=False, compare=False, default=None
+    )
+    last_root_basis: str | None = field(init=False, repr=False, compare=False, default=None)
     _opponent_model: SearchOpponentModel = field(init=False, repr=False, compare=False)
     _synergy: MechanicSynergyTable | None = field(
         init=False, repr=False, compare=False, default=None
@@ -454,10 +463,27 @@ class PotentialPointsAgent(SetupPolicyMixin):
             with profiling.node("score_true_state", aggregate=False) as sample_node:
                 scores = self._score_actions(state, legal_actions)
                 sample_node.set(candidate_count=len(legal_actions))
+        self._record_root_ranking(state, legal_actions, scores)
         return max(
             zip(scores, legal_actions, strict=True),
             key=lambda item: (item[0][0], item[0][1], _action_priority(item[1])),
         )[1]
+
+    def _record_root_ranking(
+        self,
+        state: GameState,
+        legal_actions: list[LegalAction],
+        scores: list[tuple[float, float]],
+        *,
+        depth: int | None = None,
+    ) -> None:
+        if depth is None:
+            depth = self._search_depth_for(state, state.active_player.player_id)
+        self.last_root_basis = "search" if depth > 0 else "evaluator"
+        self.last_root_ranking = [
+            (action, primary, tie_break)
+            for (primary, tie_break), action in zip(scores, legal_actions, strict=True)
+        ]
 
     def _select_action_budgeted(
         self, state: GameState, legal_actions: list[LegalAction]
@@ -565,6 +591,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "cut_short": cut_short,
             "levels_abandoned": abandoned,
         }
+        self._record_root_ranking(state, legal_actions, best, depth=used_depth)
         return max(
             zip(best, legal_actions, strict=True),
             key=lambda item: (item[0][0], item[0][1], _action_priority(item[1])),
@@ -682,10 +709,31 @@ class PotentialPointsAgent(SetupPolicyMixin):
             key=lambda item: (item.value_delta, item.realized_delta, _action_priority(item.action)),
             reverse=True,
         )
+        ranking = None
+        if self.last_root_ranking and len(self.last_root_ranking) == len(legal_actions):
+            ordered = sorted(
+                self.last_root_ranking,
+                key=lambda item: (item[1], item[2], _action_priority(item[0])),
+                reverse=True,
+            )
+            ranking = {
+                "basis": self.last_root_basis,
+                "top": [
+                    {
+                        "action_label": render_action(action),
+                        "action_type": action.action_type.value,
+                        "value": round(primary, 3),
+                        "tie_break": round(tie_break, 3),
+                        "chosen": action == selected_action,
+                    }
+                    for action, primary, tie_break in ordered[: max(self.top_alternatives, 8)]
+                ],
+            }
         return {
             "policy": "potential_points",
             "legal_action_count": len(legal_actions),
             "selected_action_type": selected_action.action_type.value,
+            "search_ranking": ranking,
             "selected_action_label": render_action(selected_action),
             "selected_value_delta": round(selected_evaluation.value_delta, 3),
             "selected_realized_delta": round(selected_evaluation.realized_delta, 3),

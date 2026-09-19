@@ -3153,3 +3153,27 @@ candidate `beam_leaf` + ladder v2 at 5 s, registered ≥ −1 vs
 had 40+-action roots (dry-feeder preference actions) averaging 4.9 s
 (worst 65 s); the root is never pruned. A cheap-score root cut is the next
 lever if the production arm's p95 is still over the cap.
+
+## Update: 2026-09-18 - Game viewer: step through any archived game from one seat's point of view
+
+`analysis/game_viewer.py <game_dir> [--pov player_2] [--interactive]
+[--turns a-b] [--all-actions] [--all-private] [--out game.md]` replays a
+game from its events (real states) and prints each decision: board with
+live scores, the POV seat's hand and bonus card, tray, feeder, goals, the
+legal actions, the ranking the agent chose from, the evaluator breakdown,
+belief and budget state, the choice and its effect (including the RNG
+draws). Purpose: let Alex find strategies the agent misses by eye and turn
+them into registered arms (`docs/experiments/game_viewer.md`).
+
+To make the "why" honest, `agent_decision_summary` now records
+`search_ranking` — the search's own root values, the basis of the choice —
+alongside the one-ply `top_alternatives`, which can disagree with the
+choice (in the doc's example the evaluator preferred playing a bird and the
+search drew two cards). Games archived before 2026-09-18 show the
+evaluator ranking with that caveat.
+
+Also this session: `analysis/launch_arm.py` (standard arm launcher with
+queueing), `analysis/compact_artifacts.py` (8.5 GB recovered, 14 → 6.6 GB;
+snapshots are read by nothing), a format-only commit over 27 drifted
+files, and the workbook-path test made environment-independent — the suite
+has no standing failures.

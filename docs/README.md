@@ -25,6 +25,7 @@ Analysis layer:
 - `analysis/r/play_attribution_hierarchical.R`: lme4 hierarchical model of play value — bird random effects and mechanic-pair interactions with shrinkage.
 - `analysis/forced_play_contrast.py`: layer C — the 2×2 forced keep-and-play interaction contrast with matched controls.
 - `analysis/bird_play_values.py`: writes the per-bird K=4 play-value table the measured opener reads (`configs/bird_values/`).
+- `analysis/game_viewer.py`: step through an archived game decision by decision from one seat's point of view — board, private hand, legal actions, the search's own ranking, the choice and its effect (`experiments/game_viewer.md`).
 - `analysis/launch_arm.py`: launches a paired arm the standard way (clean worktree at a commit, lineup runners, `--after` queueing) and writes `artifacts/<root>/launch/arm.json` as the record.
 - `analysis/compact_artifacts.py`: gzips per-game snapshot and replay-debug files under finished roots (about 60% of a root); reversible.
 - `analysis/oracle_type_posteriors.py`: writes each opponent kind's converged belief posterior for the oracle-type search opponent model (`configs/belief/`).
