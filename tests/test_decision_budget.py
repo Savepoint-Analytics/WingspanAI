@@ -57,5 +57,30 @@ class DecisionBudgetTests(TestCase):
         self.assertEqual(decision.payload["max_decision_time_ms"], 500)
         budget = decision.payload["budget"]
         self.assertEqual(budget["budget_ms"], 500)
+        self.assertEqual(budget["ladder"], "v2")
         self.assertIn("depth_used", budget)
         self.assertLessEqual(budget["depth_used"], 2)
+
+    def test_deadline_between_root_actions_abandons_a_level(self) -> None:
+        agent = PotentialPointsAgent(**self.kwargs)
+        from time import perf_counter
+
+        self.assertIsNone(
+            agent._score_actions(self.state, self.legal, depth=2, deadline=perf_counter() - 1)
+        )
+        scores = agent._score_actions(self.state, self.legal, depth=2, deadline=perf_counter() + 60)
+        self.assertEqual(len(scores), len(self.legal))
+
+    def test_depth_is_bought_before_samples(self) -> None:
+        """With time for the deepest level once but not four times, v2 keeps the depth."""
+
+        probe = PotentialPointsAgent(max_decision_time_ms=60_000, **self.kwargs)
+        probe.select_action(self.state, self.legal)
+        full_ms = probe.last_budget_report["elapsed_ms"]
+        # Roughly enough for the ladder plus one or two deep samples, not all of them.
+        agent = PotentialPointsAgent(max_decision_time_ms=full_ms * 0.65, **self.kwargs)
+        agent.select_action(self.state, self.legal)
+        report = agent.last_budget_report
+        self.assertEqual(report["depth_used"], 2)
+        self.assertLess(report["samples_used"], 2)
+        self.assertTrue(report["cut_short"])

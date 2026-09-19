@@ -267,6 +267,20 @@ that runs the deepest level with one sample first and adds samples with the
 time left, with the in-level abort. Registered target for v2: ≤ 1 point
 lost at 5 s with p95 under the cap in every round.
 
+### Ladder v2 (built 2026-09-18)
+
+One-ply first; then deepen one ply at a time on a **single** sample, with
+the next level predicted from the measured ratio of the last two (or the
+root's candidate count, capped at 12, for the first deepening) and
+**abandoned at the deadline between root actions** (the previous answer
+stands); then the remaining samples are added at the deepest depth reached
+while each fits. Samples are given up before plies. `budget.ladder = "v2"`,
+plus `levels_abandoned`. Two-game probe at 5 s under four-runner load:
+max **5,003 ms**, 10 of 52 decisions cut, depth 3 in 29 of the 36 that
+could (v1: 37%), four samples in 49 of 52, one level abandoned. The v1
+ladder is gone; its arm result above stands as the price of buying
+samples first.
+
 ## Latency by round (production shape)
 
 Default agent over 2,080 decisions: round 1 ≈ 1.8 s mean (p95 5.4 s), round 2

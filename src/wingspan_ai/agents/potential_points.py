@@ -161,13 +161,14 @@ DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
 #: on type inference, never a production model).
 SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle")
 #: Wall-clock budget per decision, in milliseconds; ``None`` is unbudgeted.
-#: With a budget the decision is anytime: the one-ply evaluator answers
-#: first, then the search deepens one ply at a time over the hidden-
-#: information samples while the measured cost of the last level says the
-#: next one fits, taking as many samples at the deepest level as the
-#: remaining time allows (degrading K, then depth, then to one-ply). Without
-#: a budget the decision is bit-identical to the unbudgeted agent. The
-#: ladder's lower levels cost about 6% of a full depth-3 decision.
+#: With a budget the decision is anytime (ladder v2): the one-ply evaluator
+#: answers first; the search deepens one ply at a time on one hidden-
+#: information sample while the measured cost of the last level says the
+#: next fits, abandoning a level at the deadline between root actions; then
+#: the remaining samples are added at the deepest depth reached while each
+#: fits. Under pressure it gives up samples before plies. Without a budget
+#: the decision is bit-identical to the unbudgeted agent. The ladder's lower
+#: levels cost about 6% of a full depth-3 decision.
 DEFAULT_MAX_DECISION_TIME_MS: float | None = None
 #: Cost multiplier assumed for the first deepening, before a measured ratio
 #: between two completed levels exists (the branching factor, roughly).
@@ -430,7 +431,17 @@ class PotentialPointsAgent(SetupPolicyMixin):
     def _select_action_budgeted(
         self, state: GameState, legal_actions: list[LegalAction]
     ) -> LegalAction:
-        """Anytime decision under ``max_decision_time_ms``; see the constant's note."""
+        """Anytime decision under ``max_decision_time_ms``; see the constant's note.
+
+        Ladder v2 (2026-09-18): the one-ply evaluator answers first; the search
+        then deepens one ply at a time on a **single** hidden-information sample
+        while the measured cost of the last level says the next fits, abandoning
+        a level (and keeping the previous answer) if the deadline passes between
+        root actions; then the remaining samples are added at the deepest depth
+        reached while each fits. Depth is bought before samples because the
+        ledger prices depth (−10.4 for two plies) and the v1 ladder, which bought
+        samples first, lost 2.0 points at 5 s.
+        """
 
         started = perf_counter()
         deadline = started + self.max_decision_time_ms / 1000.0
@@ -456,41 +467,64 @@ class PotentialPointsAgent(SetupPolicyMixin):
                 for index in range(len(legal_actions))
             ]
 
-        # Level 0: the one-ply evaluator on the true state, the answer of last resort.
+        # The answer of last resort: the one-ply evaluator on the true state.
         with profiling.node("budget_level", aggregate=False, search_depth=0):
             best = self._score_actions(state, legal_actions, depth=0)
-        used_depth, used_samples, cut_short = 0, 0, False
-        level_seconds_per_sample: dict[int, float] = {}
-        for depth in range(1, full_depth + 1):
-            previous = level_seconds_per_sample.get(depth - 1)
-            before_previous = level_seconds_per_sample.get(depth - 2)
+        used_depth, used_samples, cut_short, abandoned = 0, 0, False, 0
+        level_seconds: dict[int, float] = {}
+        first_sample: list[tuple[float, float]] | None = None
+        reached_depth: int | None = None
+
+        # Phase A: deepen on one sample.
+        for depth in range(min(1, full_depth), full_depth + 1):
+            previous = level_seconds.get(depth - 1)
+            before_previous = level_seconds.get(depth - 2)
             if previous is None:
-                predicted_per_sample = 0.0
+                predicted = 0.0
             elif before_previous:
-                predicted_per_sample = previous * max(previous / before_previous, 1.0)
+                predicted = previous * max(previous / before_previous, 1.0)
             else:
-                predicted_per_sample = previous * _BUDGET_DEFAULT_LEVEL_RATIO
-            remaining = deadline - perf_counter()
-            if predicted_per_sample > remaining:
+                # First deepening: a ply multiplies cost by about the branching,
+                # bounded by the root's own candidate count on small roots.
+                predicted = previous * min(len(legal_actions), _BUDGET_DEFAULT_LEVEL_RATIO)
+            if predicted > deadline - perf_counter():
                 cut_short = True
                 break
-            per_sample: list[list[tuple[float, float]]] = []
             level_started = perf_counter()
             with profiling.node("budget_level", aggregate=False, search_depth=depth) as node:
-                for sample in samples:
-                    if per_sample:
-                        seconds_each = (perf_counter() - level_started) / len(per_sample)
-                        if seconds_each > deadline - perf_counter():
-                            cut_short = True
-                            break
-                    per_sample.append(self._score_actions(sample, legal_actions, depth=depth))
-                node.set(output_count=len(per_sample))
-            level_seconds_per_sample[depth] = (perf_counter() - level_started) / len(per_sample)
-            best = average(per_sample)
-            used_depth, used_samples = depth, len(per_sample)
-            if cut_short:
+                scores = self._score_actions(
+                    samples[0], legal_actions, depth=depth, deadline=deadline
+                )
+                node.set(output_count=0 if scores is None else 1)
+            if scores is None:
+                cut_short, abandoned = True, abandoned + 1
                 break
+            level_seconds[depth] = perf_counter() - level_started
+            first_sample, reached_depth = scores, depth
+            best, used_depth, used_samples = scores, depth, 1
+
+        # Phase B: more samples at the deepest depth reached.
+        if first_sample is not None and reached_depth is not None:
+            per_sample = [first_sample]
+            with profiling.node(
+                "budget_samples", aggregate=False, search_depth=reached_depth
+            ) as node:
+                for sample in samples[1:]:
+                    if level_seconds[reached_depth] > deadline - perf_counter():
+                        cut_short = True
+                        break
+                    scores = self._score_actions(
+                        sample, legal_actions, depth=reached_depth, deadline=deadline
+                    )
+                    if scores is None:
+                        cut_short, abandoned = True, abandoned + 1
+                        break
+                    per_sample.append(scores)
+                node.set(output_count=len(per_sample))
+            best, used_samples = average(per_sample), len(per_sample)
+
         self.last_budget_report = {
+            "ladder": "v2",
             "budget_ms": self.max_decision_time_ms,
             "elapsed_ms": round((perf_counter() - started) * 1000.0, 1),
             "full_depth": full_depth,
@@ -498,6 +532,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "samples_used": used_samples,
             "samples_available": len(samples),
             "cut_short": cut_short,
+            "levels_abandoned": abandoned,
         }
         return max(
             zip(best, legal_actions, strict=True),
@@ -520,14 +555,18 @@ class PotentialPointsAgent(SetupPolicyMixin):
         legal_actions: list[LegalAction],
         *,
         depth: int | None = None,
-    ) -> list[tuple[float, float]]:
+        deadline: float | None = None,
+    ) -> list[tuple[float, float]] | None:
         """Score each action as ``(primary, tie_break)`` on one fully specified state.
 
         Inside the endgame-search window the primary value is the search value
         and the tie-break the immediate score delta; outside it, the potential
         delta and the realized-score delta. The same scores drive both the
         true-state and the determinized paths. ``depth`` overrides the
-        configured search depth (``0`` forces the one-ply evaluator).
+        configured search depth (``0`` forces the one-ply evaluator). With a
+        ``deadline`` (``perf_counter`` seconds) the search checks it between
+        root actions and returns ``None`` once it has passed, so a budgeted
+        caller can abandon the level instead of overrunning by a whole sample.
         """
 
         player_id = state.active_player.player_id
@@ -536,6 +575,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
         if depth > 0:
             scores = []
             for action in legal_actions:
+                if deadline is not None and perf_counter() > deadline:
+                    return None
                 with profiling.node("search_root_action", search_depth=depth):
                     value = _search_action_value(
                         state,
