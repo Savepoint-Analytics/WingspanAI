@@ -27,6 +27,7 @@ Analysis layer:
 - `analysis/bird_play_values.py`: writes the per-bird K=4 play-value table the measured opener reads (`configs/bird_values/`).
 - `flows/human_vs_agent.py`: play one archived, replay-validated game from the terminal against the production agent (human-trace study H1–H3).
 - `analysis/game_viewer.py`: step through an archived game decision by decision from one seat's point of view — board, private hand, legal actions, the search's own ranking, the choice and its effect (`experiments/game_viewer.md`).
+- `analysis/mirror_seat_effect.py`: turn-order effect in mirror matches, pooled across roots with one observation per seed (rotations of a seed are the same game; averaging them cancels a study-seat config).
 - `analysis/launch_arm.py`: launches a paired arm the standard way (clean worktree at a commit, lineup runners, `--after` queueing) and writes `artifacts/<root>/launch/arm.json` as the record; `--mirror` runs self-play with an optional `--study-search` on lineup position 1. Not reboot-safe: after a reboot, delete the partial artifacts and relaunch.
 - `analysis/compact_artifacts.py`: gzips per-game snapshot and replay-debug files under finished roots (about 60% of a root); reversible.
 - `analysis/oracle_type_posteriors.py`: writes each opponent kind's converged belief posterior for the oracle-type search opponent model (`configs/belief/`).
