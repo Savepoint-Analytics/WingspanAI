@@ -70,6 +70,12 @@ Mean points by category, 2p roster games (`rr_belief_opp`):
 
 At 3p the same shape holds (74.2: birds 35.1, goals 12.8, eggs 13.3).
 
+Against itself (A1 mirror, 2026-09-20) the profile holds: 75.3 at 2p (winners
+36.4 birds / 15.8 goals / 14.0 eggs, losers 32.8 / 12.0 / 11.4) and 78.3 at
+3p. The round-shaped mix is unchanged in the mirror (draws 27% → 11%, eggs
+22% → 40%). Winners in strong play separate on **round goals and eggs**
+more than on birds.
+
 **Reading.** The champion beats the best archetype by about +6 birds,
 +4.5 round goals and +6 eggs, and ties it on bonus, cache and tuck. It is
 not a specialist. Against this roster, egg-focus, cache/tuck-focus and
@@ -99,6 +105,8 @@ card-choice lever with a measured, transferable payoff is the bonus card.
 | At two players, what the search assumes the opponent will do is worth ≈0 (greedy, belief, oracle within ±0.3). | `search_opponent_model_test.md` | 80 paired ×3 | established (vs this roster) |
 | At three players it is worth ≈2 (greedy +2.1 over belief, p=0.07; oracle +1.4). | same, 2026-09-18 | 90 paired 3p | suggestive |
 | The gain is not from predicting the real opponent: greedy predicts the archetypes' families *less* often (35–47%) than the belief model (36–54%), and `belief_apply` was null. The working hypothesis is responsiveness on branch states; the `competent` arm (in flight) tests it. | 2026-09-19 refit + benchmark | 6,760 real decisions | open |
+| A fourth cheap opponent model (`competent`: argmax public value on the branch) is null at both counts (+0.1 / −0.7); the pooled greedy holdout (51 games) reads belief +1.5. Against scripted opponents the programme is closed: whatever the greedy model has is the applied branch state, at its full cost. | `search_opponent_model_test.md` 2026-09-20 | 90 + 80 paired | closed (vs this roster) |
+| **First seat signal in strong play:** in the 2p mirror the first player scores +5.1 and wins 0.575 (p=0.051, n=40 seeds); at 3p seat 3 wins 0.23 vs seat 1's 0.40. | `self_play_opponent_plan.md` A1 | 80 + 90 mirror games, rotations collapsed | suggestive (A2 pools) |
 | Denial has no measurable value against this roster (−0.01). | 2026-09-02 | 200 paired | null (vs this roster) |
 | Seat order at 2–3p: no robust effect. The 3p seat-3 advantage (+3.6, p=0.0009) did not replicate; two points of seat effect need 179 paired units to see. | `seat_order_investigation_3p.md`, `seat_effect_power_analysis.md` | 200 + 200 | not established |
 | The champion is weakest from seat 3 at 3p (72.5 / 0.67 vs 76.2 / 0.83 from seat 1). | `rr3p_opp/belief` | 90 games, unpaired by seat | suggestive |
@@ -117,11 +125,14 @@ determinization samples ≈0.9. `decision_profiling.md`.
 
 ## 8. What the archive cannot say yet, and why
 
-1. **Dominant strategy among strong players.** Every row above is against
+1. **Dominant strategy among strong players.** Every row in §1–§5 is against
    a roster whose best member wins 60% of its games. "Egg focus is
    dominated" means dominated *by the searching generalist against scripted
-   opponents*. The mirror-match arms (`self_play_opponent_plan.md` A1–A4,
-   in flight) are the first strong-versus-strong archive.
+   opponents*. The A1 mirror archive (170 games, 2026-09-20) is the first
+   strong-versus-strong evidence: the generalist profile survives contact
+   with itself, and winners separate on goals and eggs. Whether a
+   specialist could beat it is still untested — that needs mirror arms
+   with a specialised study seat, not a scripted specialist.
 2. **Balance of cards, goals, and food.** The two-player round-robin
    archive covers **ten seeds**; the bonus-card study 111 coverage seeds;
    layer C 240. That is enough for paired agent contrasts (the seed is

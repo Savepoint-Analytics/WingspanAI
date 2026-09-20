@@ -471,3 +471,42 @@ opponent-type inference from the search loop (the posterior remains
 useful as telemetry and for the net-value agent); a null leaves greedy's
 +2.1 as the price of applying, and the opponent-model programme moves to
 self-play (`self_play_opponent_plan.md`), where the opponent is a planner.
+
+## The competent model (2026-09-20): null at both counts; the roster programme closes
+
+`search_opponent_model="competent"` (family = argmax of the public
+candidate values on the branch state, no posterior, proxy pick inside),
+registered +1 to +2 at 3p and 0 to +1 at 2p:
+
+| Contrast | Δ score | p | Δ win | identical games |
+|---|---:|---:|---:|---:|
+| 3p, `rr3p_competent` − `rr3p_opp/belief` (90 paired) | +0.13 | 0.91 | +0.03 | 7 |
+| 2p, `rr_competent` − `rr_belief_opp` (80 paired) | −0.72 | 0.48 | −0.04 | 4 |
+
+Both null. Decision time looked 30–40% lower, but every node's ms/call
+fell by the same ratio with identical node counts — machine load, not the
+model (its own cost is 38 ms a decision against belief's 76, about 1%).
+Not adopted; `belief` stays; no holdout (nothing decided; the greedy
+holdout guards the slot).
+
+**Where the opponent-model programme ends against this roster.** Five
+models have now played the opponent seats inside the search:
+
+| Model | 2p vs belief | 3p vs belief |
+|---|---:|---:|
+| greedy (applies every action) | −0.31 | **+2.12** (p=0.07) |
+| oracle type | +0.24 | +1.36 |
+| belief_apply | −0.61 | −0.48 |
+| competent | −0.72 | +0.13 |
+| pooled greedy holdout, 51 held-out games | belief **+1.47** (p=0.29, limit 3.9) | |
+
+At two players every model is within ±1. At three, one contrast is at the
+detection limit (greedy +2.1, p=0.07); three cheap approximations of what
+greedy might be doing — the family it predicts, the pick inside the
+family, a competent family from public values — are all null, and the
+standing holdout points the other way. The economical reading is that the
++2.1 is noise at the limit, or that whatever greedy has is the *applied
+real branch state* itself, which no public-value proxy reproduces and
+which costs greedy's 15.6 s a decision. Either way there is nothing left
+to buy cheaply against scripted opponents. The question moves to
+self-play (`self_play_opponent_plan.md`, A2), where the opponent plans.

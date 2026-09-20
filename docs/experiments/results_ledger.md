@@ -41,6 +41,8 @@ losing side alive at 5% (`docs/experiments/standing_holdouts.md`).
 | 2026-09-19 | 3p: `belief_apply` (family from posterior, greedy pick inside it) vs belief | rr3p_opp/belief | −0.48 | 0.21 | −0.01 | ≈ | — | 76/90 games identical: the family prediction is what costs, not the pick |
 | 2026-09-19 | 2p: `belief_apply` vs belief | rr_belief_opp | −0.61 | 0.26 | −0.01 | 7,577 → 4,330 | — | 63/80 identical; not adopted |
 | 2026-09-19 | response-likelihood refit (`analysis/fit_response_model.py`, 53,603 archived opponent decisions, leave-one-seed-out) | hand-set profiles | log loss 1.194 → 1.183; top-1 family 0.39 → 0.41 | — | — | — | — | gate failed; 3p arm not run. Greedy model predicts archetype families *less* often (0.35–0.47) than belief (0.36–0.54): its +2.1 at 3p is responsiveness on branch states, not accuracy; `competent` model registered |
+| 2026-09-20 | 3p: `competent` opponent model (argmax public value on the branch, no posterior) vs belief | rr3p_opp/belief | +0.13 | 0.91 | +0.03 | ≈ belief (own cost 60 vs 131 ms) | ≈0 | null; registered +1 to +2 failed; not adopted |
+| 2026-09-20 | 2p: `competent` vs belief | rr_belief_opp | −0.72 | 0.48 | −0.04 | ≈ belief | ≈0 | null; opponent-model programme vs the roster closed at both counts |
 | 2026-09-18 | beam pre-ranking `beam_leaf` (cheap score picks the beam and the six leaves to evaluate) | rr_belief_opp | −0.72 | 0.55 | +0.04 | 7,577 → 1,836 | +0.13 saved | not the unbudgeted default **(H)**; goes into the production candidate |
 
 Earlier nulls on the pre-search agent (2026-09-01 to 09-04), all inside a
@@ -59,6 +61,13 @@ detail, and the depth-3 search was the first change large enough to see.
 | 2026-09-01 | v3, guardrails | guardrails rescue greedy (+10.4 points, p=0.025) and do nothing for `potential_points` |
 | 2026-09-02 | 3p seat order | seat 3 +3.6 (p=0.0009), seat 1 −2.5; **did not replicate** on 2026-09-03 |
 | 2026-09-04 | v5, six-face die | standings unchanged; power analysis: 2 points needs 179 paired units |
+
+## Strong-opponent studies (self-play, `self_play_opponent_plan.md`)
+
+| Date | Arm | Design | Headline |
+|---|---|---|---|
+| 2026-09-20 | A1 `mirror_2p` | 80 games, seeds 1–40 × 2 rotations, default config both seats | mean **75.3** (vs 78.4 against the roster); seat 1 **+5.1, win 0.575** (p=0.051 at n=40 seeds — rotations of identical configs duplicate); winners 36.4 birds / 15.8 goals / 14.0 eggs vs losers 32.8 / 12.0 / 11.4 |
+| 2026-09-20 | A1 `mirror_3p` | 90 games, seeds 1–30 × 3 rotations | mean **78.3** (higher than 74.2 against the roster); seat win 0.40 / 0.37 / 0.23, seat 1 − seat 3 +2.9 (p=0.17 at n=30 seeds) |
 
 ## Card and play studies
 

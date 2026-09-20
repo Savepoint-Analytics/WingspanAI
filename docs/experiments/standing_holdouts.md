@@ -94,6 +94,11 @@ Decisions **not** guarded by a holdout, and why:
 - `search_belief_profiles="fitted"` (2026-09-19): the refit failed its
   log-loss gate and no arm ran, so nothing was decided; the switch exists
   for a later arm and the greedy holdout guards the slot.
+- `competent` opponent model (+0.1 / −0.7 n.s., 2026-09-20): a tested
+  alternative, not a decided switch; the greedy holdout guards the slot.
+  Note that a mirror match draws every holdout independently per
+  position, so 30 of 80 two-player mirror games deviate somewhere: a
+  reason to retire holdouts as they become readable, not to add more.
 - Search depth, beam, K, food candidates: these are cost knobs priced by
   the ledger, not adopt/drop decisions. Their contrasts are re-run when the
   agent changes.

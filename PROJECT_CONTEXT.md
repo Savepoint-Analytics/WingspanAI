@@ -61,12 +61,13 @@ Current focus:
    points per doubling of decision time, K ≈ 0.9, opponent-model family ≈ 0.
    The profiler and `decision_profile_report.py` price every arm in points
    per second.
-3. The open research question is at **three players**: the greedy opponent
-   model beats belief by +2.1 (p=0.07). `belief_apply` (null) and the
-   2026-09-19 refit (gate failed; greedy predicts the archetypes' families
-   *worse* than belief) together say greedy's edge is responsiveness on
-   branch states, not accuracy about the real opponent. Next arm: the
-   `competent` opponent model (argmax public value, no inference).
+3. The opponent-model programme **against the scripted roster is closed**
+   (2026-09-20): five models within ±1 at 2p; at 3p greedy's +2.1 (p=0.07)
+   is unexplained by family accuracy, within-family pick, or a competent
+   public-value family (all null), and the pooled holdout points the other
+   way. The question now runs in **self-play**: A1 (mirror baseline) gives
+   75.3 at 2p / 78.3 at 3p and a first seat signal (seat 1 +5.1, win 0.575
+   at 2p, p=0.051); A2 (greedy study seat in the mirror) is in flight.
 4. Standing holdouts (five fields) keep every decided switch's losing side
    alive at 5% (`docs/experiments/standing_holdouts.md`).
 5. Card-choice decisions remain the parked place to spend evidence: the
@@ -253,8 +254,8 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | Read the four arms in flight (launched 2026-09-20 00:2x, ~12 h): `rr3p_competent` (registered +1 to +2 vs `rr3p_opp/belief`), `rr_competent` (0 to +1 vs `rr_belief_opp`), `mirror_2p` and `mirror_3p` (self-play A1). | Ledger rows with `arm_contrast` and `decision_profile_report`; competent ≥ +1 at 3p adopts with a `belief` holdout and triggers the production re-check; A1 gives the strong-play score level, seat split (`arm_contrast --agent potential_points@1`) and category profile. |
-| 1 | Self-play arms A2–A4 (opponent model, denial term, seat) as `launch_arm --mirror --study-search`, paired against A1. | Predictions in `self_play_opponent_plan.md`; A2 null at 2p closes the 2p opponent programme for good. |
+| 1 | Read A2 (`mirror_2p_greedy`, `mirror_3p_greedy`, launched 2026-09-20 ~12:40, ~3.5 h) with `arm_contrast --agent potential_points@1` against `mirror_2p` / `mirror_3p`. | Registered 2p +1 to +3, 3p +2 to +4 for the greedy study seat. A 2p null closes the two-player opponent question for good; pool A1+A2 for the seat effect (2p seat 1 +5.1 at p=0.051 needs the second 80). |
+| 1 | A3 (denial term in the mirror) and, if A2 is positive, a `greedy`-cost-aware production check. | A3 registered +1 to +3; null means denial is not worth a search node even against a planner. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
 | 3 | Draw-choice preference from the K=4 bird values, behind a switch. | One 80-game arm; registered ±1 band (the opener lesson says expect a null). |
@@ -3322,3 +3323,33 @@ The queue is not reboot-safe.
 - [ ] Read the four arms; ledger rows; decide `competent`; record A1.
 - [ ] Launch A2 (opponent model in the mirror) paired against A1.
 - [ ] Ten human games (Alex), then H1–H3.
+
+## Update: 2026-09-20 - Competent model null at both counts; A1 mirror baseline read; A2 launched
+
+### Results
+- `rr3p_competent` vs `rr3p_opp/belief`: **+0.13 (p=0.91)**; `rr_competent`
+  vs `rr_belief_opp`: **−0.72 (p=0.48)**. Registered +1 to +2 / 0 to +1
+  failed. The apparent 30–40% latency saving is machine load (identical
+  node counts, every node's ms/call lower); the model's own cost is 1%.
+  Not adopted; no holdout. Pooled greedy holdout (51 games): belief +1.5
+  (p=0.29). The roster opponent-model programme is closed
+  (`search_opponent_model_test.md`).
+- A1 `mirror_2p` (80) / `mirror_3p` (90): mean **75.3** / **78.3** (vs 78.4 /
+  74.2 against the roster). Seat 1 **+5.1, win 0.575** at 2p (p=0.051 with
+  rotations collapsed to 40 seeds — identical configs make the two
+  rotations the same game in 28 of 40 seeds); 3p seat wins 0.40 / 0.37 /
+  0.23. Winners separate on goals and eggs (15.8 / 14.0 vs 12.0 / 11.4).
+  Predictions: score level missed high (70–74 → 75.3), seat-1 win hit.
+  30 of 80 mirror games carry a holdout somewhere (five fields × two
+  positions).
+
+### Decision
+`belief` stays the default. The opponent question moves to self-play:
+**A2 launched** — `mirror_2p_greedy` (position 1 on `greedy`, paired vs
+`mirror_2p`) then `mirror_3p_greedy` (vs `mirror_3p`), registered 2p +1 to
++3, 3p +2 to +4.
+
+### Follow-up tasks
+- [ ] Read A2; pool A1+A2 seat effect; ledger rows.
+- [ ] A3 denial term in the mirror.
+- [ ] Retire holdouts as they pass 100 games (mirror arms double the deviation rate).

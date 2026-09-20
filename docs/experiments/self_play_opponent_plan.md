@@ -1,6 +1,6 @@
 # Self-play and human-trace opponents: is "the opponent barely matters" the game or the roster?
 
-Status: design registered 2026-09-19; nothing run yet.
+Status: design registered 2026-09-19; A1 run 2026-09-20 (results at the end); A2 launched 2026-09-20.
 
 ## Why
 
@@ -155,3 +155,53 @@ the human traces and the mirror archive to exist; the holdout design
 (`standing_holdouts.md`) already guarantees a learner sees the losing side
 of every decision. Expansion content is a separate track
 (`docs/rules/expansion_configuration.md`, unwritten).
+
+## Results
+
+### A1 (2026-09-20): the strong-play baseline
+
+`artifacts/mirror_2p` (80 games, seeds 1–40, both rotations) and
+`artifacts/mirror_3p` (90 games, seeds 1–30, three rotations), default
+research config in every seat, at `519cffb`. Read with the rotations of a
+seed collapsed to one observation, because identical configs in every
+seat make the two rotations the same game except for agent ids and
+holdout draws (28 of 40 seeds identical at 2p, 15 of 30 at 3p).
+
+| | 2p mirror | 2p vs roster | 3p mirror | 3p vs roster |
+|---|---:|---:|---:|---:|
+| mean score | **75.3** (sd 12.8) | 78.4 | **78.3** (sd 12.8) | 74.2 |
+| birds / seat-game | 7.33 | 7.35 | 7.82 | — |
+| seat-1 win rate | **0.575** | — | 0.400 (seat 3: 0.228) | — |
+| seat 1 − last seat | **+5.1** (p=0.051, n=40) | — | +2.9 (p=0.17, n=30) | — |
+| winners' profile (birds / goals / eggs) | 36.4 / 15.8 / 14.0 | — | 39.7 / 14.2 / 16.2 | — |
+| losers' profile | 32.8 / 12.0 / 11.4 | — | 35.4 / 10.0 / 14.4 | — |
+
+Predictions: 2p score 70–74 (**missed high**: 75.3 — contention costs
+three points, not four to eight); seat-1 win 0.52–0.58 (**hit**: 0.575).
+At three players the mirror scores *higher* than against the roster
+(78.3 vs 74.2): searching opponents play more birds (7.8 a seat) and
+contest the round goals less effectively than the scripted bots' flat
+gain-food / draw mix does, so the goal category is where the 3p mirror
+gains. The champion's round-shaped action mix (draws 27% → 11%, eggs
+22% → 40% from round 1 to 4 at 2p) is unchanged against itself.
+
+**Seat.** The first seat signal in strong play: +5.1 points and a 0.575
+win rate for the first player at two players, at the edge of what 40
+seeds can resolve (limit ≈ 7 points at 80% power). It is the same sign and
+about the size the plan predicted, and it needs A2's 80 games pooled
+before it is a finding. At three players seat 3 wins 0.23 of games against
+0.40 for seat 1 — the same "third seat is hardest" pattern the roster
+games showed for the champion (0.67 vs 0.83).
+
+**Holdouts in a mirror.** With five 5% holdouts drawn independently per
+position, 30 of 80 two-player mirror games and 48 of 90 three-player
+games deviate from the default somewhere. Paired arms are unaffected (the
+draws are keyed on seed, lineup, position), but a mirror baseline is a
+noisier estimate of "default vs default" than its game count suggests;
+retire holdouts as they become readable (`standing_holdouts.md`).
+
+### A2 (launched 2026-09-20)
+`mirror_2p_greedy`: position 1 on `search_opponent_model="greedy"`, paired
+against `mirror_2p`; `mirror_3p_greedy` likewise against `mirror_3p`.
+Registered above: 2p +1 to +3, 3p +2 to +4; a 2p null closes the
+two-player opponent question for good.
