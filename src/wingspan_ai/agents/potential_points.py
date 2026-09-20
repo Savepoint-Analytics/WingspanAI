@@ -173,6 +173,14 @@ SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle", "belief_apply", "compete
 #: it, is what costs two points at three players. Ignored by ``greedy``.
 SEARCH_BELIEF_PROFILE_SETS = ("hand_set", "fitted")
 DEFAULT_SEARCH_BELIEF_PROFILES = "hand_set"
+#: Weight on the shared-resource denial term (``net_value``'s
+#: ``_shared_resource_denial_value``: what a tray card or feeder die would be
+#: worth to the opponents) added to every root action's search value. ``0``
+#: is the historic agent. Registered 2026-09-19 as self-play arm A3
+#: (``docs/experiments/self_play_opponent_plan.md``): against the scripted
+#: roster denial was worth −0.01 (2026-09-02, pre-search agent); against a
+#: planning opponent the prediction is +1 to +3.
+DEFAULT_SEARCH_DENIAL_WEIGHT = 0.0
 #: Beam pre-ranking (2026-09-18). Below the root the search expands every
 #: candidate action, evaluates every child and keeps the ``beam_width`` best;
 #: 13 of ~17 expansions and all 17 evaluations at a beamed ply rank children
@@ -264,6 +272,8 @@ class PotentialPointsSearchConfig:
     search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
     #: ``"hand_set"`` or ``"fitted"``; see ``SEARCH_BELIEF_PROFILE_SETS``.
     search_belief_profiles: str = DEFAULT_SEARCH_BELIEF_PROFILES
+    #: Root-level denial term weight; see ``DEFAULT_SEARCH_DENIAL_WEIGHT``.
+    search_denial_weight: float = DEFAULT_SEARCH_DENIAL_WEIGHT
     #: Share of games that keep ``search_opponent_holdout_model`` instead, as a
     #: standing control. ``0`` disables the holdout.
     search_opponent_holdout_share: float = DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE
@@ -294,6 +304,7 @@ class PotentialPointsSearchConfig:
         "search_food_candidates",
         "search_opponent_model",
         "search_belief_profiles",
+        "search_denial_weight",
         "mechanic_synergy",
         "mechanic_synergy_hand",
         "mechanic_synergy_weight",
@@ -380,6 +391,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
     search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
     #: ``"hand_set"`` or ``"fitted"``; see ``SEARCH_BELIEF_PROFILE_SETS``.
     search_belief_profiles: str = DEFAULT_SEARCH_BELIEF_PROFILES
+    #: Root-level denial term weight; see ``DEFAULT_SEARCH_DENIAL_WEIGHT``.
+    search_denial_weight: float = DEFAULT_SEARCH_DENIAL_WEIGHT
     #: Engine-potential term; see ``DEFAULT_MECHANIC_SYNERGY``.
     mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
     mechanic_synergy_hand: bool = DEFAULT_MECHANIC_SYNERGY_HAND
@@ -438,6 +451,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
             )
         if self.search_leaf_candidates is not None and self.search_leaf_candidates < 1:
             raise ValueError("search_leaf_candidates must be at least 1 or None")
+        if self.search_denial_weight < 0:
+            raise ValueError("search_denial_weight must be non-negative")
         if self.search_belief_profiles not in SEARCH_BELIEF_PROFILE_SETS:
             raise ValueError(
                 f"unknown search_belief_profiles: {self.search_belief_profiles!r}; "
@@ -666,13 +681,14 @@ class PotentialPointsAgent(SetupPolicyMixin):
         player_id = state.active_player.player_id
         if depth is None:
             depth = self._search_depth_for(state, player_id)
+        denial = self._root_denial_values(state, legal_actions, player_id)
         if depth > 0:
             scores = []
-            for action in legal_actions:
+            for index, action in enumerate(legal_actions):
                 if deadline is not None and perf_counter() > deadline:
                     return None
                 with profiling.node("search_root_action", search_depth=depth):
-                    value = _search_action_value(
+                    value = denial[index] + _search_action_value(
                         state,
                         action,
                         player_id,
@@ -694,8 +710,41 @@ class PotentialPointsAgent(SetupPolicyMixin):
             return scores
         with profiling.node("evaluate_actions", candidate_count=len(legal_actions)):
             return [
-                (evaluation.value_delta, evaluation.realized_delta)
-                for evaluation in self.evaluate_actions(state, legal_actions)
+                (evaluation.value_delta + denial[index], evaluation.realized_delta)
+                for index, evaluation in enumerate(self.evaluate_actions(state, legal_actions))
+            ]
+
+    def _root_denial_values(
+        self, state: GameState, legal_actions: list[LegalAction], player_id: str
+    ) -> list[float]:
+        """Denial term per root action (all zero when the weight is zero).
+
+        Public information only: what a tray card or feeder die would do on
+        each opponent's visible board, discounted by how likely they are to
+        use it (``net_value._shared_resource_denial_value``).
+        """
+
+        if self.search_denial_weight <= 0:
+            return [0.0] * len(legal_actions)
+        # Lazy: ``net_value`` imports this module.
+        from wingspan_ai.agents.net_value import (
+            PublicOpponentBeliefModel,
+            _shared_resource_denial_value,
+        )
+
+        opponent_ids = [p.player_id for p in state.players if p.player_id != player_id]
+        belief_model = PublicOpponentBeliefModel()
+        with profiling.node("root_denial", candidate_count=len(legal_actions)):
+            return [
+                self.search_denial_weight
+                * _shared_resource_denial_value(
+                    state,
+                    action,
+                    observer_player_id=player_id,
+                    opponent_ids=opponent_ids,
+                    belief_model=belief_model,
+                )
+                for action in legal_actions
             ]
 
     def choose_action(self, state: GameState) -> LegalAction:
@@ -784,6 +833,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "search_food_candidates": self.search_food_candidates,
             "search_opponent_model": self.search_opponent_model,
             "search_belief_profiles": self.search_belief_profiles,
+            "search_denial_weight": self.search_denial_weight,
             "opponent_model": self._opponent_model.telemetry_payload(),
             "mechanic_synergy": self.mechanic_synergy,
             "mechanic_synergy_table": self._synergy.version if self._synergy else None,

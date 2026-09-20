@@ -515,3 +515,45 @@ class HoldoutTests(TestCase):
         text = report(rows)
         self.assertIn("| `belief` | 2 | 75.00 | 0.500 |", text)
         self.assertIn("too few to read", text)
+
+
+class SearchDenialTermTests(TestCase):
+    def test_denial_weight_adds_public_denial_value_at_the_root(self) -> None:
+        from wingspan_ai.agents.net_value import (
+            PublicOpponentBeliefModel,
+            _shared_resource_denial_value,
+        )
+
+        catalog = make_sample_catalog()
+        state = setup_base_game(catalog, player_ids=["p1", "p2"], random_seed=5)
+        legal = legal_actions_for_current_player(state)
+        raw = [
+            _shared_resource_denial_value(
+                state,
+                action,
+                observer_player_id="p1",
+                opponent_ids=["p2"],
+                belief_model=PublicOpponentBeliefModel(),
+            )
+            for action in legal
+        ]
+        self.assertTrue(any(value > 0 for value in raw), "fixture has no deniable action")
+        off = PotentialPointsAgent(search_depth=1, final_search_turns=0, determinization_samples=0)
+        on = PotentialPointsAgent(
+            search_depth=1,
+            final_search_turns=0,
+            determinization_samples=0,
+            search_denial_weight=2.0,
+        )
+        scores_off = off._score_actions(state, legal, depth=0)
+        scores_on = on._score_actions(state, legal, depth=0)
+        for (primary_off, _), (primary_on, _), value in zip(
+            scores_off, scores_on, raw, strict=True
+        ):
+            self.assertAlmostEqual(primary_on - primary_off, 2.0 * value, places=6)
+        self.assertEqual(on._root_denial_values(state, legal, "p1"), [2.0 * v for v in raw])
+        self.assertEqual(off._root_denial_values(state, legal, "p1"), [0.0] * len(legal))
+        with self.assertRaises(ValueError):
+            PotentialPointsAgent(search_denial_weight=-1.0)
+        summary = on.summarize_decision(state, legal, on.select_action(state, legal))
+        self.assertEqual(summary["search_denial_weight"], 2.0)
