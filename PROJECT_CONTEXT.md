@@ -253,11 +253,10 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | `search_opponent_model="competent"`: family = argmax public candidate value on the branch state, no posterior; proxy pick inside. One 3p arm vs `rr3p_opp/belief` (90 paired), one 2p check vs `rr_belief_opp`. | Registered 3p +1 to +2, 2p 0 to +1, cost ≈ `belief`. ≥ +1 at 3p adopts with a `belief` holdout and triggers the production config's 80-game re-check; a null moves the opponent question to self-play. |
-| 1 | Self-play build: per-seat search config, `arm_contrast --study-position`, one deterministic 2p mirror game verified; then arm A1 (`mirror_2p`, `mirror_3p`). | `docs/experiments/self_play_opponent_plan.md` §A1: score level, seat split and category profile of strong play recorded in the ledger. |
+| 1 | Read the four arms in flight (launched 2026-09-20 00:2x, ~12 h): `rr3p_competent` (registered +1 to +2 vs `rr3p_opp/belief`), `rr_competent` (0 to +1 vs `rr_belief_opp`), `mirror_2p` and `mirror_3p` (self-play A1). | Ledger rows with `arm_contrast` and `decision_profile_report`; competent ≥ +1 at 3p adopts with a `belief` holdout and triggers the production re-check; A1 gives the strong-play score level, seat split (`arm_contrast --agent potential_points@1`) and category profile. |
+| 1 | Self-play arms A2–A4 (opponent model, denial term, seat) as `launch_arm --mirror --study-search`, paired against A1. | Predictions in `self_play_opponent_plan.md`; A2 null at 2p closes the 2p opponent programme for good. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
-| 2 | Strategy analysis pass over the archive (dominance, archetype signatures, seat, card value) — the case-study questions the ledger already answers in pieces. | `docs/experiments/strategy_findings.md` with one table per question, each row citing the arm or study it comes from and its detection limit. |
-| 2 | Human-trace build (configurable opponent for `HumanCliAgent`, friendlier action renderer) and H1–H3 in `self_play_opponent_plan.md`. | Ten seat-swapped human games archived and replay-valid; belief log loss on the human scored against every roster kind. |
+| 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
 | 3 | Draw-choice preference from the K=4 bird values, behind a switch. | One 80-game arm; registered ±1 band (the opener lesson says expect a null). |
 | 3 | Keep model on the 322 measured bonus-card deals, held out on the engine-builder deals. | Beats `expected_points` 61% pick rate on held-out deals (free on archived games). |
 | 3 | `docs/architecture/reusable_board_game_ai_template.md`. | Lists every interface a second game must implement and every module that needs no change. |
@@ -3286,3 +3285,40 @@ Also registered today: the self-play / human-trace programme
 - [ ] Build `CompetentSearchOpponentModel` (≈40 lines in `search_opponent.py`), one-game probe, launch the 3p arm then the 2p check.
 - [ ] Self-play build: per-seat search config, `arm_contrast --study-position`, deterministic mirror probe; launch A1.
 - [ ] `docs/experiments/strategy_findings.md` from the ledger (dominance, archetype signatures, seat, card value, category profile of the champion).
+
+## Update: 2026-09-20 - Competent model, self-play and human-trace builds; four arms queued
+
+### What changed
+- `CompetentSearchOpponentModel` (`search_opponent_model="competent"`):
+  the family with the highest public candidate value on the branch, no
+  posterior, proxy pick inside. Probe: replay-valid, 2.9 s a decision
+  against belief's 4.2 s under the same load.
+- Self-play: `potential_points_search_by_position` on the batch flow and
+  round robin (lineup position → config, recorded per game and per
+  batch), pure mirror rosters allowed, `arm_contrast --agent kind@N`,
+  `launch_arm --mirror [--study-search]`. Two processes replay a mirror
+  game with identical action sequences (seed 11, both rotations).
+- Human traces: the board renderer moved to `wingspan_ai.state.render`
+  (shared by the viewer and `HumanCliAgent`, which now shows the full
+  board, own hand and bonus card each turn); `human_cli` is a batch-flow
+  agent kind; `flows/human_vs_agent.py` archives a human game against the
+  production agent from either seat and prints the viewer command.
+- `docs/experiments/strategy_findings.md`: the game questions answered
+  from the ledger, one table per question with design and status, and the
+  four things the archive cannot yet say (strong-vs-strong dominance, card
+  and goal balance at ten seeds, human play, expansions). New descriptive
+  finding: the champion's action mix is round-shaped (draws 26% → 14%,
+  eggs 25% → 38% from round 1 to 4) while every archetype's is flat — the
+  round-horizon result in behavioural form.
+
+### In flight
+Launched 2026-09-19 23:38, killed by a machine reboot at ~23:47 (partials
+deleted), relaunched 2026-09-20 00:2x at `519cffb`: `rr3p_competent` (six
+runners) → `rr_competent` → `mirror_2p` (seeds 1–40, four runners) →
+`mirror_3p` (seeds 1–30, six runners), chained by `queue.sh`. About 12 h.
+The queue is not reboot-safe.
+
+### Follow-up tasks
+- [ ] Read the four arms; ledger rows; decide `competent`; record A1.
+- [ ] Launch A2 (opponent model in the mirror) paired against A1.
+- [ ] Ten human games (Alex), then H1–H3.

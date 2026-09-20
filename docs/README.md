@@ -13,7 +13,7 @@ Analysis layer:
 
 - `analysis/sql/analysis_views.sql`: reproducible metric definitions over simulation telemetry.
 - `analysis/apply_sql_views.py`: applies and probes the analysis views.
-- `analysis/arm_contrast.py`: paired contrast of experimental arms against a baseline.
+- `analysis/arm_contrast.py`: paired contrast of experimental arms against a baseline; `--agent kind@N` reads lineup position N (the study seat of a mirror match).
 - `analysis/holdout_guardrail.py`: the standing 5% controls (every decided switch keeps its losing side; registry in `experiments/standing_holdouts.md`), pooled across batches.
 - `analysis/decision_profile_report.py`: latency percentiles, node breakdown, cache hit rates and value per second against a baseline.
 - `analysis/card_structure.py`: static synergy tables — what the deck supplies each bonus card, and what each bird carries.
@@ -25,8 +25,9 @@ Analysis layer:
 - `analysis/r/play_attribution_hierarchical.R`: lme4 hierarchical model of play value — bird random effects and mechanic-pair interactions with shrinkage.
 - `analysis/forced_play_contrast.py`: layer C — the 2×2 forced keep-and-play interaction contrast with matched controls.
 - `analysis/bird_play_values.py`: writes the per-bird K=4 play-value table the measured opener reads (`configs/bird_values/`).
+- `flows/human_vs_agent.py`: play one archived, replay-validated game from the terminal against the production agent (human-trace study H1–H3).
 - `analysis/game_viewer.py`: step through an archived game decision by decision from one seat's point of view — board, private hand, legal actions, the search's own ranking, the choice and its effect (`experiments/game_viewer.md`).
-- `analysis/launch_arm.py`: launches a paired arm the standard way (clean worktree at a commit, lineup runners, `--after` queueing) and writes `artifacts/<root>/launch/arm.json` as the record.
+- `analysis/launch_arm.py`: launches a paired arm the standard way (clean worktree at a commit, lineup runners, `--after` queueing) and writes `artifacts/<root>/launch/arm.json` as the record; `--mirror` runs self-play with an optional `--study-search` on lineup position 1. Not reboot-safe: after a reboot, delete the partial artifacts and relaunch.
 - `analysis/compact_artifacts.py`: gzips per-game snapshot and replay-debug files under finished roots (about 60% of a root); reversible.
 - `analysis/oracle_type_posteriors.py`: writes each opponent kind's converged belief posterior for the oracle-type search opponent model (`configs/belief/`).
 - `analysis/fit_response_model.py`: fits the belief model's response likelihoods `P(family | profile, candidate values)` per roster kind from the archive (replayed real states, public candidate values), scored by leave-one-seed-out sequential log loss against the hand-set profiles (`configs/belief/fitted_response_models.json`).
@@ -67,6 +68,7 @@ Key rules docs:
 - `experiments/round_robin_v5_feeder_odds.md`: corrected dice, and the feeder-odds ablation (null).
 - `experiments/search_food_candidates.md`: bounding gain-food continuations in the search — a third off the decision-time tail for about 1 point.
 - `experiments/feeder_odds_search_rerun.md`: the feeder-odds ablation re-run on the searching agent (still null, +0.49).
+- `experiments/strategy_findings.md`: what the archive says about the game — dominance, hidden information, horizon, the champion's profile, openings, opponent and seat — one table per question with the design and detection limit behind each row, and what it cannot yet say.
 - `experiments/self_play_opponent_plan.md`: registered design for mirror-match (self-play) and human-trace opponents — the test of whether "the opponent barely matters" is a property of the game or of the scripted roster.
 - `experiments/search_opponent_model_test.md`: the Bayesian opponent posterior plays the opponent seats inside the search — decision cost more than halved, score null (+0.31), and the posterior tracks action mix rather than opponent type.
 - `experiments/seat_effect_power_analysis.md`: how big a seat effect this design can detect, computed from measured variance.
