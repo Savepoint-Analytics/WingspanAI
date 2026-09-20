@@ -14,11 +14,20 @@ from wingspan_ai.rules.base_game import (
     legal_actions_for_current_player,
 )
 from wingspan_ai.state.models import GameState, PlayerState
+from wingspan_ai.state.render import board_lines, card_line
 
 
 @dataclass
 class HumanCliAgent:
-    """Interactive command-line policy that chooses from generated legal actions."""
+    """Interactive command-line policy that chooses from generated legal actions.
+
+    Shows the same board the archived-game viewer renders (every seat's
+    board, live scores, tray, feeder, round goals) plus this seat's own hand
+    and bonus card, then the legal actions by number. Its games go through
+    the ordinary runner and batch flow, so a human game is archived,
+    replay-validated and viewable like any agent game
+    (``flows/human_vs_agent.py``, ``docs/experiments/self_play_opponent_plan.md``).
+    """
 
     agent_id: str = "human_cli"
     use_default_setup: bool = True
@@ -30,7 +39,7 @@ class HumanCliAgent:
         print(f"\nSetup for {player.player_id}")
         print("Bird hand:")
         for index, card in enumerate(player.hand, start=1):
-            print(f"{index}. {card.common_name} ({card.food_cost.minimum_total} food)")
+            print(f"{index}. {card_line(card)}")
         bird_indices = _read_indices(
             "Keep which bird numbers? ",
             max_index=len(player.hand),
@@ -39,7 +48,7 @@ class HumanCliAgent:
 
         print("Bonus cards:")
         for index, card in enumerate(player.bonus_cards, start=1):
-            print(f"{index}. {card.name}")
+            print(f"{index}. {card.name} — {card.condition} ({card.victory_point_text})")
         bonus_indices = _read_indices("Keep one bonus number? ", max_index=len(player.bonus_cards))
         kept_bonus = [player.bonus_cards[bonus_indices[0] - 1].name]
 
@@ -65,8 +74,8 @@ class HumanCliAgent:
             f"global action {state.round_state.global_turn_number})"
         )
         print(f"Active player: {player.player_id}")
-        print(f"Food: {dict(player.food_tokens)}")
-        print(f"Hand: {[card.common_name for card in player.hand]}")
+        for line in board_lines(state, pov=player.player_id, all_private=False):
+            print(line)
         print("Legal actions:")
         for index, action in enumerate(legal_actions, start=1):
             print(f"{index}. {render_action(action)}")

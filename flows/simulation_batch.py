@@ -13,6 +13,7 @@ from uuid import uuid4
 from wingspan_ai.agents import (
     GreedyBaselineAgent,
     GuardrailedAgent,
+    HumanCliAgent,
     MonteCarloRolloutAgent,
     NetValueOpponentResponseAgent,
     PotentialPointsAgent,
@@ -82,6 +83,7 @@ PlayerTwoAgentKind = Literal[
     "archetype_bonus_card_focus",
     "archetype_round_goal_chase",
     "monte_carlo_rollout",
+    "human_cli",
 ]
 VALID_BATCH_KINDS = frozenset({"smoke", "experiment", "production"})
 VALID_PLAYER_TWO_AGENT_KINDS = frozenset(
@@ -97,6 +99,7 @@ VALID_PLAYER_TWO_AGENT_KINDS = frozenset(
         "archetype_bonus_card_focus",
         "archetype_round_goal_chase",
         "monte_carlo_rollout",
+        "human_cli",
     }
 )
 #: Prefix marking a roster entry as a guardrailed variant of a base agent,
@@ -598,6 +601,10 @@ def _make_agent(
 
     if agent_kind == "random_legal":
         agent = RandomLegalAgent(agent_id=f"random_legal_{seat}", random_seed=agent_random_seed)
+    elif agent_kind == "human_cli":
+        # A person at the terminal, choosing setup and every action; the
+        # game is archived like any other so it can be replayed and viewed.
+        agent = HumanCliAgent(agent_id=f"human_cli_{seat}", use_default_setup=False)
     elif agent_kind == "potential_points":
         search = potential_points_search or PotentialPointsSearchConfig()
         # Holdouts are keyed on the game's seed and the agent's lineup
