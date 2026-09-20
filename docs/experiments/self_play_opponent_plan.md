@@ -200,8 +200,30 @@ draws are keyed on seed, lineup, position), but a mirror baseline is a
 noisier estimate of "default vs default" than its game count suggests;
 retire holdouts as they become readable (`standing_holdouts.md`).
 
-### A2 (launched 2026-09-20)
-`mirror_2p_greedy`: position 1 on `search_opponent_model="greedy"`, paired
-against `mirror_2p`; `mirror_3p_greedy` likewise against `mirror_3p`.
-Registered above: 2p +1 to +3, 3p +2 to +4; a 2p null closes the
-two-player opponent question for good.
+### A2 at 2p (2026-09-20): null; the two-player opponent question closes
+
+`mirror_2p_greedy` (position 1 on `search_opponent_model="greedy"`, 80 games
+paired vs `mirror_2p`, `8d35fdd`): study seat **+0.46 (p=0.62)**, win
+−0.006; the other seat +0.68 (p=0.51) — both inside noise, 7 identical
+games. Decision 3.9 → 6.0 s (×1.55), so the greedy model is a **drop or
+gate** on the price list. Registered +1 to +3 failed.
+
+This was the arm the plan said would decide the question: against the
+scripted roster every opponent model tied at 2p, and the objection was
+that scripted opponents never contest anything. Now the opponent is the
+champion itself, contention exists (score fell 78.4 → 75.3), and the
+imagined opponent's family still does not matter. **At two players the
+opponent model is a cost knob, not a strength knob: keep the cheapest one
+that plays coherently.** `belief` stays; nothing to hold out.
+
+**Seat, pooled A1 + A2** (`analysis/mirror_seat_effect.py`, one observation
+per seed and root, rotations averaged so the study config cancels): seat 1
+**+3.89 (p=0.014)**, win 0.559 / 0.441, over 160 games. The caveat: both
+arms use seeds 1–40, so these are 80 observations on 40 decks and the p is
+optimistic. The 2p first-player advantage is now the best-supported seat
+claim in the project (sign predicted, size ≈ 4 points, two arms agree), one
+independent-deck replication short of established. **A3 keeps seeds 1–40
+to stay paired with A1; A4's seat reading should add a fresh-seed mirror
+(seeds 41–80) rather than more arms on the same decks.**
+
+`mirror_3p_greedy` (vs `mirror_3p`, registered +2 to +4) is in flight.

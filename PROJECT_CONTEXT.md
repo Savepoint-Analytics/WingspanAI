@@ -254,8 +254,8 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | Read A2 (`mirror_2p_greedy`, `mirror_3p_greedy`, launched 2026-09-20 ~12:40, ~3.5 h) with `arm_contrast --agent potential_points@1` against `mirror_2p` / `mirror_3p`. | Registered 2p +1 to +3, 3p +2 to +4 for the greedy study seat. A 2p null closes the two-player opponent question for good; pool A1+A2 for the seat effect (2p seat 1 +5.1 at p=0.051 needs the second 80). |
-| 1 | A3 (denial term in the mirror) and, if A2 is positive, a `greedy`-cost-aware production check. | A3 registered +1 to +3; null means denial is not worth a search node even against a planner. |
+| 1 | Read `mirror_3p_greedy` (A2 at 3p, registered +2 to +4) and A3 (`mirror_2p_denial`, `mirror_3p_denial`, `search_denial_weight=1.0`, registered +1 to +3), all queued 2026-09-20. | Ledger rows; A3 null means denial is not worth a search node even against a planner. |
+| 1 | A4 seat replication on fresh decks: `launch_arm mirror_2p_b --mirror --seeds 41-80` (no study seat). | Seat 1 +2 to +5 at p<0.05 pooled with A1+A2 establishes the 2p first-player advantage; the sign flipping retires the claim. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
 | 3 | Draw-choice preference from the K=4 bird values, behind a switch. | One 80-game arm; registered ±1 band (the opener lesson says expect a null). |
@@ -3353,3 +3353,16 @@ The queue is not reboot-safe.
 - [ ] Read A2; pool A1+A2 seat effect; ledger rows.
 - [ ] A3 denial term in the mirror.
 - [ ] Retire holdouts as they pass 100 games (mirror arms double the deviation rate).
+
+## Update: 2026-09-20 - A2 at 2p null: the two-player opponent question closes; seat 1 +3.9 pooled
+
+`mirror_2p_greedy` vs `mirror_2p` (80 paired, `8d35fdd`): greedy study seat
+**+0.46 (p=0.62)**, win −0.006, decision ×1.55. Registered +1 to +3
+failed. With a planning opponent and real contention (score 78.4 → 75.3)
+the imagined opponent's family still moves nothing: at 2p the opponent
+model is a cost knob. `belief` stays; no holdout. Seat pooled over A1+A2
+(`analysis/mirror_seat_effect.py`): seat 1 **+3.89 (p=0.014), win 0.559**
+over 160 games on 40 decks (p optimistic: same seeds). Next mirror seat
+reading needs fresh seeds (41–80). In flight: `mirror_3p_greedy`, then A3
+(`mirror_2p_denial`, `mirror_3p_denial`). Also this session:
+`search_denial_weight` switch (A3), `analysis/mirror_seat_effect.py`.

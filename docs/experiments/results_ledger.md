@@ -67,6 +67,7 @@ detail, and the depth-3 search was the first change large enough to see.
 | Date | Arm | Design | Headline |
 |---|---|---|---|
 | 2026-09-20 | A1 `mirror_2p` | 80 games, seeds 1–40 × 2 rotations, default config both seats | mean **75.3** (vs 78.4 against the roster); seat 1 **+5.1, win 0.575** (p=0.051 at n=40 seeds — rotations of identical configs duplicate); winners 36.4 birds / 15.8 goals / 14.0 eggs vs losers 32.8 / 12.0 / 11.4 |
+| 2026-09-20 | A2 `mirror_2p_greedy` | position 1 on `search_opponent_model="greedy"`, 80 games paired vs `mirror_2p` | study seat **+0.46 (p=0.62)**, win −0.006; decision ×1.55. Registered +1 to +3 failed: **the 2p opponent question closes** — a planning opponent changes nothing either. Seat pooled A1+A2 (160 games, 40 decks): seat 1 **+3.9 (p=0.014), win 0.559** |
 | 2026-09-20 | A1 `mirror_3p` | 90 games, seeds 1–30 × 3 rotations | mean **78.3** (higher than 74.2 against the roster); seat win 0.40 / 0.37 / 0.23, seat 1 − seat 3 +2.9 (p=0.17 at n=30 seeds) |
 
 ## Card and play studies
