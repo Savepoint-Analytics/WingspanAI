@@ -1,6 +1,6 @@
 # COMPANY_CONTEXT.md
 
-_Last updated: 2026-05-03_
+_Last updated: 2026-09-19_
 
 ## Purpose
 
@@ -196,20 +196,32 @@ When writing public-facing or case-study material:
 
 ## Current stage
 
-The project is moving from foundation-building into rule-fidelity and smoke-experiment validation.
+_Refreshed 2026-09-19._ The base-game simulator is complete and validated
+(every base-game power handled, replay-checked, deterministic across
+processes), and the project is in agent research with a production lens.
 
 Current assets:
-- `README.md` with objectives, roadmap, next steps, and resources.
-- `data/raw/wingspan-card-list.xlsx` with card, bonus-card, and round-goal information.
-- Rulebook PDFs in `rulebook_pdfs/`.
-- A seeded simulator with scaled core actions, baseline agents, YAML policy guardrails, telemetry events, replay-gated batches, scoring/power audit summaries, tournaments, workload-namespaced PostgreSQL/MinIO persistence, batch manifests, and workbook-backed smoke batches.
+- A rule-faithful base-game simulator with seeded, replayable telemetry,
+  PostgreSQL/MinIO persistence, batch manifests and a game viewer.
+- A champion search agent (`potential_points`: depth-3 determinized search
+  with a Bayesian opponent posterior) that wins 87.5% of two-player games
+  against the scripted roster, and a production configuration of the same
+  agent that keeps that strength at 1.1 s a decision under a 5 s cap.
+- An experiment method — registered predictions, seed-paired arms, value
+  per millisecond, standing 5% holdouts — with a results ledger of every
+  arm and study (`docs/experiments/results_ledger.md`).
+- A case-study body written from the ledger (`docs/experiments/case_study.md`).
 
 Near-term goal:
-1. Continue tightening base-game fidelity around high-volume powers, scoring, and choice policies.
-2. Use smoke batches to catch simulator regressions before interpreting strategy results.
-3. Expand event/replay detail so game traces can explain why an agent chose an action.
-4. Compare baseline and heuristic agents only when the relevant mechanics are implemented or explicitly filtered.
-5. Convert validated findings into reusable architecture and case-study material.
+1. Close the three-player opponent-model question (refit the belief
+   model's response likelihoods to the archive; one 3p arm).
+2. Collect the strategy findings the ledger already contains — dominance,
+   archetype signatures, seat effects, card value — into one document with
+   detection limits.
+3. Design the self-play / human-trace opponent that tests whether "the
+   opponent barely matters" is a property of the game or of the roster.
+4. Write the reusable-template and expansion-configuration architecture
+   docs, then encode the European expansion as the first content pack.
 
 ## Things to avoid repeating
 

@@ -29,6 +29,7 @@ Analysis layer:
 - `analysis/launch_arm.py`: launches a paired arm the standard way (clean worktree at a commit, lineup runners, `--after` queueing) and writes `artifacts/<root>/launch/arm.json` as the record.
 - `analysis/compact_artifacts.py`: gzips per-game snapshot and replay-debug files under finished roots (about 60% of a root); reversible.
 - `analysis/oracle_type_posteriors.py`: writes each opponent kind's converged belief posterior for the oracle-type search opponent model (`configs/belief/`).
+- `analysis/fit_response_model.py`: fits the belief model's response likelihoods `P(family | profile, candidate values)` per roster kind from the archive (replayed real states, public candidate values), scored by leave-one-seed-out sequential log loss against the hand-set profiles (`configs/belief/fitted_response_models.json`).
 
 Key rules docs:
 
@@ -66,6 +67,7 @@ Key rules docs:
 - `experiments/round_robin_v5_feeder_odds.md`: corrected dice, and the feeder-odds ablation (null).
 - `experiments/search_food_candidates.md`: bounding gain-food continuations in the search — a third off the decision-time tail for about 1 point.
 - `experiments/feeder_odds_search_rerun.md`: the feeder-odds ablation re-run on the searching agent (still null, +0.49).
+- `experiments/self_play_opponent_plan.md`: registered design for mirror-match (self-play) and human-trace opponents — the test of whether "the opponent barely matters" is a property of the game or of the scripted roster.
 - `experiments/search_opponent_model_test.md`: the Bayesian opponent posterior plays the opponent seats inside the search — decision cost more than halved, score null (+0.31), and the posterior tracks action mix rather than opponent type.
 - `experiments/seat_effect_power_analysis.md`: how big a seat effect this design can detect, computed from measured variance.
 - `experiments/seat_order_four_player_test.md`: the four-player test, and why seat claims need a stability check.
