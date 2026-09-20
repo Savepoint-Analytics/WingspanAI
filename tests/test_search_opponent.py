@@ -291,6 +291,48 @@ class BeliefApplySearchOpponentModelTests(TestCase):
         self.assertIn(agent.select_action(state, actions), actions)
 
 
+class CompetentSearchOpponentModelTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.catalog = make_sample_catalog()
+
+    def test_plays_the_highest_public_value_family_available(self) -> None:
+        from wingspan_ai.agents.search_opponent import (
+            CompetentSearchOpponentModel,
+            _public_candidate_values,
+        )
+
+        model = build_search_opponent_model("competent", owner_agent_id="pp")
+        self.assertIsInstance(model, CompetentSearchOpponentModel)
+        for seed in range(1, 8):
+            branch = _opponent_turn_state(self.catalog, seed)
+            legal = legal_actions_for_current_player(branch)
+            chosen = model.select_action(branch, legal)
+            values = _public_candidate_values(branch, "p2")
+            available = {a.action_type for a in legal}
+            expected = max(
+                (f for f in values if f in available), key=lambda f: (values[f], f.value)
+            )
+            self.assertEqual(chosen.action_type, expected, f"seed {seed}")
+            self.assertEqual(model.select_action(branch, legal), chosen)
+
+    def test_no_inference_and_agent_accepts_the_switch(self) -> None:
+        model = build_search_opponent_model("competent", owner_agent_id="pp")
+        branch = _opponent_turn_state(self.catalog)
+        model.observe_action(branch, legal_actions_for_current_player(branch)[0], "p2")
+        self.assertEqual(model.telemetry_payload(), {"model_id": "competent"})
+        agent = PotentialPointsAgent(
+            search_depth=2,
+            final_search_turns=8,
+            determinization_samples=0,
+            search_opponent_model="competent",
+        )
+        state = setup_base_game(self.catalog, player_ids=["p1", "p2"], random_seed=7)
+        actions = legal_actions_for_current_player(state)
+        self.assertIn(agent.select_action(state, actions), actions)
+        self.assertEqual(agent.opponent_model.model_id, "competent")
+
+
 class SearchOpponentConfigTests(TestCase):
     def test_config_and_manifest_carry_the_switch(self) -> None:
         payload = PotentialPointsSearchConfig().as_manifest_payload()

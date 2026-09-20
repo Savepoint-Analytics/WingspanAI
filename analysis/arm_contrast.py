@@ -49,13 +49,35 @@ def load_arm(artifact_root: Path) -> dict[GameKey, dict]:
     return games
 
 
+def split_agent(agent: str) -> tuple[str, int | None]:
+    """``kind`` or ``kind@position`` → (kind, lineup position or None)."""
+
+    kind, _, position = agent.partition("@")
+    return kind, (int(position) if position else None)
+
+
+def lineup_position(lineup: tuple[str, ...] | list[str], agent: str) -> int | None:
+    """Lineup index of ``agent``; ``kind@N`` names position N, which must hold that kind.
+
+    A mirror match names the same kind in two positions, so the study seat
+    has to be addressed by position — it travels with the policy through
+    every seat rotation, exactly like the holdout key.
+    """
+
+    kind, position = split_agent(agent)
+    if position is not None:
+        return position if position < len(lineup) and lineup[position] == kind else None
+    return lineup.index(kind) if kind in lineup else None
+
+
 def agent_result(game: dict, agent: str) -> tuple[float, float] | None:
     """(score, win share) for `agent` in one game, or None if it did not play."""
 
     lineup = game["player_agent_kinds"]
-    if agent not in lineup:
+    position = lineup_position(lineup, agent)
+    if position is None:
         return None
-    seat = (lineup.index(agent) - game["seat_rotation"]) % game["player_count"]
+    seat = (position - game["seat_rotation"]) % game["player_count"]
     scores = game["outcome"]["scores"]
     own = scores[f"player_{seat + 1}"]
     best = max(scores.values())
@@ -86,7 +108,7 @@ def contrast(
     """Per-agent paired contrast of `arm` against `baseline`."""
 
     shared = sorted(
-        (key for key in baseline if key in arm and agent in key.lineup),
+        (key for key in baseline if key in arm and lineup_position(key.lineup, agent) is not None),
         key=lambda key: (key.lineup, key.rotation, key.seed),
     )
     base_scores, arm_scores, base_wins, arm_wins = [], [], [], []
@@ -99,7 +121,8 @@ def contrast(
         arm_scores.append(other[0])
         base_wins.append(base[1])
         arm_wins.append(other[1])
-        opponents = tuple(kind for kind in key.lineup if kind != agent)
+        own_position = lineup_position(key.lineup, agent)
+        opponents = tuple(kind for index, kind in enumerate(key.lineup) if index != own_position)
         by_opponent["+".join(opponents)].append(other[0] - base[0])
 
     score_deltas = [a - b for a, b in zip(arm_scores, base_scores, strict=True)]
@@ -198,7 +221,10 @@ def main() -> int:
         "--arm", type=Path, action="append", required=True, help="artifact root(s) to contrast"
     )
     parser.add_argument(
-        "--agent", action="append", help="agent(s) to report; default: all in the baseline"
+        "--agent",
+        action="append",
+        help="agent(s) to report; default: all in the baseline. ``kind@N`` reads lineup "
+        "position N (the study seat of a mirror match, e.g. potential_points@1)",
     )
     args = parser.parse_args()
 

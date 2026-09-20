@@ -60,7 +60,7 @@ from wingspan_ai.state.models import GameState, to_public_state
 
 _PUBLIC_MODEL = PublicOpponentBeliefModel()
 
-SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle", "belief_apply")
+SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle", "belief_apply", "competent")
 #: Where the oracle-type model reads each opponent kind's converged posterior
 #: (written by ``analysis/oracle_type_posteriors.py``).
 DEFAULT_ORACLE_TYPE_POSTERIORS = "configs/belief/oracle_type_posteriors.json"
@@ -354,6 +354,53 @@ class OracleTypeSearchOpponentModel(BeliefSearchOpponentModel):
         return payload
 
 
+@dataclass
+class CompetentSearchOpponentModel:
+    """Play each opponent turn as the family with the highest public value on the branch.
+
+    Registered 2026-09-19 after two nulls closed the other explanations of
+    greedy's +2.1 at three players: ``belief_apply`` (the pick inside the
+    family is not it) and the response-likelihood refit (greedy predicts the
+    archetypes' real families *less* often than the belief model, so
+    accuracy about the real opponent is not it either). What greedy does
+    that the belief model does not is answer the searcher's imagined move
+    with a competent reply in every branch — take the tray card the plan
+    wanted — where the belief model's temperature-2 priors reply the same
+    way whatever the branch. This model keeps the belief model's cost (one
+    public valuation, no ``apply_action``) and drops the posterior: the
+    family is the argmax of the public candidate values on the branch
+    state, the pick inside it the same printed-points proxy.
+
+    No inference, so ``observe_action`` is a no-op and there is no belief
+    state to report; the family it plays still reads only the public
+    projection of the branch.
+    """
+
+    model_id: str = "competent"
+
+    def select_action(self, state: GameState, legal_actions: list[LegalAction]) -> LegalAction:
+        if not legal_actions:
+            raise ValueError("CompetentSearchOpponentModel cannot select from an empty list")
+        with profiling.node("competent_family"):
+            values = _public_candidate_values(state, state.active_player.player_id)
+        available = {action.action_type for action in legal_actions}
+        pool = legal_actions
+        for family in sorted(values, key=lambda f: (-values[f], f.value)):
+            if family in available:
+                pool = [action for action in legal_actions if action.action_type == family]
+                break
+        with profiling.node("competent_within_family_pick"):
+            return max(pool, key=lambda action: _proxy_action_score(state, action))
+
+    def observe_action(
+        self, state_before: GameState, action: LegalAction, acting_player_id: str
+    ) -> None:
+        return None
+
+    def telemetry_payload(self) -> dict:
+        return {"model_id": self.model_id}
+
+
 _ORACLE_CACHE: dict[str, dict[str, dict[str, float]]] = {}
 
 
@@ -395,6 +442,8 @@ def build_search_opponent_model(
         return BeliefApplySearchOpponentModel(
             owner_agent_id=owner_agent_id, profile_model_set=profile_model_set
         )
+    if kind == "competent":
+        return CompetentSearchOpponentModel()
     raise ValueError(
         f"unknown search opponent model: {kind!r}; expected one of {SEARCH_OPPONENT_MODELS}"
     )

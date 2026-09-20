@@ -102,7 +102,7 @@ class SetupPolicyHoldoutTests(TestCase):
         )
         self.assertEqual(agent.setup_policy.policy_id, "potential_points_setup_v3_keep3")
         self.assertEqual(agent.holdouts_applied, ["setup_policy"])
-        recorded = simulation_batch._search_holdouts([agent], config)
+        recorded = simulation_batch._search_holdouts([agent], {agent.agent_id: config})
         self.assertEqual(
             recorded[agent.agent_id]["effective"]["setup_policy"],
             "potential_points_setup_v3_keep3",
@@ -122,7 +122,7 @@ class SetupPolicyHoldoutTests(TestCase):
         self.assertEqual(agent.setup_policy.policy_id, "default_setup_v1")
         self.assertEqual(agent.holdouts_applied, [])
         self.assertEqual(
-            simulation_batch._search_holdouts([agent], config)[agent.agent_id]["effective"][
+            simulation_batch._search_holdouts([agent], {agent.agent_id: config})[agent.agent_id]["effective"][
                 "setup_policy"
             ],
             "default_setup_v1",

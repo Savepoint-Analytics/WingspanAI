@@ -161,7 +161,10 @@ DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
 #: on type inference, never a production model).
 #: ``"belief_apply"`` predicts the family with the posterior and picks inside
 #: it by applying (greedy's accuracy where the search goes; registered 2026-09-18).
-SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle", "belief_apply")
+#: ``"competent"`` plays the family with the highest public candidate value on
+#: the branch, no posterior — the responsiveness hypothesis registered
+#: 2026-09-19 (``docs/experiments/search_opponent_model_test.md``).
+SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle", "belief_apply", "competent")
 #: Which response likelihoods the belief opponent model reasons with:
 #: ``"hand_set"`` (the 2026-08 archetype table, ``DEFAULT_PROFILE_MODELS``) or
 #: ``"fitted"`` (per roster kind, fitted to the archive by

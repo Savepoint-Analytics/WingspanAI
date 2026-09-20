@@ -316,3 +316,45 @@ class SimulationBatchFlowTests(TestCase):
                 upload_artifacts=False,
                 batch_kind="adhoc",
             )
+
+
+class MirrorMatchTests(TestCase):
+    def test_per_position_search_config_gives_one_seat_its_own_search(self) -> None:
+        cheap = {"search_depth": 1, "final_search_turns": 0, "determinization_samples": 0}
+        study = PotentialPointsSearchConfig(search_opponent_model="competent", **cheap)
+        with TemporaryDirectory() as tmp_dir:
+            results = simulation_batch.run_simulation_batch(
+                workbook_path="missing-workbook.xlsx",
+                seeds=[1],
+                artifact_root=tmp_dir,
+                persist_postgres=False,
+                upload_artifacts=False,
+                batch_kind="smoke",
+                batch_label="mirror",
+                batch_id="mirror_batch",
+                player_agent_kinds=["potential_points", "potential_points"],
+                seat_rotation=1,
+                potential_points_search=PotentialPointsSearchConfig(**cheap),
+                potential_points_search_by_position={1: study},
+            )
+            manifest = json.loads(
+                Path(results[0]["batch_manifest"]["path"]).read_text(encoding="utf-8")
+            )
+        game = manifest["games"][0]
+        # Agent identity travels with the lineup position, not the seat.
+        self.assertEqual(game["player_agent_ids"], ["potential_points_p1", "potential_points_p2"])
+        self.assertEqual(game["seated_agent_ids"], ["potential_points_p2", "potential_points_p1"])
+        models = {k: v["model"] for k, v in game["search_opponent_models"].items()}
+        self.assertEqual(models["potential_points_p2"], "competent")
+        self.assertEqual(models["potential_points_p1"], "belief")
+        # The study seat is not "held out" from its own config.
+        self.assertFalse(game["search_opponent_models"]["potential_points_p2"]["holdout"])
+        self.assertEqual(
+            game["search_holdouts"]["potential_points_p2"]["effective"]["search_opponent_model"],
+            "competent",
+        )
+        self.assertEqual(list(game["potential_points_search_by_position"]), ["1"])
+        self.assertEqual(
+            manifest["potential_points_search_by_position"]["1"]["search_opponent_model"],
+            "competent",
+        )

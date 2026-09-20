@@ -143,6 +143,7 @@ def run_seeded_game(
     net_value_max_opponent_response_actions: int | None = 8,
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
+    potential_points_search_by_position: dict[int, PotentialPointsSearchConfig] | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
     setup_policy_overrides: dict[str, str] | None = None,
     opening_hand_overrides: dict[str, list[str]] | None = None,
@@ -155,6 +156,12 @@ def run_seeded_game(
     ``opening_hand_overrides`` and ``forced_play_birds`` map an agent kind to
     bird names: the birds are swapped into that agent's dealt hand and played
     as soon as legal (the forced keep-and-play instrument).
+
+    ``potential_points_search_by_position`` maps a zero-based lineup position
+    to its own search config, overriding ``potential_points_search`` for that
+    position only. It is what lets a mirror match (``potential_points`` in
+    every seat) vary one seat's search: the study position is a lineup
+    position, so it travels with the policy through every seat rotation.
     """
 
     load_dotenv()
@@ -190,7 +197,10 @@ def run_seeded_game(
         load_guardrail_config(guardrail_config_path) if guardrail_config_path is not None else None
     )
 
-    def build_seat_agent(agent_kind: PlayerTwoAgentKind, seat: str):
+    def search_for_position(position: int) -> PotentialPointsSearchConfig | None:
+        return (potential_points_search_by_position or {}).get(position, potential_points_search)
+
+    def build_seat_agent(agent_kind: PlayerTwoAgentKind, seat: str, position: int):
         base_agent = _make_agent(
             agent_kind,
             seat=seat,
@@ -203,7 +213,7 @@ def run_seeded_game(
             net_value_max_candidate_actions=net_value_max_candidate_actions,
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
             net_value_response_mode=net_value_response_mode,
-            potential_points_search=potential_points_search,
+            potential_points_search=search_for_position(position),
             lineup=tuple(resolved_lineup),
             forced_bonus_choice=forced_bonus_choice,
             setup_policy_overrides=setup_policy_overrides,
@@ -222,9 +232,13 @@ def run_seeded_game(
     # rotates the lineup so the same matchup can be replayed with each agent in
     # each seat, which is how seat advantage is cancelled (see ADR 0002).
     lineup_agents = [
-        build_seat_agent(agent_kind, f"p{index + 1}")
+        build_seat_agent(agent_kind, f"p{index + 1}", index)
         for index, agent_kind in enumerate(resolved_lineup)
     ]
+    search_by_agent = {
+        agent.agent_id: search_for_position(index) or PotentialPointsSearchConfig()
+        for index, agent in enumerate(lineup_agents)
+    }
     resolved_seat_rotation = seat_rotation % len(lineup_agents)
     seated_agents = lineup_agents[resolved_seat_rotation:] + lineup_agents[:resolved_seat_rotation]
     seated_kinds = list(resolved_lineup[resolved_seat_rotation:]) + list(
@@ -303,14 +317,13 @@ def run_seeded_game(
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "net_value_response_mode": net_value_response_mode,
         "potential_points_search": _search_payload(potential_points_search),
+        "potential_points_search_by_position": _search_by_position_payload(
+            potential_points_search_by_position
+        ),
         # The model each potential_points seat actually searched with, after
         # the holdout draw; ``holdout`` marks the standing-control games.
-        "search_opponent_models": _search_opponent_models(
-            lineup_agents, potential_points_search or PotentialPointsSearchConfig()
-        ),
-        "search_holdouts": _search_holdouts(
-            lineup_agents, potential_points_search or PotentialPointsSearchConfig()
-        ),
+        "search_opponent_models": _search_opponent_models(lineup_agents, search_by_agent),
+        "search_holdouts": _search_holdouts(lineup_agents, search_by_agent),
         "forced_bonus_choice": dict(forced_bonus_choice) if forced_bonus_choice else None,
         "setup_policy_overrides": dict(setup_policy_overrides) if setup_policy_overrides else None,
         "opening_hand_overrides": dict(opening_hand_overrides) if opening_hand_overrides else None,
@@ -414,6 +427,9 @@ def run_seeded_game(
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "search_opponent_models": batch_metadata["search_opponent_models"],
         "search_holdouts": batch_metadata["search_holdouts"],
+        "potential_points_search_by_position": batch_metadata[
+            "potential_points_search_by_position"
+        ],
         "forced_bonus_choice": batch_metadata["forced_bonus_choice"],
         "setup_policy_overrides": batch_metadata["setup_policy_overrides"],
         "opening_hand_overrides": batch_metadata["opening_hand_overrides"],
@@ -487,7 +503,9 @@ def _apply_setup_policy(agent, agent_kind: PlayerTwoAgentKind, setup_policy_kind
     return agent
 
 
-def _search_opponent_models(agents, search: PotentialPointsSearchConfig) -> dict[str, dict]:
+def _search_opponent_models(
+    agents, search_by_agent: dict[str, PotentialPointsSearchConfig]
+) -> dict[str, dict]:
     models: dict[str, dict] = {}
     for agent in agents:
         base = getattr(agent, "base_agent", agent)  # unwrap a guardrailed agent
@@ -496,12 +514,14 @@ def _search_opponent_models(agents, search: PotentialPointsSearchConfig) -> dict
             continue
         models[agent.agent_id] = {
             "model": effective,
-            "holdout": effective != search.search_opponent_model,
+            "holdout": effective != search_by_agent[agent.agent_id].search_opponent_model,
         }
     return models
 
 
-def _search_holdouts(agents, search: PotentialPointsSearchConfig) -> dict[str, dict]:
+def _search_holdouts(
+    agents, search_by_agent: dict[str, PotentialPointsSearchConfig]
+) -> dict[str, dict]:
     """Per potential_points seat: the effective search fields and the holdouts applied."""
 
     out: dict[str, dict] = {}
@@ -509,6 +529,7 @@ def _search_holdouts(agents, search: PotentialPointsSearchConfig) -> dict[str, d
         base = getattr(agent, "base_agent", agent)
         if not hasattr(base, "search_child_expansion"):
             continue
+        search = search_by_agent[agent.agent_id]
         effective = {name: getattr(base, name) for name in search.AGENT_FIELDS}
         setup_policy = getattr(base, "setup_policy", None)
         if setup_policy is not None:
@@ -524,6 +545,16 @@ def _search_payload(config: PotentialPointsSearchConfig | None) -> dict | None:
     """Manifest form of the potential-points search settings; None means agent defaults."""
 
     return config.as_manifest_payload() if config is not None else None
+
+
+def _search_by_position_payload(
+    by_position: dict[int, PotentialPointsSearchConfig] | None,
+) -> dict[str, dict] | None:
+    """Manifest form of per-lineup-position search overrides, keyed by position string."""
+
+    if not by_position:
+        return None
+    return {str(position): config.as_manifest_payload() for position, config in by_position.items()}
 
 
 def _make_agent(
@@ -733,6 +764,7 @@ def _write_batch_manifest(
     net_value_max_candidate_actions: int | None,
     net_value_max_opponent_response_actions: int | None,
     potential_points_search: PotentialPointsSearchConfig | None = None,
+    potential_points_search_by_position: dict[int, PotentialPointsSearchConfig] | None = None,
 ) -> Path:
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -761,6 +793,9 @@ def _write_batch_manifest(
         "net_value_max_candidate_actions": net_value_max_candidate_actions,
         "net_value_max_opponent_response_actions": net_value_max_opponent_response_actions,
         "potential_points_search": _search_payload(potential_points_search),
+        "potential_points_search_by_position": _search_by_position_payload(
+            potential_points_search_by_position
+        ),
         "guardrail_config_names": sorted(
             {
                 result["guardrail_config_name"]
@@ -793,6 +828,7 @@ def _write_batch_manifest(
                 "seat_rotation": result["seat_rotation"],
                 "player_count": result["player_count"],
                 "player_agent_kinds": result["player_agent_kinds"],
+                "player_agent_ids": result["player_agent_ids"],
                 "seated_agent_ids": result["seated_agent_ids"],
                 "setup_policy_kind": result["setup_policy_kind"],
                 "guardrail_config_name": result["guardrail_config_name"],
@@ -806,6 +842,9 @@ def _write_batch_manifest(
                 ],
                 "search_opponent_models": result.get("search_opponent_models", {}),
                 "search_holdouts": result.get("search_holdouts", {}),
+                "potential_points_search_by_position": result.get(
+                    "potential_points_search_by_position"
+                ),
                 "forced_bonus_choice": result.get("forced_bonus_choice"),
                 "setup_policy_overrides": result.get("setup_policy_overrides"),
                 "opening_hand_overrides": result.get("opening_hand_overrides"),
@@ -860,6 +899,7 @@ def run_simulation_batch(
     net_value_max_opponent_response_actions: int | None = 8,
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
+    potential_points_search_by_position: dict[int, PotentialPointsSearchConfig] | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
     setup_policy_overrides: dict[str, str] | None = None,
     opening_hand_overrides: dict[str, list[str]] | None = None,
@@ -903,6 +943,7 @@ def run_simulation_batch(
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
             net_value_response_mode=net_value_response_mode,
             potential_points_search=potential_points_search,
+            potential_points_search_by_position=potential_points_search_by_position,
             forced_bonus_choice=forced_bonus_choice,
             setup_policy_overrides=setup_policy_overrides,
             opening_hand_overrides=opening_hand_overrides,
@@ -941,6 +982,7 @@ def run_simulation_batch(
             net_value_max_candidate_actions=net_value_max_candidate_actions,
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
             potential_points_search=potential_points_search,
+            potential_points_search_by_position=potential_points_search_by_position,
         )
         storage_config = object_storage_config_from_env()
         should_upload_manifest = (

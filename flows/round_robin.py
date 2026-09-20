@@ -418,12 +418,17 @@ def run_round_robin(
     net_value_max_opponent_response_actions: int | None = 3,
     net_value_response_mode: str = "expected",
     potential_points_search: PotentialPointsSearchConfig | None = None,
+    potential_points_search_by_position: dict[int, PotentialPointsSearchConfig] | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
     setup_policy_overrides: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run every agent lineup in every seat rotation across the setup factor.
 
-    Seat counterbalancing is always applied and cannot be disabled.
+    Seat counterbalancing is always applied and cannot be disabled. A roster
+    that names the same kind twice (``["potential_points", "potential_points"]``)
+    is a mirror match; ``potential_points_search_by_position`` then gives one
+    lineup position its own search config (the study seat, which travels
+    with the policy through every rotation).
     """
 
     load_dotenv()
@@ -433,8 +438,13 @@ def run_round_robin(
     resolved_roster = [
         _validate_player_two_agent_kind(agent) for agent in (roster or list(DEFAULT_ROSTER))
     ]
-    if len(set(resolved_roster)) < player_count:
-        raise ValueError(f"round robin requires at least {player_count} distinct agent kinds")
+    if len(resolved_roster) < player_count:
+        raise ValueError(f"round robin requires at least {player_count} agent kinds")
+    if len(set(resolved_roster)) < player_count and len(set(resolved_roster)) != 1:
+        raise ValueError(
+            "a roster that repeats a kind must be a pure mirror match (one kind, "
+            f"{player_count} copies); got {resolved_roster}"
+        )
     resolved_setup_policy_kinds = [
         _validate_setup_policy_kind(kind)
         for kind in (setup_policy_kinds or ["control", "strategic"])
@@ -470,6 +480,7 @@ def run_round_robin(
                 net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
                 net_value_response_mode=net_value_response_mode,
                 potential_points_search=potential_points_search,
+                potential_points_search_by_position=potential_points_search_by_position,
                 forced_bonus_choice=forced_bonus_choice,
                 setup_policy_overrides=setup_policy_overrides,
             )
@@ -494,6 +505,14 @@ def run_round_robin(
             "forced_bonus_choice": dict(forced_bonus_choice) if forced_bonus_choice else None,
             "setup_policy_overrides": (
                 dict(setup_policy_overrides) if setup_policy_overrides else None
+            ),
+            "potential_points_search_by_position": (
+                {
+                    str(k): v.as_manifest_payload()
+                    for k, v in potential_points_search_by_position.items()
+                }
+                if potential_points_search_by_position
+                else None
             ),
             "potential_points_search": (
                 potential_points_search.as_manifest_payload()
