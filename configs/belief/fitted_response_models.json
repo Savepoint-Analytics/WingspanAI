@@ -1,0 +1,175 @@
+{
+  "version": "fitted_response_models_v1",
+  "generated_at": "2026-09-20T06:15:27+00:00",
+  "source": "artifacts/response_fit/observations.jsonl",
+  "form": "logit",
+  "decisions": 53603,
+  "eval_roots": [
+    "artifacts/rr_belief_opp",
+    "artifacts/rr3p_opp/belief"
+  ],
+  "train_mean_log_likelihood": {
+    "bonus_card_focus": -1.2223,
+    "engine_builder": -1.224,
+    "greedy_immediate": -0.7141,
+    "net_value_response": -1.2284
+  },
+  "cross_validation": {
+    "hand_set": {
+      "bonus_card_focus": {
+        "n": 1809,
+        "log_loss": 1.2282,
+        "top1": 0.3847
+      },
+      "engine_builder": {
+        "n": 2065,
+        "log_loss": 1.2468,
+        "top1": 0.3574
+      },
+      "greedy_immediate": {
+        "n": 1281,
+        "log_loss": 1.0042,
+        "top1": 0.498
+      },
+      "net_value_response": {
+        "n": 1547,
+        "log_loss": 1.2397,
+        "top1": 0.3639
+      },
+      "all": {
+        "n": 6702,
+        "log_loss": 1.1938,
+        "top1": 0.3932,
+        "unmodelled": 58
+      }
+    },
+    "fitted": {
+      "bonus_card_focus": {
+        "n": 1809,
+        "log_loss": 1.2115,
+        "top1": 0.3847
+      },
+      "engine_builder": {
+        "n": 2065,
+        "log_loss": 1.2508,
+        "top1": 0.355
+      },
+      "greedy_immediate": {
+        "n": 1281,
+        "log_loss": 0.9726,
+        "top1": 0.5496
+      },
+      "net_value_response": {
+        "n": 1547,
+        "log_loss": 1.2313,
+        "top1": 0.3911
+      },
+      "all": {
+        "n": 6702,
+        "log_loss": 1.1825,
+        "top1": 0.4085,
+        "unmodelled": 58
+      }
+    },
+    "fitted_known_kind": {
+      "bonus_card_focus": {
+        "n": 1809,
+        "log_loss": 1.2262,
+        "top1": 0.3554
+      },
+      "engine_builder": {
+        "n": 2065,
+        "log_loss": 1.2594,
+        "top1": 0.3186
+      },
+      "greedy_immediate": {
+        "n": 1281,
+        "log_loss": 1.2617,
+        "top1": 0.5582
+      },
+      "net_value_response": {
+        "n": 1547,
+        "log_loss": 1.2293,
+        "top1": 0.3969
+      },
+      "all": {
+        "n": 6702,
+        "log_loss": 1.2439,
+        "top1": 0.3924,
+        "unmodelled": 58
+      }
+    }
+  },
+  "profiles": {
+    "bonus_card_focus": {
+      "family_prior": {
+        "play_bird": 0.030865,
+        "gain_food": 0.278043,
+        "lay_eggs": 0.056573,
+        "draw_cards": 0.634519
+      },
+      "value_temperature": 1.0,
+      "family_value_weight": {
+        "play_bird": 1.073138,
+        "gain_food": 0.350385,
+        "lay_eggs": 0.745839,
+        "draw_cards": 0.062582
+      }
+    },
+    "engine_builder": {
+      "family_prior": {
+        "play_bird": 0.070229,
+        "gain_food": 0.412863,
+        "lay_eggs": 0.076466,
+        "draw_cards": 0.440442
+      },
+      "value_temperature": 1.0,
+      "family_value_weight": {
+        "play_bird": 0.834525,
+        "gain_food": 0.448825,
+        "lay_eggs": 0.661354,
+        "draw_cards": 0.077199
+      }
+    },
+    "greedy_immediate": {
+      "family_prior": {
+        "play_bird": 0.006313,
+        "gain_food": 0.513934,
+        "lay_eggs": 0.44634,
+        "draw_cards": 0.033413
+      },
+      "value_temperature": 1.0,
+      "family_value_weight": {
+        "play_bird": 1.12563,
+        "gain_food": -1.381065,
+        "lay_eggs": 0.767488,
+        "draw_cards": 0.738551
+      }
+    },
+    "net_value_response": {
+      "family_prior": {
+        "play_bird": 0.138579,
+        "gain_food": 0.243487,
+        "lay_eggs": 0.235273,
+        "draw_cards": 0.382662
+      },
+      "value_temperature": 1.0,
+      "family_value_weight": {
+        "play_bird": 0.456289,
+        "gain_food": 0.253422,
+        "lay_eggs": 0.391555,
+        "draw_cards": 0.65908
+      }
+    },
+    "random_legal": {
+      "family_prior": {
+        "draw_cards": 0.45,
+        "gain_food": 0.23,
+        "play_bird": 0.22,
+        "lay_eggs": 0.1
+      },
+      "value_temperature": null,
+      "family_value_weight": null
+    }
+  }
+}

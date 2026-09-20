@@ -14,7 +14,7 @@ from wingspan_ai.agents.search_opponent import (
     OracleTypeSearchOpponentModel,
     build_search_opponent_model,
 )
-from wingspan_ai.belief import OpponentProfile
+from wingspan_ai.belief import DEFAULT_PROFILE_MODELS, OpponentProfile
 from wingspan_ai.content import make_sample_catalog
 from wingspan_ai.rules.actions import ActionType
 from wingspan_ai.rules.base_game import (
@@ -168,7 +168,7 @@ class BeliefSearchOpponentModelTests(TestCase):
         self.assertEqual(model.belief_state_for("p2").observation_count, 1)
         posterior = model.belief_state_for("p2").profile_posterior
         self.assertAlmostEqual(sum(posterior.values()), 1.0)
-        self.assertEqual(set(posterior), set(OpponentProfile))
+        self.assertEqual(set(posterior), set(DEFAULT_PROFILE_MODELS))
 
     def test_search_branches_do_not_write_the_posterior(self) -> None:
         model = BeliefSearchOpponentModel(owner_agent_id="pp")

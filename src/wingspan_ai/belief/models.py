@@ -63,7 +63,16 @@ _MIN_PROBABILITY = 1e-9
 
 
 class OpponentProfile(StrEnum):
-    """Opponent types the belief model can distinguish from public behaviour."""
+    """Opponent types the belief model can distinguish from public behaviour.
+
+    The first six are the hand-set archetypes of ``DEFAULT_PROFILE_MODELS``.
+    The rest name the scripted roster kinds whose response likelihoods
+    ``analysis/fit_response_model.py`` fits from the archive
+    (``FITTED_RESPONSE_MODELS_PATH``); ``ENGINE_BUILDER`` serves both sets.
+    A profile is only ever inferred from public behaviour — the name says
+    which kind of player the likelihoods were fitted to, never who is sitting
+    in the seat.
+    """
 
     RANDOM_LEGAL = "random_legal"
     VALUE_MAXIMIZING = "value_maximizing"
@@ -71,6 +80,9 @@ class OpponentProfile(StrEnum):
     EGG_FOCUS = "egg_focus"
     CARD_DRAW = "card_draw"
     FOOD_ACCELERATION = "food_acceleration"
+    GREEDY_IMMEDIATE = "greedy_immediate"
+    BONUS_CARD_FOCUS = "bonus_card_focus"
+    NET_VALUE_RESPONSE = "net_value_response"
 
 
 @dataclass(frozen=True)
@@ -81,6 +93,11 @@ class ProfileResponseModel:
     family_prior: Mapping[ActionType, float]
     #: Higher temperature means public value estimates matter less.
     value_temperature: float
+    #: Fitted form: one value slope per family instead of a shared ``1/T``,
+    #: so a family whose public value estimate is a poor proxy for what the
+    #: player actually weighs can be given a slope near zero (or negative).
+    #: ``None`` keeps the temperature form.
+    family_value_weight: Mapping[ActionType, float] | None = None
 
     def family_probabilities(
         self,
@@ -93,12 +110,40 @@ class ProfileResponseModel:
         logits: dict[ActionType, float] = {}
         for family, value in candidate_values.items():
             prior = max(self.family_prior.get(family, 0.0), _MIN_PROBABILITY)
-            if math.isinf(self.value_temperature):
+            if self.family_value_weight is not None:
+                scaled_value = self.family_value_weight.get(family, 0.0) * value
+            elif math.isinf(self.value_temperature):
                 scaled_value = 0.0
             else:
                 scaled_value = value / self.value_temperature
             logits[family] = math.log(prior) + _clip_logit(scaled_value)
         return _softmax(logits)
+
+    def as_payload(self) -> dict[str, object]:
+        return {
+            "family_prior": {f.value: round(p, 6) for f, p in self.family_prior.items()},
+            "value_temperature": (
+                None if math.isinf(self.value_temperature) else self.value_temperature
+            ),
+            "family_value_weight": (
+                None
+                if self.family_value_weight is None
+                else {f.value: round(w, 6) for f, w in self.family_value_weight.items()}
+            ),
+        }
+
+    @classmethod
+    def from_payload(cls, profile: OpponentProfile, payload: Mapping) -> ProfileResponseModel:
+        temperature = payload.get("value_temperature")
+        weights = payload.get("family_value_weight")
+        return cls(
+            profile=profile,
+            family_prior={ActionType(f): float(p) for f, p in payload["family_prior"].items()},
+            value_temperature=math.inf if temperature is None else float(temperature),
+            family_value_weight=(
+                None if weights is None else {ActionType(f): float(w) for f, w in weights.items()}
+            ),
+        )
 
 
 def _clip_logit(value: float) -> float:
@@ -183,6 +228,47 @@ DEFAULT_PROFILE_MODELS: dict[OpponentProfile, ProfileResponseModel] = {
         value_temperature=2.0,
     ),
 }
+
+
+#: Response likelihoods fitted to the scripted roster from the archive by
+#: ``analysis/fit_response_model.py``; loaded with ``load_profile_models``.
+#: The hand-set ``RANDOM_LEGAL`` profile is kept alongside the fitted ones as
+#: the catch-all for behaviour that looks like none of them.
+FITTED_RESPONSE_MODELS_PATH = "configs/belief/fitted_response_models.json"
+PROFILE_MODEL_SETS = ("hand_set", "fitted")
+
+_PROFILE_MODEL_CACHE: dict[str, dict[OpponentProfile, ProfileResponseModel]] = {}
+
+
+def load_profile_models(path: str | None = None) -> dict[OpponentProfile, ProfileResponseModel]:
+    """Read a fitted profile table (``{"profiles": {profile: payload}}``) from JSON."""
+
+    import json
+    from pathlib import Path
+
+    resolved = path or FITTED_RESPONSE_MODELS_PATH
+    if resolved not in _PROFILE_MODEL_CACHE:
+        candidate = Path(resolved)
+        if not candidate.is_absolute() and not candidate.exists():
+            candidate = Path(__file__).resolve().parents[3] / resolved
+        data = json.loads(candidate.read_text(encoding="utf-8"))
+        _PROFILE_MODEL_CACHE[resolved] = {
+            OpponentProfile(name): ProfileResponseModel.from_payload(OpponentProfile(name), payload)
+            for name, payload in data["profiles"].items()
+        }
+    return dict(_PROFILE_MODEL_CACHE[resolved])
+
+
+def profile_models_for(model_set: str) -> dict[OpponentProfile, ProfileResponseModel]:
+    """``"hand_set"`` → ``DEFAULT_PROFILE_MODELS``; ``"fitted"`` → the fitted table."""
+
+    if model_set == "hand_set":
+        return dict(DEFAULT_PROFILE_MODELS)
+    if model_set == "fitted":
+        return load_profile_models()
+    raise ValueError(
+        f"unknown profile model set: {model_set!r}; expected one of {PROFILE_MODEL_SETS}"
+    )
 
 
 @dataclass(frozen=True)

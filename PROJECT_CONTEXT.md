@@ -1,6 +1,6 @@
 # PROJECT_CONTEXT.md
 
-_Last updated: 2026-05-03_
+_Last updated: 2026-09-19_
 
 ## Purpose
 
@@ -40,7 +40,7 @@ The project owner is Alex Oswald. Alex is the sole current contributor and final
 
 ## Current phase
 
-_Standing sections refreshed 2026-09-17; the dated updates below are the record._
+_Standing sections refreshed 2026-09-19; the dated updates below are the record._
 
 The simulator is rule-faithful for the base game (every base-game power
 handled, replay-validated, deterministic across processes) and the project
@@ -51,22 +51,31 @@ latency (`docs/experiments/results_ledger.md`).
 Current focus:
 1. The champion is `potential_points`: depth-3 determinized search on every
    turn (K=4) with the Bayesian opponent posterior as the in-search opponent
-   model. It wins ~0.87 of games against the roster at ~78 points. The only
-   change worth ten points was the search itself; every valuation refinement
-   since has been null or negative at 80 games.
-2. Value per millisecond. A shipped agent has a latency budget; the
-   decision-tree profiler and `decision_profile_report.py` price every arm
-   in points per second, and the fast search-child expansion (2026-09-17)
-   is the first pure cost win.
-3. Standing holdouts. Every adopted or dropped switch keeps its losing side
-   alive in a deterministic 5% of games as a long-run guardrail against
-   false positives and learning bias (`docs/experiments/standing_holdouts.md`).
-4. Card-choice decisions are the next place to spend evidence: the opener's
-   bird/food selection costs ~4 points; bonus-card choice is worth 6.4 and
-   `expected_points` already gets 61% of it.
-5. Keep the reusable template honest: holdouts, profiling, paired arms,
+   model. It wins 0.875 of 2p games against the roster at 78.4 points and
+   0.76 of 3p games at 74.2. The only change worth ten points was the search
+   itself; every valuation refinement since has been null or negative at 80
+   games. The **production configuration** (adopted 2026-09-19) is
+   `beam_leaf` pre-ranking under a 5 s anytime budget: −0.6 n.s. at 1.1 s a
+   decision instead of 7.6. Research arms stay unbudgeted for determinism.
+2. Value per millisecond. The price list is closed at 2p: depth ≈ 1.7
+   points per doubling of decision time, K ≈ 0.9, opponent-model family ≈ 0.
+   The profiler and `decision_profile_report.py` price every arm in points
+   per second.
+3. The open research question is at **three players**: the greedy opponent
+   model beats belief by +2.1 (p=0.07). `belief_apply` (null) and the
+   2026-09-19 refit (gate failed; greedy predicts the archetypes' families
+   *worse* than belief) together say greedy's edge is responsiveness on
+   branch states, not accuracy about the real opponent. Next arm: the
+   `competent` opponent model (argmax public value, no inference).
+4. Standing holdouts (five fields) keep every decided switch's losing side
+   alive at 5% (`docs/experiments/standing_holdouts.md`).
+5. Card-choice decisions remain the parked place to spend evidence: the
+   measured opener showed play value is not keep value (−1.9); bonus-card
+   choice is worth 6.4 and `expected_points` gets 61% of it.
+6. Keep the reusable template honest: holdouts, profiling, paired arms,
    replay hashing and the rules/agents/telemetry split know nothing about
-   Wingspan.
+   Wingspan. The template doc and the expansion configuration doc are the
+   two unwritten architecture pieces.
 
 ## Current assets
 
@@ -236,17 +245,23 @@ The recommended method sequence is intentionally practical:
 ## Current recommended next tasks
 
 The May 2026 build list is complete; the record is in the dated updates.
-Current tasks, in order (2026-09-17):
+The 2026-09-17 list is also done: measured opener (−1.9, dropped), 5 s
+budget (ladder v2 + pre-ranking adopted as the production configuration),
+oracle-type arm (null at 2p), beam pre-ranking (−0.7, in production), case
+study body (`docs/experiments/case_study.md`). Current tasks, in order
+(2026-09-19):
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | Fix `PotentialPointsSetupPolicy` bird/food selection with the K=4 shrunken bird values as the bird scorer. | ≥ +2 on an 80-game paired arm vs `rr_belief_opp` (the v2 opener lost −3.0 with the same bonus choice that is worth +0.85 on its own). |
-| 1 | `max_decision_time_ms` on `potential_points`, degrading K → depth → one-ply, each step priced by the ledger. | A 5 s budget loses < 2 points vs unbudgeted on 80 paired games; p95 latency under budget in every round. |
-| 2 | Oracle opponent-type arm (search plays the opponent's true policy). | Registered prediction: null at 2p (< +1). A positive bounds what belief modelling could still win. |
-| 2 | Beam pre-ranking without expansion (immediate score, no copy), expanding only the beam. | Bit-identical or ≤ −0.5 points; `terminal_value` + `expand_children` share falls below 60%. |
-| 2 | Draw-choice preference from the K=4 bird values, behind a switch. | One 80-game arm; registered ±1 band. |
-| 3 | Keep model on the 322 measured bonus-card deals (hand, round goals, card), held out on the engine-builder deals. | Beats `expected_points` 61% pick rate on held-out deals. |
-| 3 | Case study write-up from `results_ledger.md`. | `docs/experiments/case_study_outline.md` filled with the ledger's numbers and the three method lessons (pairing, registration, holdouts). |
+| 1 | `search_opponent_model="competent"`: family = argmax public candidate value on the branch state, no posterior; proxy pick inside. One 3p arm vs `rr3p_opp/belief` (90 paired), one 2p check vs `rr_belief_opp`. | Registered 3p +1 to +2, 2p 0 to +1, cost ≈ `belief`. ≥ +1 at 3p adopts with a `belief` holdout and triggers the production config's 80-game re-check; a null moves the opponent question to self-play. |
+| 1 | Self-play build: per-seat search config, `arm_contrast --study-position`, one deterministic 2p mirror game verified; then arm A1 (`mirror_2p`, `mirror_3p`). | `docs/experiments/self_play_opponent_plan.md` §A1: score level, seat split and category profile of strong play recorded in the ledger. |
+| 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
+| 2 | Strategy analysis pass over the archive (dominance, archetype signatures, seat, card value) — the case-study questions the ledger already answers in pieces. | `docs/experiments/strategy_findings.md` with one table per question, each row citing the arm or study it comes from and its detection limit. |
+| 2 | Human-trace build (configurable opponent for `HumanCliAgent`, friendlier action renderer) and H1–H3 in `self_play_opponent_plan.md`. | Ten seat-swapped human games archived and replay-valid; belief log loss on the human scored against every roster kind. |
+| 3 | Draw-choice preference from the K=4 bird values, behind a switch. | One 80-game arm; registered ±1 band (the opener lesson says expect a null). |
+| 3 | Keep model on the 322 measured bonus-card deals, held out on the engine-builder deals. | Beats `expected_points` 61% pick rate on held-out deals (free on archived games). |
+| 3 | `docs/architecture/reusable_board_game_ai_template.md`. | Lists every interface a second game must implement and every module that needs no change. |
+| 4 | European expansion as the first content pack + rules module (`docs/rules/expansion_configuration.md` first). | Loader, handlers and scoring behind `ruleset` config; base-game batches bit-identical with the pack off. |
 
 ## Open questions
 
@@ -326,14 +341,16 @@ Important evaluation metrics:
 ## Documentation backlog
 
 Written: architecture, rules scope, event taxonomy, baseline and champion
-agent docs, decision profiling, results ledger, standing holdouts, ADRs
-0001–0004. Still to write:
+agent docs, decision profiling, results ledger, standing holdouts, case
+study body (`docs/experiments/case_study.md`, 2026-09-18), game viewer,
+ADRs 0002–0005. Still to write:
 - `docs/architecture/reusable_board_game_ai_template.md` — the template as
   it now exists (state/actions/transition/scoring/policy/belief/holdout/
   profiling), with what is and is not Wingspan-specific.
 - `docs/rules/expansion_configuration.md` — nothing beyond the base game is
   encoded yet; the content-pack plus rules-module decision stands.
-- Case study body from the results ledger.
+- `docs/experiments/strategy_findings.md` — the balance / dominance /
+  archetype answers, collected from the ledger with detection limits.
 
 ## Project memory update protocol
 
@@ -3227,3 +3244,45 @@ part. Not adopted; no holdout (see registry). **Registered next: refit
 `P(family | profile, candidate values)` to the archive (~6,000 opponent
 decisions), score by log loss vs the current priors, one 3p arm;
 prediction +1 to +2 over belief at no extra cost.** Worktrees removed.
+
+## Update: 2026-09-19 - Response-likelihood refit: gate failed; greedy's edge is responsiveness, not prediction
+
+### What changed
+Built `analysis/fit_response_model.py`: replays every archived game at the
+current rules (17 roots, 1,680 games), records the public candidate values
+and chosen family at each of 53,603 distinct opponent decisions, fits
+`P(family | kind, values)` per roster kind by maximum likelihood, and
+scores it the way the search uses it (sequential predict-then-observe,
+uniform prior, leave-one-seed-out over 70 whole games). The belief model
+gained `ProfileResponseModel.family_value_weight`, `load_profile_models`,
+three roster-kind profiles, and a `search_belief_profiles` switch
+(`hand_set` | `fitted`) on the agent and search config, recorded in
+manifests and decision telemetry. `configs/belief/fitted_response_models.json`
+holds the fit with its cross-validation.
+
+### Result
+Held-out log loss 1.194 (hand-set) → 1.183 (fitted); top-1 family 0.39 →
+0.41; worse on `engine_builder`; knowing the true kind from turn one scores
+*worse* (1.244) than inferring it. **Gate failed; the 3p arm was not run.**
+The benchmark explains why the arm would have been null anyway: on the
+same 6,760 real decisions the greedy opponent model matches the three
+archetypes' families 35–47% of the time, the belief model 36–54%; greedy's
+57% overall is its perfect prediction of `greedy_immediate`, and its +2.1
+at 3p is not concentrated in lineups with that agent. So neither family
+accuracy (this refit) nor the within-family pick (`belief_apply`) is the
+mechanism. What differs is on branch states: greedy answers the
+searcher's imagined move with a competent family; the belief model's
+temperature-2 priors answer every branch the same way.
+
+### Decision
+`belief` stays the default with `hand_set` profiles; nothing adopted, no
+holdout. **Registered: `search_opponent_model="competent"`** — argmax of
+the public candidate values on the branch, no posterior, proxy pick —
+prediction +1 to +2 over `belief` at 3p, 0 to +1 at 2p, cost ≈ `belief`.
+Also registered today: the self-play / human-trace programme
+(`docs/experiments/self_play_opponent_plan.md`, arms A1–A4, studies H1–H3).
+
+### Follow-up tasks
+- [ ] Build `CompetentSearchOpponentModel` (≈40 lines in `search_opponent.py`), one-game probe, launch the 3p arm then the 2p check.
+- [ ] Self-play build: per-seat search config, `arm_contrast --study-position`, deterministic mirror probe; launch A1.
+- [ ] `docs/experiments/strategy_findings.md` from the ledger (dominance, archetype signatures, seat, card value, category profile of the champion).

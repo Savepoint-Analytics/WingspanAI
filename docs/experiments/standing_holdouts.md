@@ -91,6 +91,9 @@ Decisions **not** guarded by a holdout, and why:
 - `belief_apply` (−0.5 / −0.6 n.s., 2026-09-19): produces the belief model's
   game in 84% of cases, so a holdout would mostly replay the default; the
   greedy holdout already guards the opponent-model slot.
+- `search_belief_profiles="fitted"` (2026-09-19): the refit failed its
+  log-loss gate and no arm ran, so nothing was decided; the switch exists
+  for a later arm and the greedy holdout guards the slot.
 - Search depth, beam, K, food candidates: these are cost knobs priced by
   the ledger, not adopt/drop decisions. Their contrasts are re-run when the
   agent changes.

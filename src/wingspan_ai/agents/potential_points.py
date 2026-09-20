@@ -162,6 +162,14 @@ DEFAULT_SEARCH_OPPONENT_HOLDOUT_MODEL = "greedy"
 #: ``"belief_apply"`` predicts the family with the posterior and picks inside
 #: it by applying (greedy's accuracy where the search goes; registered 2026-09-18).
 SEARCH_OPPONENT_MODELS = ("greedy", "belief", "oracle", "belief_apply")
+#: Which response likelihoods the belief opponent model reasons with:
+#: ``"hand_set"`` (the 2026-08 archetype table, ``DEFAULT_PROFILE_MODELS``) or
+#: ``"fitted"`` (per roster kind, fitted to the archive by
+#: ``analysis/fit_response_model.py``). Registered 2026-09-19 after
+#: ``belief_apply`` showed the family the search assumes, not the pick inside
+#: it, is what costs two points at three players. Ignored by ``greedy``.
+SEARCH_BELIEF_PROFILE_SETS = ("hand_set", "fitted")
+DEFAULT_SEARCH_BELIEF_PROFILES = "hand_set"
 #: Beam pre-ranking (2026-09-18). Below the root the search expands every
 #: candidate action, evaluates every child and keeps the ``beam_width`` best;
 #: 13 of ~17 expansions and all 17 evaluations at a beamed ply rank children
@@ -251,6 +259,8 @@ class PotentialPointsSearchConfig:
     #: ``"greedy"`` or ``"belief"``; see ``DEFAULT_SEARCH_OPPONENT_MODEL``. This
     #: is the preferred model; the flow resolves the effective one per game.
     search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
+    #: ``"hand_set"`` or ``"fitted"``; see ``SEARCH_BELIEF_PROFILE_SETS``.
+    search_belief_profiles: str = DEFAULT_SEARCH_BELIEF_PROFILES
     #: Share of games that keep ``search_opponent_holdout_model`` instead, as a
     #: standing control. ``0`` disables the holdout.
     search_opponent_holdout_share: float = DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE
@@ -280,6 +290,7 @@ class PotentialPointsSearchConfig:
         "planning_horizon",
         "search_food_candidates",
         "search_opponent_model",
+        "search_belief_profiles",
         "mechanic_synergy",
         "mechanic_synergy_hand",
         "mechanic_synergy_weight",
@@ -364,6 +375,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
     #: agent this is the effective model for its game; the holdout is resolved
     #: by whoever constructs the agent (``PotentialPointsSearchConfig``).
     search_opponent_model: str = DEFAULT_SEARCH_OPPONENT_MODEL
+    #: ``"hand_set"`` or ``"fitted"``; see ``SEARCH_BELIEF_PROFILE_SETS``.
+    search_belief_profiles: str = DEFAULT_SEARCH_BELIEF_PROFILES
     #: Engine-potential term; see ``DEFAULT_MECHANIC_SYNERGY``.
     mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
     mechanic_synergy_hand: bool = DEFAULT_MECHANIC_SYNERGY_HAND
@@ -422,8 +435,15 @@ class PotentialPointsAgent(SetupPolicyMixin):
             )
         if self.search_leaf_candidates is not None and self.search_leaf_candidates < 1:
             raise ValueError("search_leaf_candidates must be at least 1 or None")
+        if self.search_belief_profiles not in SEARCH_BELIEF_PROFILE_SETS:
+            raise ValueError(
+                f"unknown search_belief_profiles: {self.search_belief_profiles!r}; "
+                f"expected one of {SEARCH_BELIEF_PROFILE_SETS}"
+            )
         self._opponent_model = build_search_opponent_model(
-            self.search_opponent_model, owner_agent_id=self.agent_id
+            self.search_opponent_model,
+            owner_agent_id=self.agent_id,
+            profile_model_set=self.search_belief_profiles,
         )
 
     @property
@@ -760,6 +780,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "planning_horizon": self.planning_horizon,
             "search_food_candidates": self.search_food_candidates,
             "search_opponent_model": self.search_opponent_model,
+            "search_belief_profiles": self.search_belief_profiles,
             "opponent_model": self._opponent_model.telemetry_payload(),
             "mechanic_synergy": self.mechanic_synergy,
             "mechanic_synergy_table": self._synergy.version if self._synergy else None,

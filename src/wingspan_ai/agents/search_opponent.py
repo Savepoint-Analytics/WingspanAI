@@ -47,7 +47,13 @@ from wingspan_ai.agents.net_value import (
     _public_player,
     _public_response_candidates,
 )
-from wingspan_ai.belief import OpponentBeliefState, ResponseDistribution
+from wingspan_ai.belief import (
+    OpponentBeliefState,
+    ProfileResponseModel,
+    ResponseDistribution,
+    profile_models_for,
+)
+from wingspan_ai.belief.models import OpponentProfile
 from wingspan_ai.rules.actions import ActionType, LegalAction
 from wingspan_ai.rules.base_game import egg_cost_for_slot
 from wingspan_ai.state.models import GameState, to_public_state
@@ -164,12 +170,23 @@ class BeliefSearchOpponentModel:
 
     owner_agent_id: str
     model_id: str = "belief"
+    #: ``"hand_set"`` or ``"fitted"`` (``wingspan_ai.belief.PROFILE_MODEL_SETS``):
+    #: the response likelihoods the posterior is formed over.
+    profile_model_set: str = "hand_set"
     belief_states: dict[str, OpponentBeliefState] = field(default_factory=dict, compare=False)
+    _profile_models: dict[OpponentProfile, ProfileResponseModel] = field(
+        init=False, repr=False, compare=False
+    )
+
+    def __post_init__(self) -> None:
+        self._profile_models = profile_models_for(self.profile_model_set)
 
     def belief_state_for(self, opponent_id: str) -> OpponentBeliefState:
         belief_state = self.belief_states.get(opponent_id)
         if belief_state is None:
-            belief_state = OpponentBeliefState.uniform(opponent_id)
+            belief_state = OpponentBeliefState.uniform(
+                opponent_id, profile_models=self._profile_models
+            )
             self.belief_states[opponent_id] = belief_state
         return belief_state
 
@@ -215,6 +232,7 @@ class BeliefSearchOpponentModel:
     def telemetry_payload(self) -> dict:
         return {
             "model_id": self.model_id,
+            "profile_model_set": self.profile_model_set,
             "opponent_belief_states": {
                 opponent_id: {
                     "observation_count": belief_state.observation_count,
@@ -293,6 +311,7 @@ class OracleTypeSearchOpponentModel(BeliefSearchOpponentModel):
     _fixed: set[str] = field(default_factory=set, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        super().__post_init__()
         self._table = _load_oracle_posteriors(self.posteriors_path)
 
     def predict_family(self, state: GameState, opponent_id: str) -> ResponseDistribution:
@@ -316,7 +335,7 @@ class OracleTypeSearchOpponentModel(BeliefSearchOpponentModel):
         if posterior is None:
             self.belief_states[opponent_id] = OpponentBeliefState.uniform(opponent_id)
             return
-        uniform = OpponentBeliefState.uniform(opponent_id)
+        uniform = OpponentBeliefState.uniform(opponent_id, profile_models=self._profile_models)
         self.belief_states[opponent_id] = OpponentBeliefState(
             opponent_id=opponent_id,
             profile_posterior={
@@ -360,15 +379,22 @@ def _agent_kind(agent_id: str) -> str:
     return kind.rsplit("_p", 1)[0] if "_p" in kind else kind
 
 
-def build_search_opponent_model(kind: str, *, owner_agent_id: str) -> SearchOpponentModel:
+def build_search_opponent_model(
+    kind: str, *, owner_agent_id: str, profile_model_set: str = "hand_set"
+) -> SearchOpponentModel:
     if kind == "greedy":
         return GreedySearchOpponentModel()
     if kind == "belief":
-        return BeliefSearchOpponentModel(owner_agent_id=owner_agent_id)
+        return BeliefSearchOpponentModel(
+            owner_agent_id=owner_agent_id, profile_model_set=profile_model_set
+        )
     if kind == "oracle":
+        # The oracle table is over the hand-set profiles; it ignores the set.
         return OracleTypeSearchOpponentModel(owner_agent_id=owner_agent_id)
     if kind == "belief_apply":
-        return BeliefApplySearchOpponentModel(owner_agent_id=owner_agent_id)
+        return BeliefApplySearchOpponentModel(
+            owner_agent_id=owner_agent_id, profile_model_set=profile_model_set
+        )
     raise ValueError(
         f"unknown search opponent model: {kind!r}; expected one of {SEARCH_OPPONENT_MODELS}"
     )

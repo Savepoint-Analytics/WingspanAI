@@ -40,6 +40,7 @@ losing side alive at 5% (`docs/experiments/standing_holdouts.md`).
 | 2026-09-18 | 3p: oracle-type vs belief | rr3p_opp/belief | +1.36 | 0.18 | +0.03 | ≈ | — | consistent with the greedy result |
 | 2026-09-19 | 3p: `belief_apply` (family from posterior, greedy pick inside it) vs belief | rr3p_opp/belief | −0.48 | 0.21 | −0.01 | ≈ | — | 76/90 games identical: the family prediction is what costs, not the pick |
 | 2026-09-19 | 2p: `belief_apply` vs belief | rr_belief_opp | −0.61 | 0.26 | −0.01 | 7,577 → 4,330 | — | 63/80 identical; not adopted |
+| 2026-09-19 | response-likelihood refit (`analysis/fit_response_model.py`, 53,603 archived opponent decisions, leave-one-seed-out) | hand-set profiles | log loss 1.194 → 1.183; top-1 family 0.39 → 0.41 | — | — | — | — | gate failed; 3p arm not run. Greedy model predicts archetype families *less* often (0.35–0.47) than belief (0.36–0.54): its +2.1 at 3p is responsiveness on branch states, not accuracy; `competent` model registered |
 | 2026-09-18 | beam pre-ranking `beam_leaf` (cheap score picks the beam and the six leaves to evaluate) | rr_belief_opp | −0.72 | 0.55 | +0.04 | 7,577 → 1,836 | +0.13 saved | not the unbudgeted default **(H)**; goes into the production candidate |
 
 Earlier nulls on the pre-search agent (2026-09-01 to 09-04), all inside a

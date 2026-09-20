@@ -409,3 +409,65 @@ priors, and run one 3p arm with the fitted model. Registered prediction:
 greedy; a null there means the family a scripted opponent plays is simply
 not predictable from public values, and greedy's edge is the price of
 applying — which the 5 s production cap could afford at 2p but not at 3p.
+
+## The refit (2026-09-19): the family is not predictable from public values — by anyone
+
+Registered above: refit `P(family | profile, candidate values)` to the
+roster, score by held-out log loss, run one 3p arm if it wins. Built as
+`analysis/fit_response_model.py` (extract: replay every archived game at
+the current rules and record, at each of the 53,603 distinct opponent
+decisions, the public candidate values the belief model sees and the family
+chosen; fit: per roster kind, `logit(a) = log prior(a) + w(a)·v(a)` by
+maximum likelihood; score: sequential predict-then-observe through 70
+whole held-out games, leave-one-seed-out).
+
+| Model | Held-out log loss | Top-1 family |
+|---|---:|---:|
+| uniform over available families | 1.386 | — |
+| hand-set profiles (`DEFAULT_PROFILE_MODELS`) | 1.194 | 0.393 |
+| fitted, per-family slope, posterior inference | 1.183 | 0.408 |
+| fitted, true kind known from turn one | 1.244 | 0.392 |
+
+The fit gains 0.011 nats a decision, is worse on `engine_builder`, and
+knowing the kind is *worse* than inferring it — the mixture's per-game
+drift across profiles is doing the work of features the model does not
+have (round, cubes left, egg room, hand size). **Gate failed; the 3p arm is
+not run.** The fitted table is written to
+`configs/belief/fitted_response_models.json` behind
+`search_belief_profiles="fitted"` so the switch exists, default `hand_set`.
+
+The instructive number came from the benchmark. On the same 6,760 real
+opponent decisions, the family each search opponent model would have
+played (`artifacts/response_fit/greedy_family_match.txt`):
+
+| Opponent kind | greedy model matches | belief model matches |
+|---|---:|---:|
+| `bonus_card_focus` | 0.45–0.47 | 0.50–0.54 |
+| `engine_builder` | 0.44–0.46 | 0.46–0.47 |
+| `net_value_response` | 0.35–0.39 | 0.36–0.42 |
+| `greedy_immediate` | 1.00 | 0.49 |
+
+The greedy model predicts the three archetypes' families *less* often
+than the belief model does; its +2.1 at 3p is not concentrated in lineups
+containing `greedy_immediate` (+4.5 in `bonus_card_focus+net_value_response`,
++1.0 in `engine_builder+greedy_immediate`). So greedy's edge is not
+predictive accuracy about the real opponent, and `belief_apply` already
+showed it is not the pick inside the family. What is left is the property
+the two models differ in on **branch** states: greedy chooses a competent
+family for the state the search has imagined — an opponent that takes the
+tray card the plan wanted — while the belief model's temperature-2 priors
+make the imagined opponent play nearly the same family in every branch,
+whatever the searcher just did. The search gains from an opponent that
+answers its plan, not from one that mimics the roster.
+
+**Registered next: the competent-response opponent model.**
+`search_opponent_model="competent"`: family = argmax of the public
+candidate values on the branch state (the `VALUE_MAXIMIZING` profile at
+temperature → 0, no posterior, no inference), pick inside by the existing
+proxy. Cost equal to `belief`. Predictions: 3p **+1 to +2 over `belief`**
+(recovering most of greedy's +2.1 at a fraction of its cost); 2p **0 to
++1**. A positive confirms responsiveness is the mechanism and retires
+opponent-type inference from the search loop (the posterior remains
+useful as telemetry and for the net-value agent); a null leaves greedy's
++2.1 as the price of applying, and the opponent-model programme moves to
+self-play (`self_play_opponent_plan.md`), where the opponent is a planner.
