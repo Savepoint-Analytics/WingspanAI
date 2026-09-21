@@ -1,6 +1,6 @@
 # Self-play and human-trace opponents: is "the opponent barely matters" the game or the roster?
 
-Status: design registered 2026-09-19; A1 run 2026-09-20 (results at the end); A2 launched 2026-09-20.
+Status: design registered 2026-09-19; A1 and A2 run 2026-09-20 (results at the end); A3 in flight.
 
 ## Why
 
@@ -226,4 +226,36 @@ independent-deck replication short of established. **A3 keeps seeds 1–40
 to stay paired with A1; A4's seat reading should add a fresh-seed mirror
 (seeds 41–80) rather than more arms on the same decks.**
 
-`mirror_3p_greedy` (vs `mirror_3p`, registered +2 to +4) is in flight.
+### A2 at 3p (2026-09-20): ≈+2 again; real, and priced
+
+`mirror_3p_greedy` (position 1 on `greedy`, 90 games paired vs `mirror_3p`,
+`8d35fdd`): study seat **+1.89 (p=0.072)**, win −0.011; the two other
+seats +0.53 and +0.18 (n.s.); 10 identical games. Decision 5.5 → 8.5 s
+(×1.55), +0.18 points per second: **drop or gate** on the price list.
+Registered +2 to +4: the point estimate sits just under the band.
+
+Read with the roster arm (`rr3p_opp/greedy` − belief: +2.12, p=0.073), this
+is the second independent 90-game contrast at three players to land at
+≈+2 with p≈0.07, against different opponents (scripted, then the champion
+itself). Combined, p≈0.01: **the greedy opponent model is worth about two
+points at three players, and nothing at two.** It is a score effect, not a
+win effect (win rate flat in both), and four cheaper models that tried to
+reproduce it — oracle type, `belief_apply`, the refit, `competent` — all
+failed, so what greedy has is the applied branch state itself, at its full
+cost. The pooled greedy holdout (51 games, mostly 2p) reads the other way
+and is unreadable at its limit; the 3p holdout games will accrue.
+
+**Decision.** `belief` stays the default at every player count. The
+production agent at 3p already runs against its 5 s cap with belief
+(p95 by round 3–11 s unbudgeted), so greedy cannot ship there; for
+research arms +2 at ×1.55 is the same price class as the fourth
+determinization sample (+0.33/s, kept) and the K arm (−2.0 for ÷5), a
+judgement call the ledger records rather than makes. If a 3p production
+budget above ~10 s is ever acceptable, greedy is the first thing to buy.
+Registered for the record: **`rr3p` re-baseline on greedy only if a 3p
+strength question needs the two points** — there is none queued.
+
+**Seat at 3p, pooled A1 + A2** (180 games, 30 decks): seat 1 − seat 3
++1.44 (p=0.30), win 0.344 / 0.372 / 0.283. Seat 3 remains the hard seat
+in every 3p root the project has (roster: 0.67 vs 0.83), never at
+significance; a fresh-deck 3p mirror (A4) is the replication.

@@ -510,3 +510,19 @@ real branch state* itself, which no public-value proxy reproduces and
 which costs greedy's 15.6 s a decision. Either way there is nothing left
 to buy cheaply against scripted opponents. The question moves to
 self-play (`self_play_opponent_plan.md`, A2), where the opponent plans.
+
+## Self-play (2026-09-20): the 3p effect replicates, the 2p null replicates
+
+Mirror-match arms (`self_play_opponent_plan.md` A2), greedy on one seat
+against the champion on the others:
+
+| Contrast | Δ score | p | Δ win | cost |
+|---|---:|---:|---:|---:|
+| 2p, `mirror_2p_greedy` study seat vs `mirror_2p` (80 paired) | +0.46 | 0.62 | −0.006 | ×1.55 |
+| 3p, `mirror_3p_greedy` study seat vs `mirror_3p` (90 paired) | **+1.89** | 0.072 | −0.011 | ×1.55 |
+
+Both roster results replicate against a planning opponent: nothing at two
+players, about two points at three (two independent 90-game contrasts at
+p≈0.07 each, combined p≈0.01). The opponent model's value is a property of
+the player count, not of who sits in the seat. Not adopted for cost; the
+ledger and the self-play plan carry the price and the standing decision.
