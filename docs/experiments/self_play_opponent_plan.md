@@ -1,6 +1,6 @@
 # Self-play and human-trace opponents: is "the opponent barely matters" the game or the roster?
 
-Status: design registered 2026-09-19; A1 and A2 run 2026-09-20 (results at the end); A3 in flight.
+Status: design registered 2026-09-19; A1, A2 and A3 run 2026-09-20 (results at the end); A4 in flight.
 
 ## Why
 
@@ -259,3 +259,34 @@ strength question needs the two points** — there is none queued.
 +1.44 (p=0.30), win 0.344 / 0.372 / 0.283. Seat 3 remains the hard seat
 in every 3p root the project has (roster: 0.67 vs 0.83), never at
 significance; a fresh-deck 3p mirror (A4) is the replication.
+
+### A3 (2026-09-20): denial is a liability, not a term
+
+`mirror_2p_denial` (position 1 with `search_denial_weight=1.0` — the
+`net_value` shared-resource denial value added to every root action's
+search value; 80 games paired vs `mirror_2p`, `dfa2d71`): study seat
+**−5.94 (p<0.001)**, win 0.500 → 0.344; the other seat +0.42 with win
+0.656; 0 identical games. Registered +1 to +3: failed by nine points.
+
+The mechanism is in the action mix. With the term on, the study seat's
+draw share rises from 24% to 33% of actions (tray draws 371 → 657 over
+the 80 games; in round 4 draws go 10% → 23% of actions) and it plays 6.7
+birds a game instead of 7.4, laying 2.2 fewer egg points. The term prices
+a tray card at what it would do on the opponent's board, and against a
+searching opponent that price is real — but the opponent simply draws the
+next card, the tray refills, and the denying seat has spent an action
+and holds a card it did not want. Denial against a refilling supply is
+paid on every turn and repaid on none. It is the synergy hand term's
+lesson again (−4.5, 2026-09-17): any term that pays the agent to take a
+card for a reason other than its own plan loses more than the reason is
+worth.
+
+**Decision.** Dropped; `search_denial_weight` stays 0. No holdout, on the
+precedent of the synergy hand term: the loss is large, the cause is
+understood, and a 5% minority of games played six points worse would be
+a cost with nothing to learn. The 3p arm (`mirror_3p_denial`, same weight,
+same mechanism) was stopped four minutes in as answered. A lower weight
+(0.25) is a legitimate follow-up if anyone wants to know whether *some*
+denial is free; the registered prediction would be a null, and it is not
+queued. The plan's reading stands as written: denial is not worth a
+search node even against a planner.

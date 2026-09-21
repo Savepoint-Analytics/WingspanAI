@@ -255,8 +255,8 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | Read A3 (`mirror_2p_denial` launched 17:29, `mirror_3p_denial` chained; `search_denial_weight=1.0`, registered +1 to +3). | Ledger rows; null means denial is not worth a search node even against a planner. |
-| 1 | A4 seat replication on fresh decks: `launch_arm mirror_2p_b --mirror --seeds 41-80` (no study seat). | Seat 1 +2 to +5 at p<0.05 pooled with A1+A2 establishes the 2p first-player advantage; the sign flipping retires the claim. |
+| 1 | Read A4 (`mirror_2p_b`, seeds 41–80, no study seat; launched 2026-09-20 ~18:45). | Seat 1 +2 to +5 on the fresh decks and pooled p<0.05 with A1+A2+A3 establishes the 2p first-player advantage; a sign flip retires the claim. |
+| 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
 | 3 | Draw-choice preference from the K=4 bird values, behind a switch. | One 80-game arm; registered ±1 band (the opener lesson says expect a null). |
@@ -3379,3 +3379,15 @@ applied branch state at full cost. Decision: `belief` stays the default
 (the 3p production agent already runs against its cap); greedy is the
 first thing to buy if a 3p budget above ~10 s is ever acceptable. Seat at
 3p pooled A1+A2: +1.4 n.s., seat 3 wins 0.28. A3 running.
+
+## Update: 2026-09-20 - A3: the denial term costs six points in the mirror; dropped; A4 launched
+
+`mirror_2p_denial` vs `mirror_2p` (80 paired): study seat **−5.94
+(p<0.001)**, win −0.156. The term pays the agent to draw tray cards the
+opponent would want (draw share 24% → 33%, 0.7 fewer birds, −2.2 egg
+points) against a supply that refills. Dropped, no holdout (synergy
+hand-term precedent); the 3p arm stopped as answered. Denial is an
+established negative in this game, now against both scripted and
+planning opponents. Machine time goes to A4: `mirror_2p_b`, seeds 41–80,
+the fresh-deck replication of the 2p first-player advantage (+3.9 pooled
+on seeds 1–40 across A1 and A2; +3.3 with A3 included).

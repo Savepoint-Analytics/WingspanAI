@@ -99,6 +99,9 @@ Decisions **not** guarded by a holdout, and why:
   Note that a mirror match draws every holdout independently per
   position, so 30 of 80 two-player mirror games deviate somewhere: a
   reason to retire holdouts as they become readable, not to add more.
+- `search_denial_weight=1.0` (−5.9 at p<0.001 in the 2p mirror, 2026-09-20):
+  a large, explained loss (the term over-draws tray cards); the synergy
+  hand term precedent — no holdout.
 - Search depth, beam, K, food candidates: these are cost knobs priced by
   the ledger, not adopt/drop decisions. Their contrasts are re-run when the
   agent changes.
