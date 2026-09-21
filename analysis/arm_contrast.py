@@ -29,6 +29,9 @@ class GameKey:
     lineup: tuple[str, ...]
     rotation: int
     seed: int
+    #: Games under different rulesets (content packs, rules modules) never
+    #: pair: the decks differ, so the seed does not difference anything out.
+    ruleset_id: str = "core_base_game_v1"
 
 
 def load_arm(artifact_root: Path) -> dict[GameKey, dict]:
@@ -44,6 +47,7 @@ def load_arm(artifact_root: Path) -> dict[GameKey, dict]:
                 lineup=tuple(game["player_agent_kinds"]),
                 rotation=game["seat_rotation"],
                 seed=game["outcome"]["random_seed"],
+                ruleset_id=game.get("ruleset_id") or "core_base_game_v1",
             )
             games[key] = game
     return games
@@ -168,10 +172,11 @@ def render(
     arms: dict[str, dict[GameKey, dict]],
     agents: list[str],
 ) -> str:
+    rulesets = sorted({key.ruleset_id for key in baseline})
     lines = [
         "# Arm Contrast",
         "",
-        f"Baseline: `{baseline_name}` ({len(baseline)} games)",
+        f"Baseline: `{baseline_name}` ({len(baseline)} games; ruleset {', '.join(rulesets)})",
         "",
     ]
     for arm_name, arm in arms.items():

@@ -27,6 +27,7 @@ Analysis layer:
 - `analysis/bird_play_values.py`: writes the per-bird K=4 play-value table the measured opener reads (`configs/bird_values/`).
 - `flows/human_vs_agent.py`: play one archived, replay-validated game from the terminal against the production agent (human-trace study H1–H3).
 - `analysis/game_viewer.py`: step through an archived game decision by decision from one seat's point of view — board, private hand, legal actions, the search's own ranking, the choice and its effect (`experiments/game_viewer.md`).
+- `analysis/base_game_bit_identity.py`: the base-game guard — replays an archived `rr_belief_opp` cell with the current code and diffs the action sequences; run after any engine, loader or flow change.
 - `analysis/mirror_seat_effect.py`: turn-order effect in mirror matches, pooled across roots with one observation per seed (rotations of a seed are the same game; averaging them cancels a study-seat config).
 - `analysis/launch_arm.py`: launches a paired arm the standard way (clean worktree at a commit, lineup runners, `--after` queueing) and writes `artifacts/<root>/launch/arm.json` as the record; `--mirror` runs self-play with an optional `--study-search` on lineup position 1. Not reboot-safe: after a reboot, delete the partial artifacts and relaunch.
 - `analysis/compact_artifacts.py`: gzips per-game snapshot and replay-debug files under finished roots (about 60% of a root); reversible.
@@ -82,6 +83,7 @@ Key rules docs:
 - `decisions/0003-random-seed-is-the-sole-reproducibility-key.md`: RNG namespace ADR.
 - `decisions/0004-cross-process-determinism-and-canonical-set-ordering.md`: cross-process determinism ADR.
 - `decisions/0005-artifact-storage-is-object-storage.md`: artifacts are durable in MinIO; local `artifacts/` is a prunable cache.
+- `rules/expansion_configuration.md`: packs + rules modules, ruleset ids, the engine's module gate, per-expansion rule deltas with rulebook pages (European, Oceania, Asia), the nine gates before a ruleset's first ledger row, and the phase order.
 - `rules/birdfeeder_dice.md`: the six-face die, reroll/refill rules, and derived probabilities.
 - `rules/bonus_card_composition.md`: the 26 core bonus cards are the base-game deck; Bird Bander and Diet Specialist are European.
 - `rules/game_content_schema.md`: current content schema and enum design.

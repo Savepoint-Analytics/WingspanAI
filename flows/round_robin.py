@@ -421,6 +421,8 @@ def run_round_robin(
     potential_points_search_by_position: dict[int, PotentialPointsSearchConfig] | None = None,
     forced_bonus_choice: dict[str, int] | None = None,
     setup_policy_overrides: dict[str, str] | None = None,
+    content_packs: list[str] | None = None,
+    rules_modules: list[str] | None = None,
 ) -> dict[str, Any]:
     """Run every agent lineup in every seat rotation across the setup factor.
 
@@ -483,6 +485,8 @@ def run_round_robin(
                 potential_points_search_by_position=potential_points_search_by_position,
                 forced_bonus_choice=forced_bonus_choice,
                 setup_policy_overrides=setup_policy_overrides,
+                content_packs=content_packs,
+                rules_modules=rules_modules,
             )
         )
 
@@ -506,6 +510,8 @@ def run_round_robin(
             "setup_policy_overrides": (
                 dict(setup_policy_overrides) if setup_policy_overrides else None
             ),
+            "content_packs": content_packs,
+            "rules_modules": rules_modules,
             "potential_points_search_by_position": (
                 {
                     str(k): v.as_manifest_payload()

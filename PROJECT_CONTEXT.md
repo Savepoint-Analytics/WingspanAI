@@ -78,7 +78,9 @@ Current focus:
 6. Keep the reusable template honest: holdouts, profiling, paired arms,
    replay hashing and the rules/agents/telemetry split know nothing about
    Wingspan. The template doc and the expansion configuration doc are the
-   two unwritten architecture pieces.
+   two unwritten architecture pieces — the expansion configuration doc is
+   now written and phase 0 (packs/modules threading, teal/yellow hooks,
+   ruleset grain, bit-identity guard) built on 2026-09-20.
 
 ## Current assets
 
@@ -257,7 +259,7 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 | Priority | Task | Success criteria |
 |---|---|---|
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
-| 1 | Expansion phase 0 (`docs/rules/expansion_configuration.md`, pack threading with the base-game bit-identity guard, teal fix + end-of-round/end-of-game hooks, ruleset dimension in the analysis views). | Base-game batches bit-identical with packs off; a synthetic teal/yellow bird fires the right number of times. |
+| 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
@@ -350,8 +352,7 @@ ADRs 0002–0005. Still to write:
 - `docs/architecture/reusable_board_game_ai_template.md` — the template as
   it now exists (state/actions/transition/scoring/policy/belief/holdout/
   profiling), with what is and is not Wingspan-specific.
-- `docs/rules/expansion_configuration.md` — nothing beyond the base game is
-  encoded yet; the content-pack plus rules-module decision stands.
+- (written 2026-09-20) `docs/rules/expansion_configuration.md`.
 - `docs/experiments/strategy_findings.md` — the balance / dominance /
   archetype answers, collected from the ledger with detection limits.
 
@@ -3404,3 +3405,39 @@ opponent model ≈0 at 2p / ≈+2 at 3p (both replicating the roster),
 denial −5.9 (dropped), first player +6 at 2p (established). Self-play
 worktrees removed. Next: the human-trace study (the tooling is built) and
 expansion phase 0.
+
+## Update: 2026-09-20 - Expansion phase 0 built: configuration doc, pack threading, teal/yellow hooks, ruleset grain
+
+### What changed
+- `docs/rules/expansion_configuration.md`: packs + modules as the decision,
+  ruleset ids (`core_base_game_v1` kept; otherwise `<packs>[__<modules>]_v1`),
+  per-expansion rule deltas cited to the European/Oceania/Asia PDFs, the
+  nine gates before a ruleset's first ledger row, phase order and cost.
+  Two state gaps found in the rules: action cubes per habitat row
+  (European teal, an Oceania goal) and action types used this round.
+- Loader: `ruleset_id_for`, `build_ruleset`, `normalize_rules_modules`;
+  `load_content_catalog(rules_modules=...)`. Flows: `content_packs` /
+  `rules_modules` on the batch and round-robin flows, recorded per game
+  and per batch. Engine: `IMPLEMENTED_RULES_MODULES` — setup refuses a
+  module it does not implement.
+- Engine hooks: `resolve_end_of_round_powers` (teal, before the goal, in
+  player order from the round's first player) and
+  `resolve_end_of_game_powers` (yellow, after round 4's end-of-round steps)
+  in `_advance_turn`; `tests/test_power_timing.py`. The evaluator's teal
+  count was already fixed.
+- `ruleset_id` in every aggregate SQL view (view layer rebuilt from
+  scratch by `apply_sql_views.py`, verified on 8,976 rows); `arm_contrast`
+  pairs only within a ruleset.
+- **Bit-identity guard** (`analysis/base_game_bit_identity.py`): seed 1 of
+  `potential_points` vs `engine_builder`, both rotations, replayed on the
+  new code is identical to the 2026-09-16 archive; the mirror probe is
+  identical to its 2026-09-19 run; an explicit `core` batch equals the
+  default (test).
+- Readiness: all three packs load today (European 261 birds, Oceania 275,
+  Asia 270 with core); text templates already classify 88–95% of their
+  powers (matched, not verified for teal/yellow semantics).
+
+### Decision
+Phase 1 is European: content plus one timing rule, the smallest
+structural change. Oceania (nectar, revised mat, dice) is phase 2; Asia
+content phase 3; Duet, Flock and Automa deferred.

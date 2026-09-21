@@ -71,6 +71,12 @@ def apply_views(database_url: str, sql_path: Path = DEFAULT_SQL_PATH) -> list[st
     applied: list[str] = []
     with psycopg.connect(database_url) as connection:
         with connection.cursor() as cursor:
+            # The view layer is fully derived, so rebuild it from scratch:
+            # ``create or replace`` cannot add a column in the middle of a
+            # view (adding ``ruleset_id`` to every grain did exactly that).
+            # Dropping in reverse order with cascade removes dependents first.
+            for view in reversed(statements):
+                cursor.execute(f"drop view if exists {view.view_name} cascade")
             for view in statements:
                 cursor.execute(view.statement)
                 applied.append(view.view_name)

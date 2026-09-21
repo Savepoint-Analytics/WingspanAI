@@ -8,6 +8,12 @@
 --   python analysis/apply_sql_views.py
 --
 -- Naming: `v_` prefix, `lower_snake_case`, one grain documented per view.
+--
+-- Every aggregate view carries `ruleset_id` in its grain (2026-09-20,
+-- docs/rules/expansion_configuration.md): a metric over the base game and a
+-- metric over an expansion ruleset are different metrics, never pooled by
+-- accident. Cross-ruleset comparisons are unpaired by construction (different
+-- decks) and belong in a separate, explicitly unpaired analysis.
 
 -- ---------------------------------------------------------------------------
 -- Grain: one row per simulation run.
@@ -234,6 +240,7 @@ group by a.game_id, a.simulation_run_id, a.agent_id, a.player_id, a.action_type;
 create or replace view v_agent_performance as
 select
     s.agent_id,
+    s.ruleset_id,
     s.batch_kind,
     s.batch_label,
     s.setup_policy_kind,
@@ -255,6 +262,7 @@ from v_game_player_scores s
 where s.replay_is_valid is not false
 group by
     s.agent_id,
+    s.ruleset_id,
     s.batch_kind,
     s.batch_label,
     s.setup_policy_kind,
@@ -269,6 +277,7 @@ select
     a.game_id,
     a.simulation_run_id,
     a.random_seed,
+    a.ruleset_id,
     a.batch_label,
     a.setup_policy_kind,
     a.seat_rotation,
@@ -295,6 +304,7 @@ create or replace view v_head_to_head_summary as
 select
     h.agent_id,
     h.opponent_agent_id,
+    h.ruleset_id,
     h.setup_policy_kind,
     h.batch_label,
     count(*)                                                   as games,
@@ -312,7 +322,7 @@ select
     )                                                          as win_rate_as_seat_two
 from v_head_to_head_games h
 where h.replay_is_valid is not false
-group by h.agent_id, h.opponent_agent_id, h.setup_policy_kind, h.batch_label;
+group by h.agent_id, h.opponent_agent_id, h.ruleset_id, h.setup_policy_kind, h.batch_label;
 
 -- ---------------------------------------------------------------------------
 -- Grain: one row per agent per run.
@@ -345,6 +355,7 @@ create or replace view v_setup_policy_outcomes as
 select
     sel.setup_policy_id,
     sel.agent_id,
+    scores.ruleset_id,
     scores.setup_policy_kind,
     scores.batch_label,
     count(*)                                                     as games,
@@ -358,7 +369,8 @@ join v_game_player_scores scores
     on scores.game_id = sel.game_id
    and scores.player_id = sel.player_id
 where scores.replay_is_valid is not false
-group by sel.setup_policy_id, sel.agent_id, scores.setup_policy_kind, scores.batch_label;
+group by
+    sel.setup_policy_id, sel.agent_id, scores.ruleset_id, scores.setup_policy_kind, scores.batch_label;
 
 -- ---------------------------------------------------------------------------
 -- Grain: one row per run.
@@ -410,6 +422,7 @@ from v_simulation_runs run;
 create or replace view v_seat_effect as
 select
     s.player_count,
+    s.ruleset_id,
     s.seat_index,
     s.batch_kind,
     s.batch_label,
@@ -424,7 +437,7 @@ select
     round(stddev_samp(s.total_score), 2)                       as score_stddev
 from v_game_player_scores s
 where s.replay_is_valid is not false
-group by s.player_count, s.seat_index, s.batch_kind, s.batch_label;
+group by s.player_count, s.ruleset_id, s.seat_index, s.batch_kind, s.batch_label;
 
 -- ---------------------------------------------------------------------------
 -- Grain: one row per player count per batch.
@@ -434,6 +447,7 @@ group by s.player_count, s.seat_index, s.batch_kind, s.batch_label;
 create or replace view v_seat_effect_magnitude as
 select
     e.player_count,
+    e.ruleset_id,
     e.batch_kind,
     e.batch_label,
     sum(e.games)                                    as games,
@@ -442,7 +456,7 @@ select
     max(e.win_rate_vs_fair_share)                   as best_seat_edge,
     min(e.win_rate_vs_fair_share)                   as worst_seat_edge
 from v_seat_effect e
-group by e.player_count, e.batch_kind, e.batch_label;
+group by e.player_count, e.ruleset_id, e.batch_kind, e.batch_label;
 
 -- ---------------------------------------------------------------------------
 -- Grain: one row per game per player, for rows that FAIL integrity.
@@ -493,17 +507,21 @@ create or replace view v_score_composition as
 with scored as (
     select * from v_game_player_scores where replay_is_valid is not false
 ), totals as (
-    select nullif(avg(total_score), 0) as avg_total, count(*) as n from scored
+    select ruleset_id, nullif(avg(total_score), 0) as avg_total, count(*) as n
+    from scored
+    group by ruleset_id
 )
 select
+    scored.ruleset_id,
     category,
     round(avg(points), 2) as avg_points,
-    round(100.0 * avg(points) / (select avg_total from totals), 1) as share_of_total_pct,
+    round(100.0 * avg(points) / max(totals.avg_total), 1) as share_of_total_pct,
     round(100.0 * sum(case when points > 0 then 1 else 0 end) / count(*), 1)
         as players_scoring_pct,
     max(points) as max_points,
-    (select n from totals) as player_games
-from scored,
+    max(totals.n) as player_games
+from scored
+join totals on totals.ruleset_id = scored.ruleset_id,
      lateral (values
          ('bird_points', bird_points),
          ('bonus_points', bonus_points),
@@ -512,4 +530,4 @@ from scored,
          ('cached_food_points', cached_food_points),
          ('tucked_card_points', tucked_card_points)
      ) as unpivoted(category, points)
-group by category;
+group by scored.ruleset_id, category;

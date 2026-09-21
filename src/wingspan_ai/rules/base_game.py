@@ -30,6 +30,7 @@ from wingspan_ai.content.schemas import (
     FoodCost,
     FoodType,
     Habitat,
+    PowerColor,
     RulesetMetadata,
     RulesModule,
 )
@@ -88,6 +89,14 @@ BASE_ACTION_CUBES_BY_ROUND: dict[int, int] = {
 #: A game is four rounds. Named because turns per round are 8/7/6/5, so round
 #: count cannot be inferred from turns remaining.
 TOTAL_ROUNDS = max(BASE_ACTION_CUBES_BY_ROUND)
+#: Rules modules this engine implements. A ruleset naming any other module
+#: is refused at setup rather than silently played as the base game: a
+#: batch that claims nectar rules must actually get them
+#: (``docs/rules/expansion_configuration.md``). Content packs are not gated
+#: here — unsupported cards are tagged by the power registry and can be
+#: excluded per batch, which is the honest bridge while a pack is being
+#: implemented.
+IMPLEMENTED_RULES_MODULES: frozenset[RulesModule] = frozenset({RulesModule.BASE_GAME})
 ROUND_GOAL_GREEN_SCORES: dict[int, tuple[int, ...]] = {
     1: (4, 1, 0, 0, 0),
     2: (5, 2, 1, 0, 0),
@@ -197,6 +206,12 @@ def setup_base_game(
     ruleset = (
         catalog.rulesets[0] if catalog.rulesets else _default_ruleset(len(player_ids), random_seed)
     )
+    unsupported = [m for m in ruleset.rules_modules if m not in IMPLEMENTED_RULES_MODULES]
+    if unsupported:
+        raise NotImplementedError(
+            f"ruleset {ruleset.ruleset_id!r} needs rules modules this engine does not implement: "
+            f"{[m.value for m in unsupported]}"
+        )
 
     return GameState(
         game_id=game_id,
@@ -945,6 +960,57 @@ def resolve_played_bird_power(
     if slot.card.power.color.value != "white":
         return
     _resolve_power_text(player, slot, slot.card.power.text, state, habitat=habitat, depth=depth)
+
+
+def round_first_player_index(state: GameState) -> int:
+    """Index of the player who took the first turn of the current round.
+
+    ADR 0002: the first player of round 1 is index 0 and the token passes
+    clockwise at every round end, so round ``r`` starts with ``(r - 1) % n``.
+    """
+
+    return (state.round_state.round_number - 1) % len(state.players)
+
+
+def resolve_end_of_round_powers(state: GameState) -> None:
+    """Resolve teal ("round end") powers for every player, in player order.
+
+    European Expansion rulebook p.2: round-end powers resolve when all turns
+    of the round are complete and before the round's goal is scored, in
+    player order starting with the player who went first that round; a
+    player with several may order them freely (this engine uses the
+    board's habitat order, forest → grassland → wetland, left to right);
+    they do not trigger pink powers. Core content has no teal birds, so
+    base-game games never enter the loop.
+    """
+
+    first = round_first_player_index(state)
+    order = state.players[first:] + state.players[:first]
+    for player in order:
+        for habitat in (Habitat.FOREST, Habitat.GRASSLAND, Habitat.WETLAND):
+            for slot in list(player.habitats[habitat]):
+                if slot.card.power.color != PowerColor.TEAL:
+                    continue
+                _resolve_power_text(player, slot, slot.card.power.text, state, habitat=habitat)
+
+
+def resolve_end_of_game_powers(state: GameState) -> None:
+    """Resolve yellow ("game end") powers once, after the last round's end-of-round steps.
+
+    Oceania Expansion rulebook p.3: after completing all end-of-round steps
+    of round 4, activate game-end powers; several on one player's board may
+    be activated in any order (habitat order here); they do not trigger pink
+    powers. Player order is the same convention as round-end powers.
+    """
+
+    first = round_first_player_index(state)
+    order = state.players[first:] + state.players[:first]
+    for player in order:
+        for habitat in (Habitat.FOREST, Habitat.GRASSLAND, Habitat.WETLAND):
+            for slot in list(player.habitats[habitat]):
+                if slot.card.power.color != PowerColor.YELLOW:
+                    continue
+                _resolve_power_text(player, slot, slot.card.power.text, state, habitat=habitat)
 
 
 def resolve_habitat_powers(
@@ -1848,9 +1914,15 @@ def _advance_turn(state: GameState) -> None:
     player.action_cubes_available -= 1
 
     if all(candidate.action_cubes_available == 0 for candidate in state.players):
+        # End-of-round order (European p.1 reference tile, Oceania p.3):
+        # round-end powers, [discard nectar], score the goal, remove cubes,
+        # refresh the tray, then game-end powers after round 4 or pass the
+        # first-player token.
+        resolve_end_of_round_powers(state)
         _score_completed_round_goal(state)
         _refresh_bird_tray(state)
-        if state.round_state.round_number == 4:
+        if state.round_state.round_number == TOTAL_ROUNDS:
+            resolve_end_of_game_powers(state)
             state.round_state.game_over = True
             return
         completed_round = state.round_state.round_number

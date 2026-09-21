@@ -40,8 +40,15 @@ from wingspan_ai.agents.setup import (
 )
 from wingspan_ai.config import database_url_from_env, load_dotenv, object_storage_config_from_env
 from wingspan_ai.content.filters import filter_catalog_by_power_status
-from wingspan_ai.content.loader import DEFAULT_WORKBOOK_PATH, load_base_game_content_catalog
+from wingspan_ai.content.loader import (
+    DEFAULT_WORKBOOK_PATH,
+    _pack_order,
+    build_ruleset,
+    load_content_catalog,
+    normalize_rules_modules,
+)
 from wingspan_ai.content.sample_catalog import make_sample_catalog
+from wingspan_ai.content.schemas import ContentPack, RulesModule
 from wingspan_ai.provenance import code_provenance
 from wingspan_ai.rules import MultiplayerAuditError, audit_rule_coverage
 from wingspan_ai.simulation import (
@@ -153,6 +160,8 @@ def run_seeded_game(
     forced_play_birds: dict[str, list[str]] | None = None,
     opening_food_bonus: dict[str, int] | None = None,
     decision_profile_mode: str = DEFAULT_PROFILE_MODE,
+    content_packs: list[str] | None = None,
+    rules_modules: list[str] | None = None,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch.
 
@@ -165,9 +174,16 @@ def run_seeded_game(
     position only. It is what lets a mirror match (``potential_points`` in
     every seat) vary one seat's search: the study position is a lineup
     position, so it travels with the policy through every seat rotation.
+
+    ``content_packs`` and ``rules_modules`` are the game's expansion
+    configuration (``docs/rules/expansion_configuration.md``). Omitted, the
+    catalog is the core base game with the historic ``core_base_game_v1``
+    ruleset, bit-identical to every archived batch. The sample catalog
+    (used when the workbook is absent) is core-only whatever is asked.
     """
 
     load_dotenv()
+    resolved_packs, resolved_modules = _resolve_ruleset_config(content_packs, rules_modules)
     resolved_batch_kind = _validate_batch_kind(batch_kind)
     resolved_batch_label = _validate_path_segment(batch_label, "batch_label")
     resolved_batch_id = _validate_path_segment(batch_id or _new_batch_id(), "batch_id")
@@ -182,10 +198,32 @@ def run_seeded_game(
     resolved_workbook_path = Path(workbook_path)
     workbook_exists = resolved_workbook_path.exists()
     catalog = (
-        load_base_game_content_catalog(resolved_workbook_path)
+        load_content_catalog(
+            resolved_workbook_path,
+            content_packs=set(resolved_packs),
+            rules_modules=resolved_modules,
+        )
         if workbook_exists
         else make_sample_catalog()
     )
+    if not workbook_exists and (
+        resolved_packs != [ContentPack.CORE] or resolved_modules != [RulesModule.BASE_GAME]
+    ):
+        raise ValueError(
+            "expansion content needs the source workbook; the sample catalog is core-only"
+        )
+    if workbook_exists:
+        # Stamp the requested ruleset (packs, modules, player count) on the
+        # catalog: ``setup_base_game`` copies ``rulesets[0]`` into the state.
+        catalog = catalog.model_copy(
+            update={
+                "rulesets": [
+                    build_ruleset(
+                        resolved_packs, resolved_modules, player_count=len(resolved_lineup)
+                    )
+                ]
+            }
+        )
     content_filter_payload = None
     if power_status_filter is not None or excluded_power_handler_keys is not None:
         filter_result = filter_catalog_by_power_status(
@@ -419,6 +457,8 @@ def run_seeded_game(
         "seat_rotation": resolved_seat_rotation,
         "seated_agent_ids": [agent.agent_id for agent in seated_agents],
         "setup_policy_kind": resolved_setup_policy_kind,
+        "content_packs": [pack.value for pack in resolved_packs],
+        "rules_modules": [module.value for module in resolved_modules],
         "content_filter": content_filter_payload,
         "guardrail_config_path": guardrail_config_path,
         "guardrail_config_name": batch_metadata["guardrail_config_name"],
@@ -712,6 +752,20 @@ def _resolve_agent_lineup(
     return [_validate_player_two_agent_kind(kind) for kind in kinds]
 
 
+def _resolve_ruleset_config(
+    content_packs: list[str] | None, rules_modules: list[str] | None
+) -> tuple[list[ContentPack], list[RulesModule]]:
+    """Validate and order a batch's expansion configuration; core + base game by default."""
+
+    packs = sorted({ContentPack(pack) for pack in (content_packs or ["core"])}, key=_pack_order)
+    if ContentPack.CORE not in packs:
+        raise ValueError(
+            "content_packs must include 'core'; expansions are shuffled into the base deck"
+        )
+    modules = normalize_rules_modules([RulesModule(module) for module in (rules_modules or [])])
+    return packs, modules
+
+
 def _validate_setup_policy_kind(setup_policy_kind: str) -> SetupPolicyKind:
     if is_potential_points_setup_policy_id(setup_policy_kind):
         return setup_policy_kind  # type: ignore[return-value]
@@ -772,6 +826,8 @@ def _write_batch_manifest(
     net_value_max_opponent_response_actions: int | None,
     potential_points_search: PotentialPointsSearchConfig | None = None,
     potential_points_search_by_position: dict[int, PotentialPointsSearchConfig] | None = None,
+    content_packs: list[str] | None = None,
+    rules_modules: list[str] | None = None,
 ) -> Path:
     manifest = {
         "schema_version": MANIFEST_SCHEMA_VERSION,
@@ -791,6 +847,9 @@ def _write_batch_manifest(
         "player_two_agent_ids": sorted({result["player_two_agent_id"] for result in results}),
         "seat_rotation": seat_rotation,
         "player_counts": sorted({result["player_count"] for result in results}),
+        "ruleset_ids": sorted({result["ruleset_id"] for result in results}),
+        "content_packs": content_packs,
+        "rules_modules": rules_modules,
         "setup_policy_kinds": sorted({result["setup_policy_kind"] for result in results}),
         "content_filter": results[0].get("content_filter") if results else None,
         "monte_carlo_rollout_count": monte_carlo_rollout_count,
@@ -828,6 +887,8 @@ def _write_batch_manifest(
                 "outcome": result["outcome"],
                 "event_count": result["event_count"],
                 "ruleset_id": result["ruleset_id"],
+                "content_packs": result.get("content_packs"),
+                "rules_modules": result.get("rules_modules"),
                 "player_one_agent_kind": result["player_one_agent_kind"],
                 "player_one_agent_id": result["player_one_agent_id"],
                 "player_two_agent_kind": result["player_two_agent_kind"],
@@ -913,6 +974,8 @@ def run_simulation_batch(
     forced_play_birds: dict[str, list[str]] | None = None,
     opening_food_bonus: dict[str, int] | None = None,
     decision_profile_mode: str = DEFAULT_PROFILE_MODE,
+    content_packs: list[str] | None = None,
+    rules_modules: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -957,6 +1020,8 @@ def run_simulation_batch(
             forced_play_birds=forced_play_birds,
             opening_food_bonus=opening_food_bonus,
             decision_profile_mode=decision_profile_mode,
+            content_packs=content_packs,
+            rules_modules=rules_modules,
         )
         for seed in resolved_seeds
     ]
@@ -990,6 +1055,12 @@ def run_simulation_batch(
             net_value_max_opponent_response_actions=net_value_max_opponent_response_actions,
             potential_points_search=potential_points_search,
             potential_points_search_by_position=potential_points_search_by_position,
+            content_packs=[
+                p.value for p in _resolve_ruleset_config(content_packs, rules_modules)[0]
+            ],
+            rules_modules=[
+                m.value for m in _resolve_ruleset_config(content_packs, rules_modules)[1]
+            ],
         )
         storage_config = object_storage_config_from_env()
         should_upload_manifest = (

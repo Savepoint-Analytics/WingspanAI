@@ -98,7 +98,9 @@ has to be per decision.
 
 ## How to add a row
 
-Register the prediction in `PROJECT_CONTEXT.md` before launching; run the
+Every row so far is under `core_base_game_v1`. A row under another ruleset
+goes in its own table (one per ruleset); cross-ruleset rows are unpaired and
+say so. Register the prediction in `PROJECT_CONTEXT.md` before launching; run the
 arm from a clean worktree at a recorded commit; read it through
 `arm_contrast` **and** `decision_profile_report --value-against`; add the
 row here with both numbers; if the decision adopts or drops a switch, add

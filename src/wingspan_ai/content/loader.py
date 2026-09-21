@@ -93,6 +93,7 @@ def load_content_catalog(
     *,
     content_packs: set[ContentPack] | None = None,
     include_default_ruleset: bool = True,
+    rules_modules: list[RulesModule] | None = None,
 ) -> ContentCatalog:
     """Load the card workbook into typed content models.
 
@@ -100,6 +101,11 @@ def load_content_catalog(
         workbook_path: Source workbook path.
         content_packs: Optional pack filter. When omitted, all known packs are loaded.
         include_default_ruleset: Include a ruleset matching the requested content packs.
+        rules_modules: Rules modules for that ruleset; ``base_game_rules`` is
+            always present. The catalog's first ruleset is what
+            ``setup_base_game`` stamps on every game state, so this is where a
+            batch's expansion configuration enters the simulator
+            (``docs/rules/expansion_configuration.md``).
     """
 
     path = resolve_workbook_path(workbook_path)
@@ -119,14 +125,7 @@ def load_content_catalog(
             | {goal.content_pack for goal in round_goals},
             key=lambda pack: pack.value,
         )
-        rulesets.append(
-            RulesetMetadata(
-                ruleset_id=_default_ruleset_id(loaded_packs),
-                content_packs=loaded_packs,
-                rules_modules=[RulesModule.BASE_GAME],
-                player_count=2,
-            )
-        )
+        rulesets.append(build_ruleset(loaded_packs, rules_modules))
 
     return ContentCatalog(
         birds=birds,
@@ -542,8 +541,58 @@ def _row_number(row: dict[Any, Any]) -> int | None:
     return int(value) if value is not None else None
 
 
-def _default_ruleset_id(content_packs: list[ContentPack]) -> str:
-    if content_packs == [ContentPack.CORE]:
+def _pack_order(pack: ContentPack) -> tuple[int, str]:
+    """Core first, then the expansions alphabetically, in ids and ruleset metadata."""
+
+    return (pack is not ContentPack.CORE, pack.value)
+
+
+def normalize_rules_modules(rules_modules: list[RulesModule] | None) -> list[RulesModule]:
+    """Base-game rules first, then the other modules in a stable order, deduplicated."""
+
+    ordered = [RulesModule.BASE_GAME]
+    for module in sorted(rules_modules or [], key=lambda m: m.value):
+        if module not in ordered:
+            ordered.append(module)
+    return ordered
+
+
+def ruleset_id_for(
+    content_packs: list[ContentPack], rules_modules: list[RulesModule] | None = None
+) -> str:
+    """Stable ruleset id from packs and modules.
+
+    The base game keeps its historic id (``core_base_game_v1``) so every
+    archived event, manifest and database row stays comparable. Any other
+    configuration is ``<packs>[__<modules>]_v1``, core first then packs and
+    non-base modules each sorted, so the same configuration always names the
+    same ruleset.
+    """
+
+    packs = sorted(content_packs, key=_pack_order)
+    modules = [m for m in normalize_rules_modules(rules_modules) if m is not RulesModule.BASE_GAME]
+    if packs == [ContentPack.CORE] and not modules:
         return "core_base_game_v1"
-    pack_slug = "_".join(pack.value for pack in content_packs)
-    return f"{pack_slug}_ruleset_v1"
+    slug = "_".join(pack.value for pack in packs)
+    if modules:
+        slug += "__" + "__".join(module.value for module in modules)
+    return f"{slug}_v1"
+
+
+def build_ruleset(
+    content_packs: list[ContentPack],
+    rules_modules: list[RulesModule] | None = None,
+    *,
+    player_count: int = 2,
+) -> RulesetMetadata:
+    packs = sorted(content_packs, key=_pack_order)
+    return RulesetMetadata(
+        ruleset_id=ruleset_id_for(packs, rules_modules),
+        content_packs=packs,
+        rules_modules=normalize_rules_modules(rules_modules),
+        player_count=player_count,
+    )
+
+
+def _default_ruleset_id(content_packs: list[ContentPack]) -> str:
+    return ruleset_id_for(content_packs)

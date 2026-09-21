@@ -1,7 +1,11 @@
 # End-of-Round (Teal) Powers
 
-Status: gap analysis, 2026-09-04. **A concrete defect found: teal powers are
-undervalued by roughly 2x in rounds 1-3.**
+Status: gap analysis, 2026-09-04. The evaluator defect below was fixed
+(`_remaining_teal_triggers` now reads the round number) and the engine gained
+end-of-round and end-of-game hooks on 2026-09-20
+(`docs/rules/expansion_configuration.md`); the per-card handlers are phase 1.
+
+**Original finding: teal powers were undervalued by roughly 2x in rounds 1-3.**
 
 ## The defect
 
