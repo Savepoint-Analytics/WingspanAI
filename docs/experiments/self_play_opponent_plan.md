@@ -1,6 +1,6 @@
 # Self-play and human-trace opponents: is "the opponent barely matters" the game or the roster?
 
-Status: design registered 2026-09-19; A1, A2 and A3 run 2026-09-20 (results at the end); A4 in flight.
+Status: design registered 2026-09-19; A1–A4 run 2026-09-20 (results at the end).
 
 ## Why
 
@@ -290,3 +290,40 @@ same mechanism) was stopped four minutes in as answered. A lower weight
 denial is free; the registered prediction would be a null, and it is not
 queued. The plan's reading stands as written: denial is not worth a
 search node even against a planner.
+
+### A4 (2026-09-20): the first-player advantage replicates on fresh decks
+
+`mirror_2p_b` (80 games, seeds 41–80, both rotations, default config both
+seats, `8e7639f`) — the same design as A1 on decks no earlier arm had
+seen. Read with `analysis/mirror_seat_effect.py`, one observation per
+seed:
+
+| Roots | games | decks | seat 1 − seat 2 | p | seat-1 win | limit |
+|---|---:|---:|---:|---:|---:|---:|
+| A4 alone | 80 | 40 | **+7.19** | <0.001 | 0.650 | 5.7 |
+| A1 + A4 (clean baselines, independent decks) | 160 | 80 | **+6.16** | <0.001 | 0.613 | 4.6 |
+| all four 2p mirrors (A1–A4) | 320 | 160* | +4.27 | <0.001 | 0.588 | 3.0 |
+
+\* A2 and A3 reuse A1's decks, so the 160 is 120 independent.
+
+Registered seat 1 +2 to +5: the fresh decks came in above the band, and
+the mean score level replicated to the decimal (75.28 vs 75.25), so the
+arm is measuring the same game. **Established: at two players, between
+equal searching agents, the first player scores about six points more and
+wins about 61% of games.** The size is comparable to the whole bonus-card
+choice (6.4) and more than half the search's own value against the
+roster; it is the largest single structural effect the project has
+measured that is a property of the rules rather than of an agent.
+
+Why it never showed against the roster: the seat studies of 2026-09-02/03
+used mixed-strength lineups and the pre-search agent, and the 3p seat-3
+claim did not replicate. A 6-point tempo edge is invisible when the
+agent-strength gap is 20 points and the agent cannot use tempo; the
+searching agent, playing itself, converts the extra first action into a
+first bird and everything that compounds from it. ADR 0002's seat
+counterbalancing was the right call for every paired arm and stays
+mandatory.
+
+What it is not: a 3p claim (seat 1 − seat 3 is +1.4, n.s., with seat 3 at
+0.28 win — a fresh-deck 3p mirror is the same replication and is not
+queued), or a claim about human play.

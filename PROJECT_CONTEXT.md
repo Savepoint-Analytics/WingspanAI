@@ -67,8 +67,9 @@ Current focus:
    +2.1, mirror +1.9, combined p≈0.01), a score not a win effect, at ×1.55;
    nothing cheaper reproduces it. `belief` stays everywhere; the ledger
    carries the 3p price. Self-play A1 gives 75.3 at 2p / 78.3 at 3p; seat 1
-   is +3.9 at 2p pooled over A1+A2 (p=0.014, same 40 decks — A4 replicates
-   on fresh seeds).
+   is **+6.2 at 2p** pooled over A1+A4 on 80 independent decks (p<0.001,
+   win 0.61) — the first established seat finding, invisible against the
+   roster. Denial as a root term is −5.9 (A3, dropped).
 4. Standing holdouts (five fields) keep every decided switch's losing side
    alive at 5% (`docs/experiments/standing_holdouts.md`).
 5. Card-choice decisions remain the parked place to spend evidence: the
@@ -255,7 +256,8 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | Read A4 (`mirror_2p_b`, seeds 41–80, no study seat; launched 2026-09-20 ~18:45). | Seat 1 +2 to +5 on the fresh decks and pooled p<0.05 with A1+A2+A3 establishes the 2p first-player advantage; a sign flip retires the claim. |
+| 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
+| 1 | Expansion phase 0 (`docs/rules/expansion_configuration.md`, pack threading with the base-game bit-identity guard, teal fix + end-of-round/end-of-game hooks, ruleset dimension in the analysis views). | Base-game batches bit-identical with packs off; a synthetic teal/yellow bird fires the right number of times. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
@@ -3391,3 +3393,14 @@ established negative in this game, now against both scripted and
 planning opponents. Machine time goes to A4: `mirror_2p_b`, seeds 41–80,
 the fresh-deck replication of the 2p first-player advantage (+3.9 pooled
 on seeds 1–40 across A1 and A2; +3.3 with A3 included).
+
+## Update: 2026-09-20 - A4: first-player advantage replicates on fresh decks (+7.2); established at +6
+
+`mirror_2p_b` (seeds 41–80, 80 games): seat 1 **+7.19 (p<0.001), win
+0.650**; score level 75.28 (A1: 75.25). Pooled with A1 on 80 independent
+decks: **+6.16 (p<0.001)**, above the 4.6-point limit. Registered +2 to +5:
+came in above. The self-play programme's four arms are done in one day:
+opponent model ≈0 at 2p / ≈+2 at 3p (both replicating the roster),
+denial −5.9 (dropped), first player +6 at 2p (established). Self-play
+worktrees removed. Next: the human-trace study (the tooling is built) and
+expansion phase 0.

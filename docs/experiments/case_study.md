@@ -176,6 +176,19 @@ interfaces those rules were enforced through.
 - IP: Wingspan content and rules are used as research inputs for a private
   case study; public release needs review (`COMPANY_CONTEXT.md`).
 
+### 6. Against itself (2026-09-20)
+
+Four self-play arms put the champion in every seat. Three roster findings
+survived a planning opponent unchanged: the opponent model is worth
+nothing at two players (+0.5 n.s.) and about two at three (+1.9, p=0.07,
+replicating the roster's +2.1); a denial term is a liability (−5.9: it
+pays the agent to draw cards the opponent wants, and the tray refills);
+and the generalist profile holds (75.3 at 2p, winners separating on round
+goals and eggs). One thing the roster had hidden: **the first player wins
+61% of two-player games between equal agents, by about six points** —
+replicated on fresh decks (p<0.001), the largest structural effect in the
+project that belongs to the rules rather than to an agent.
+
 ## What is next
 
 The production question — how much strength survives a five-second clock —
