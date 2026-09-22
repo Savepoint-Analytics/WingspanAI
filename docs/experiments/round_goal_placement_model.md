@@ -172,6 +172,54 @@ within two points of each other, and card-choice terms at setup have never
 moved the needle. Worth one arm because it is nearly free and because the
 round-1 measurement above shows the first goal is a real prize.
 
+### Result: the switch is inert (2026-09-22)
+
+`artifacts/rr_opener_allgoals` (`potential_points_setup_v2_allgoals`) vs
+`artifacts/rr_opener_v2` (the same opener reading round 1 only), 80 paired
+games. The headline number is **−1.21 (p=0.037)** and it does **not** mean
+what it appears to: the arm cannot measure the goal horizon.
+
+What the games say:
+
+| Comparison | n | mean Δ |
+|---|---:|---:|
+| opening selection differs (birds, bonus or food) | 2 | +0.00 |
+| selection identical | 78 | −1.24 |
+| a standing holdout fired in the arm | 16 | −6.06 (p=0.022) |
+| no holdout fired | 64 | **+0.00 (bit-identical)** |
+
+Reading all four goals changed the opening in **2 of 80 games**, and those
+two scored identically. Sixty-four games were bit-identical end to end.
+The −1.21 comes entirely from the sixteen games where a standing holdout
+fired — and `rr_opener_v2` (2026-09-16) predates the holdout machinery, so
+it has none to fire. The arm measured the holdout portfolio, not the
+opener.
+
+**Conclusion: the registered null holds in its strongest form.** The
+four-goal term is not merely worth nothing; it almost never changes the
+decision, because round-1 alignment, playability and tempo dominate the
+opening score and the later goals' discounted weights rarely flip a
+choice. Not adopted, `goal_horizon` stays `"first"`. No holdout: nothing
+was decided that the existing `setup_policy` holdout does not already
+guard, and a switch that changes 2 games in 80 has nothing to guard.
+
+### A method note this arm paid for
+
+**A paired arm must share its baseline's holdout set, not just its
+commit.** When the arm carries holdouts the baseline lacks, the holdout
+deviation is attributed to the arm. Ledger rows from 2026-09-17 to
+2026-09-22 paired against `rr_belief_opp` (no `DEFAULT_HOLDOUTS`) while
+carrying two to four of them, so each of those rows is biased downward by
+Σ share × cost ≈ 0.1–0.4 points — inside every one of their detection
+limits, so no conclusion changes, but the direction is known. The
+2026-09-22 re-baseline fixes this going forward: `rr_goal_placement` and
+`rr3p_goal_placement` carry the same four holdouts every future arm will.
+
+The pooled guardrail is still unreadable per field (6–33 held-out games,
+detection limits 3.9–12.1 points) after six arms, which is the design
+working as documented — and an argument for retiring fields as they reach
+the 100-game bar rather than adding more.
+
 ## Reading the arms
 
     python analysis/arm_contrast.py --baseline artifacts/rr_belief_opp --arm artifacts/rr_goal_placement

@@ -127,6 +127,22 @@ State at 2026-09-17 for the opponent model (four roots, 320 games):
 belief −1.34 versus greedy, p = 0.51, 19 held-out games — unreadable, as
 expected, and pointing the way the arm said (no real difference).
 
+## What the portfolio costs, and reading it against a baseline
+
+Two measurements from 2026-09-22, both arguing for retiring fields rather
+than adding them:
+
+- **A baseline must carry the same holdout set as the arm.** With four
+  fields at 5%, about 19% of games deviate somewhere; in the four-goal
+  opener arm those sixteen games carried the whole apparent −1.21 while
+  the other sixty-four were bit-identical. Pairing against a baseline
+  without the holdouts charges the arm for them.
+- **The per-field guardrail is still unreadable** after six arms: 6–33
+  held-out games per field, detection limits 3.9–12.1 points. The
+  guardrail is cheap because it is slow, as designed — but a field that
+  cannot be read and does deviate games is a cost with no return until it
+  reaches the 100-game bar.
+
 ## Retiring a holdout
 
 When a field has accrued ≥ 100 held-out games and the guardrail agrees

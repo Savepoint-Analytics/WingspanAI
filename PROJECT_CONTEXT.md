@@ -3468,5 +3468,24 @@ would lose). Combined +0.79 (p=0.17). **Adopted** on the pre-registered
 Registered follow-up: production-config re-check.
 
 ### Follow-up tasks
-- [ ] Read `rr_opener_allgoals` (four-goal opener vs `rr_opener_v2`, registered null).
 - [ ] Production-config re-check with the placement default (80 games).
+
+## Update: 2026-09-22 - Four-goal opener is inert; and a paired arm must match its baseline's holdouts
+
+`rr_opener_allgoals` vs `rr_opener_v2`: headline −1.21 (p=0.037), and it
+measures nothing about the opener. Reading all four goals changed the
+opening selection in **2 of 80 games** (both scored identically) and 64
+games were bit-identical end to end; the −1.21 is entirely the sixteen
+games where a standing holdout fired, which the 2026-09-16 baseline cannot
+match because it predates the holdout machinery. Registered null confirmed
+in its strongest form — the term almost never changes the decision.
+`goal_horizon` stays `"first"`; no holdout.
+
+**Method rule added:** a paired arm must share its baseline's *holdout
+set*, not just its commit. Rows from 2026-09-17 to 2026-09-22 paired
+against `rr_belief_opp` carry a downward bias of ≈0.1–0.4 points from
+this; inside every affected detection limit, so nothing flips, and the
+2026-09-22 re-baseline removes it going forward. Also measured: the
+per-field guardrail remains unreadable (6–33 held-out games, limits
+3.9–12.1), an argument for retiring fields at the 100-game bar rather
+than adding more.

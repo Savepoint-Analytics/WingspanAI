@@ -70,6 +70,7 @@ detail, and the depth-3 search was the first change large enough to see.
 | 2026-09-20 | A2 `mirror_2p_greedy` | position 1 on `search_opponent_model="greedy"`, 80 games paired vs `mirror_2p` | study seat **+0.46 (p=0.62)**, win −0.006; decision ×1.55. Registered +1 to +3 failed: **the 2p opponent question closes** — a planning opponent changes nothing either. Seat pooled A1+A2 (160 games, 40 decks): seat 1 **+3.9 (p=0.014), win 0.559** |
 | 2026-09-20 | A2 `mirror_3p_greedy` | position 1 on `greedy`, 90 games paired vs `mirror_3p` | study seat **+1.89 (p=0.072)**, win −0.011; decision ×1.55 (+0.18 points/s). Registered +2 to +4: point estimate just under. With the roster result (+2.12, p=0.073) two independent contrasts agree: **≈+2 at 3p is real** (combined p≈0.01), a score not a win effect, and four cheap reproductions failed. Not adopted for cost; belief stays |
 | 2026-09-20 | A3 `mirror_2p_denial` | position 1 with `search_denial_weight=1.0`, 80 games paired vs `mirror_2p` | study seat **−5.94 (p<0.001)**, win −0.156; cost ×0.89. Registered +1 to +3 failed: the term pays the agent to draw tray cards (draw share 24% → 33%, tray draws 371 → 657) against a refilling supply. Dropped; 3p arm stopped as answered |
+| 2026-09-22 | four-goal opener (`v2_allgoals`) vs the round-1-only opener (`v2`) | rr_opener_v2 | −1.21 | 0.037 | −0.01 | — | — | **invalid as a goal-horizon test**: the switch changed the opening in 2/80 games, 64 games were bit-identical, and the −1.21 is the arm's standing holdouts (the 2026-09-16 baseline has none). Registered null confirmed; not adopted |
 | 2026-09-22 | 3p: placement round-goal model vs the heuristic | rr3p_opp/belief | **+1.12** | 0.128 | +0.03 | ≈ (0.1 ms a state) | — | meets the registered +1 bar → **adopted (H)**; re-baseline `rr_goal_placement` (2p) / `rr3p_goal_placement` (3p). Composition differs from 2p: goals +0.46, eggs +0.97, birds only −0.27 |
 | 2026-09-22 | 2p: placement round-goal model vs the reachability heuristic | rr_belief_opp | +0.41 | 0.69 | +0.04 | ≈ (load-confounded) | — | inside the registered 0 to +2 but under the +1 adoption bar. **Mechanism confirmed and paid for**: goal points +0.84 (p=0.011), birds −0.75, bonus −0.41. At 2p the goals bought cost what they pay |
 | 2026-09-20 | A4 `mirror_2p_b` | 80 games, fresh decks (seeds 41–80), default config both seats | score level replicates (75.28 vs 75.25); seat 1 **+7.2, win 0.650** (p<0.001, n=40 decks). Pooled with A1 on 80 independent decks: **+6.2 (p<0.001)**, limit 4.6 — **the 2p first-player advantage in strong play is established** |
@@ -97,6 +98,16 @@ Before the fast expansion: `expand_children` 73%, `terminal_value` 17%,
 opponent model 3%, 5.2 s mean decision. After: 53% / 33%, 2.6 s. Latency by
 round in the archive: 1.8 → 5.9 → 10.5 → 15.7 s mean; a production budget
 has to be per decision.
+
+## Reading a row fairly
+
+Two conditions, both learned the hard way. **Pair by seed** (2026-09-01,
+after a greedy agent ranked second and a seat-3 advantage that were both
+artefacts). **Match the holdout set**: an arm carrying standing holdouts
+its baseline lacks is charged for the deviation (2026-09-22, the four-goal
+opener arm). Rows from 2026-09-17 to 2026-09-22 paired against
+`rr_belief_opp` carry a downward bias of about 0.1–0.4 points from this,
+inside their detection limits; the 2026-09-22 re-baseline removes it.
 
 ## How to add a row
 
