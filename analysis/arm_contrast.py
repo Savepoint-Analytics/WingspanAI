@@ -129,6 +129,10 @@ def contrast(
         opponents = tuple(kind for index, kind in enumerate(key.lineup) if index != own_position)
         by_opponent["+".join(opponents)].append(other[0] - base[0])
 
+    by_deck: dict[int, list[float]] = defaultdict(list)
+    for key, base_score, arm_score in zip(shared, base_scores, arm_scores, strict=True):
+        by_deck[key.seed].append(arm_score - base_score)
+
     score_deltas = [a - b for a, b in zip(arm_scores, base_scores, strict=True)]
     win_deltas = [a - b for a, b in zip(arm_wins, base_wins, strict=True)]
     score_delta, score_p = paired_test(score_deltas)
@@ -147,7 +151,36 @@ def contrast(
         "by_opponent": {
             name: paired_test(deltas) + (len(deltas),) for name, deltas in by_opponent.items()
         },
+        # A seed is a deck: every game on it shares the shuffle, the round
+        # goals and the opening hands. Games are not independent units, decks
+        # are, so the contrast is also reported over per-deck mean deltas.
+        "decks": len(by_deck),
+        "deck_p": paired_test([mean(deltas) for deltas in by_deck.values()])[1],
+        "design_effect": _design_effect(by_deck),
     }
+
+
+def _design_effect(by_deck: dict[int, list[float]]) -> float:
+    """1 + (games per deck − 1) × ICC: how much the naive p overstates.
+
+    Pairing removes the deck from the delta, so this is usually ≈1 and the
+    per-game test is sound. It is not when a design puts many games on few
+    decks — the 5-seed three-player round robin runs 18 games a deck and
+    comes out near 2 (2026-09-22).
+    """
+
+    deltas = [value for values in by_deck.values() for value in values]
+    if len(by_deck) < 2 or len(deltas) == len(by_deck):
+        return 1.0
+    grand = mean(deltas)
+    per_deck = len(deltas) / len(by_deck)
+    between = sum(len(v) * (mean(v) - grand) ** 2 for v in by_deck.values()) / (len(by_deck) - 1)
+    within = sum((x - mean(v)) ** 2 for v in by_deck.values() for x in v) / (
+        len(deltas) - len(by_deck)
+    )
+    denominator = between + (per_deck - 1) * within
+    icc = (between - within) / denominator if denominator else 0.0
+    return max(0.0, 1 + (per_deck - 1) * icc)
 
 
 def unchanged_games(baseline: dict[GameKey, dict], arm: dict[GameKey, dict]) -> tuple[int, int]:
@@ -193,13 +226,19 @@ def render(
             row = contrast(baseline, arm, agent)
             if row["n"] == 0:
                 continue
-            mark = "**" if row["score_p"] < 0.05 else ""
+            mark = "**" if max(row["score_p"], row["deck_p"]) < 0.05 else ""
             lines.append(
                 f"| `{agent}` | {row['n']} | {row['baseline_score']:.2f} → {row['arm_score']:.2f} "
                 f"| {mark}{row['score_delta']:+.2f}{mark} | {row['score_p']:.3f} "
                 f"| {row['baseline_win']:.3f} → {row['arm_win']:.3f} "
                 f"| {row['win_delta']:+.3f} | {row['win_p']:.3f} |"
             )
+            if row["design_effect"] > 1.3:
+                lines.append(
+                    f"| | {row['decks']} decks | *deck-clustered read* | "
+                    f"{row['score_delta']:+.2f} | *{row['deck_p']:.3f}* | design effect "
+                    f"{row['design_effect']:.1f} | | |"
+                )
         lines.append("")
         for agent in agents:
             row = contrast(baseline, arm, agent)

@@ -260,6 +260,7 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 |---|---|---|
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
+| 1 | Re-run the 3p placement confirmation on a 15-deck design (15 seeds × 2 opponent pairs × 3 rotations = 90 games) against a matching baseline. | Deck-clustered p < 0.1 at ≥ +1 confirms the adoption; below +0.5 reverts it to the heuristic. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
@@ -3489,3 +3490,26 @@ this; inside every affected detection limit, so nothing flips, and the
 per-field guardrail remains unreadable (6–33 held-out games, limits
 3.9–12.1), an argument for retiring fields at the 100-game bar rather
 than adding more.
+
+## Update: 2026-09-22 - Decks, not games: the 3p round robin samples five decks
+
+Prompted by a question about seed reuse. Seeds do vary within every batch
+and each seed is a distinct setup (10 seeds → 10 distinct round-goal sets),
+but a seed is a **deck** and the designs put very different numbers of
+games on one: 2p round robin 8 games on each of 10 decks, **3p round robin
+18 games on each of 5**, mirrors 2–3 games on each of 30–40.
+
+Measured the intraclass correlation of the paired deltas: ≈0 or negative
+in three designs (pairing removes the deck, so the per-game test is sound
+or conservative) and +0.06…+0.08 in the 3p round robin, where 18 games a
+deck turns that into a **design effect near 2**. Its p-values are
+overstated by about √2: greedy opponent model +2.12 reads p=0.239 not
+0.073; placement +1.12 reads p=0.282 not 0.128. **No conclusion
+reverses** — point estimates are unchanged, and the greedy result was
+already replicated on the 30-deck 3p mirror (+1.89, deck-clustered
+p=0.030, stronger by deck).
+
+`arm_contrast.py` now reports deck count, deck-clustered p and design
+effect, flagging any contrast above 1.3. Future 3p arms spread over 15
+seeds rather than 5. Registered: a 15-deck confirmation of the placement
+adoption.

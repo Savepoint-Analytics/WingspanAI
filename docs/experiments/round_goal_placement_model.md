@@ -141,6 +141,12 @@ should do when second place pays: it declines contests it would lose
 on something certain. The heuristic, which ignores second place entirely,
 cannot make that call.
 
+**Deck caveat (2026-09-22).** The 3p round robin runs 18 games on each of
+five decks, so its naive p overstates: read by deck, +1.12 is p=0.282 (the
+point estimate is unchanged). See the ledger's "Decks, not games". The
+adoption below was made on the point-estimate bar, which still holds; the
+confirmation on a 15-deck 3p design is registered as the follow-up.
+
 **Decision: adopted**, per the pre-registered rule (≥ +1 at either player
 count). The evidence is weak and the record should say so: +1.12 at
 p=0.128 against a ~2-point detection limit, +0.41 at 2p, combined +0.79

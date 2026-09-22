@@ -99,6 +99,45 @@ opponent model 3%, 5.2 s mean decision. After: 53% / 33%, 2.6 s. Latency by
 round in the archive: 1.8 → 5.9 → 10.5 → 15.7 s mean; a production budget
 has to be per decision.
 
+## Decks, not games (2026-09-22)
+
+A seed is a **deck**: every game on it shares the shuffle, the round goals
+and the opening hands. Games on one deck are not independent units. What
+the archive's designs actually sample:
+
+| design | decks | games a deck | ICC of paired deltas | design effect |
+|---|---:|---:|---:|---:|
+| 2p round robin (seeds 1–10 × 4 lineups × 2 rotations) | 10 | 8 | −0.02 | 0.86 |
+| **3p round robin (seeds 1–5 × 6 lineups × 3 rotations)** | **5** | **18** | +0.06…+0.08 | **≈2.0** |
+| 2p mirror (seeds 1–40 × 2 rotations) | 40 | 2 | −0.15 | 0.85 |
+| 3p mirror (seeds 1–30 × 3 rotations) | 30 | 3 | −0.15 | 0.69 |
+
+Pairing removes the deck from the delta, so in three of the four designs
+the per-game test is sound or conservative — the deltas do not cluster.
+The exception is the **three-player round robin**: 18 games on each of 5
+decks, and even a small positive ICC at that cluster size roughly doubles
+the variance. Its p-values are overstated by about √2:
+
+| 3p row | naive p | deck-clustered p |
+|---|---:|---:|
+| greedy opponent model +2.12 | 0.073 | 0.239 |
+| placement goal model +1.12 | 0.128 | 0.282 |
+| oracle-type +1.36 | 0.18 | ~0.35 |
+| `belief_apply` −0.48 | 0.21 | ~0.4 |
+
+No conclusion reverses: the point estimates are unchanged, and the one
+that mattered — the greedy opponent model at 3p — was **replicated on a
+properly decked design** (the 3p mirror, 30 decks: +1.89, deck-clustered
+p=0.030, *stronger* read by deck). The placement adoption was made on a
+pre-registered point-estimate bar, which it still meets; its evidence is
+weaker than the naive p suggested and the registry says so.
+
+`arm_contrast.py` now prints the deck count, the deck-clustered p and the
+design effect, and flags any contrast whose design effect exceeds 1.3.
+**Future three-player arms should spread over more seeds** (15 seeds × 2
+opponent pairs × 3 rotations = 90 games on 15 decks) rather than more
+lineups on five.
+
 ## Reading a row fairly
 
 Two conditions, both learned the hard way. **Pair by seed** (2026-09-01,
