@@ -83,6 +83,41 @@ the heuristic could not express.
   bearing — that the flat term's over-valuation of early goals was
   accidentally correct — and the honest record is a drop with the reason.
 
+### Result at two players (2026-09-22)
+
+`artifacts/rr_goal_placement` vs `rr_belief_opp`, 80 paired games at
+`1b380e7`: **+0.41 (p=0.69)**, win 0.875 → 0.912 (+0.037, p=0.41), 8
+identical games. Inside the registered 0 to +2 band, under the +1
+adoption bar: not adopted at 2p.
+
+The interesting part is the decomposition, because the arm did exactly
+what it was built to do and the points did not follow:
+
+| category | heuristic | placement | Δ | p |
+|---|---:|---:|---:|---:|
+| round goals | 15.62 | 16.46 | **+0.84** | **0.011** |
+| birds | 35.54 | 34.79 | −0.75 | 0.26 |
+| bonus | 5.58 | 5.16 | −0.41 | 0.36 |
+| eggs / cache / tuck | 21.67 | 22.41 | +0.74 | — |
+| **total** | **78.41** | **78.83** | **+0.41** | 0.69 |
+
+Goal win share rose 0.656 → 0.700 and goal points a round 3.91 → 4.12
+(`round_goal_report.py --by-agent`). So the model wins the goals it aims
+at, significantly — and pays for them with birds not played and bonus
+progress not made, netting about zero.
+
+**Reading.** At two players a round goal is worth 3 points of placement
+swing and an action is worth about 3, so the trade is close to fair by
+construction; the old heuristic was structurally wrong (no scale, no
+opponent turns, no ties) but *aggregately* well calibrated at 2p — it
+over-valued early goals by about as much as it under-valued late ones.
+This is the first arm in the project where a term did what it claimed and
+the claim turned out to be worth nothing, which is a different and more
+useful null than the synergy and denial losses.
+
+The 3p arm is the real test: second place pays there (5/2/1, 6/3/2,
+7/4/3), so the marginal action buys placement the 2p game cannot.
+
 ## 3. Four-goal opener (registered arm, expected null)
 
 All four goals are public at setup; the opener read round 1's alone.

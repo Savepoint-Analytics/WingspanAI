@@ -115,6 +115,14 @@ Three findings:
    always "is this within one action", which is exactly the question the
    old heuristic could not answer.
 
+**Goals are priced fairly at two players.** Replacing the goal heuristic
+with a measured placement model (2026-09-22) raised the champion's goal
+points by +0.84 (p=0.011) and its goal win share from 0.656 to 0.700 — and
+its total score by +0.41 (n.s.), because the birds not played cost −0.75.
+A goal swing is 3 points and an action is worth about 3, so chasing pays
+only when it is nearly free. Whether three players change that (second
+place pays) is in test.
+
 ## 5. Openings and card choices
 
 | Claim | Evidence | Design | Status |
