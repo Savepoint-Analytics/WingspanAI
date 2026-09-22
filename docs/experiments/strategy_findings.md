@@ -84,6 +84,37 @@ plays a bird roughly every third action and fills the board with eggs in
 the last round. Whether a specialist could beat that plan is exactly what
 the roster cannot tell us (§8).
 
+### Round goals in strong play (2026-09-22, 160 mirror games)
+
+`analysis/round_goal_report.py` over the two clean 2p mirror baselines
+(A1 + A4, equal agents in both seats):
+
+| round | pays 1st/2nd | seat 1 wins | seat 2 wins | tie | nobody | margin ≤1 | seat-1 goal pts | seat-2 |
+|---:|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 4/1 | **0.581** | 0.156 | 0.125 | 0.138 | 0.44 | 2.59 | 1.08 |
+| 2 | 5/2 | 0.344 | **0.456** | 0.150 | 0.050 | 0.61 | 2.79 | 3.11 |
+| 3 | 6/3 | 0.419 | 0.419 | 0.156 | 0.006 | 0.55 | 4.11 | 3.92 |
+| 4 | 7/4 | **0.525** | 0.319 | 0.156 | 0.000 | 0.53 | 5.53 | 4.71 |
+
+Three findings:
+
+1. **The round-1 goal is the first player's.** Seat 1 takes it outright in
+   58% of games against seat 2's 16%, worth **+1.51 goal points
+   (p<0.0001)** — a quarter of the whole +6.16 first-player advantage, and
+   goals across all four rounds account for +2.21 of it. The extra first
+   action buys the first bird, and in round 1 (which pays 4/1 and where 14%
+   of games see *nobody* qualify) one bird is usually the goal.
+2. **The advantage follows the first-player token, then fades.** In round 2
+   the token has passed and seat 2 wins the goal 0.456 to 0.344; by round 3
+   it is even. Tempo decides the early goals; accumulated board decides the
+   late ones (seat 1 retakes round 4 despite going second in it).
+3. **Goals are decided at the margin.** 44–61% of decided rounds come down
+   to one item or a tie, and ties (13–16%, split rounded down) cost the
+   leader two points. A goal is worth 3 points of placement swing every
+   round while an action is worth about 3 — so the decision is nearly
+   always "is this within one action", which is exactly the question the
+   old heuristic could not answer.
+
 ## 5. Openings and card choices
 
 | Claim | Evidence | Design | Status |

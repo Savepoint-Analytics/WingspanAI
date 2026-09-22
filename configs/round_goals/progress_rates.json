@@ -1,0 +1,264 @@
+{
+  "version": "round_goal_progress_v1",
+  "generated_at": "2026-09-22T14:49:30+00:00",
+  "observations": 46020,
+  "pooled_rate_per_turn": 0.1966,
+  "goals": {
+    "[bird] in [forest]": {
+      "observations": 1678,
+      "rate_per_turn": 0.1198,
+      "measured_rate": 0.1198,
+      "mean_gain_by_turns_left": {
+        "1": 0.09,
+        "2": 0.29,
+        "3": 0.359,
+        "4": 0.472,
+        "5": 0.556,
+        "6": 0.724,
+        "7": 1.125,
+        "8": 0.667
+      },
+      "pooled_fallback": false
+    },
+    "[bird] in [grassland]": {
+      "observations": 5024,
+      "rate_per_turn": 0.0885,
+      "measured_rate": 0.0885,
+      "mean_gain_by_turns_left": {
+        "1": 0.102,
+        "2": 0.19,
+        "3": 0.283,
+        "4": 0.404,
+        "5": 0.457,
+        "6": 0.472,
+        "7": 0.517,
+        "8": 0.613
+      },
+      "pooled_fallback": false
+    },
+    "[bird] in [wetland]": {
+      "observations": 2090,
+      "rate_per_turn": 0.0987,
+      "measured_rate": 0.0987,
+      "mean_gain_by_turns_left": {
+        "1": 0.074,
+        "2": 0.208,
+        "3": 0.338,
+        "4": 0.421,
+        "5": 0.471,
+        "6": 0.537,
+        "7": 0.5,
+        "8": 0.933
+      },
+      "pooled_fallback": false
+    },
+    "[bowl] [bird] with [egg]": {
+      "observations": 1496,
+      "rate_per_turn": 0.0925,
+      "measured_rate": 0.0925,
+      "mean_gain_by_turns_left": {
+        "1": 0.09,
+        "2": 0.16,
+        "3": 0.262,
+        "4": 0.414,
+        "5": 0.451,
+        "6": 0.415,
+        "7": 0.478,
+        "8": 0.75
+      },
+      "pooled_fallback": false
+    },
+    "[cavity] [bird] with [egg]": {
+      "observations": 2544,
+      "rate_per_turn": 0.0896,
+      "measured_rate": 0.0896,
+      "mean_gain_by_turns_left": {
+        "1": 0.086,
+        "2": 0.221,
+        "3": 0.271,
+        "4": 0.32,
+        "5": 0.444,
+        "6": 0.5,
+        "7": 0.55,
+        "8": 0.716
+      },
+      "pooled_fallback": false
+    },
+    "[egg] in [bowl]": {
+      "observations": 3586,
+      "rate_per_turn": 0.2206,
+      "measured_rate": 0.2206,
+      "mean_gain_by_turns_left": {
+        "1": 0.204,
+        "2": 0.446,
+        "3": 0.609,
+        "4": 0.643,
+        "5": 0.754,
+        "6": 0.767,
+        "7": 1.79,
+        "8": 1.833
+      },
+      "pooled_fallback": false
+    },
+    "[egg] in [cavity]": {
+      "observations": 3934,
+      "rate_per_turn": 0.2306,
+      "measured_rate": 0.2306,
+      "mean_gain_by_turns_left": {
+        "1": 0.304,
+        "2": 0.466,
+        "3": 0.668,
+        "4": 0.894,
+        "5": 0.9,
+        "6": 0.923,
+        "7": 0.91,
+        "8": 1.218
+      },
+      "pooled_fallback": false
+    },
+    "[egg] in [forest]": {
+      "observations": 4652,
+      "rate_per_turn": 0.2717,
+      "measured_rate": 0.2717,
+      "mean_gain_by_turns_left": {
+        "1": 0.349,
+        "2": 0.637,
+        "3": 0.903,
+        "4": 1.116,
+        "5": 1.102,
+        "6": 0.8,
+        "7": 0.839,
+        "8": 1.65
+      },
+      "pooled_fallback": false
+    },
+    "[egg] in [grassland]": {
+      "observations": 2332,
+      "rate_per_turn": 0.2705,
+      "measured_rate": 0.2705,
+      "mean_gain_by_turns_left": {
+        "1": 0.173,
+        "2": 0.47,
+        "3": 0.604,
+        "4": 0.914,
+        "5": 0.995,
+        "6": 0.873,
+        "7": 1.375,
+        "8": 1.533
+      },
+      "pooled_fallback": false
+    },
+    "[egg] in [ground]": {
+      "observations": 4202,
+      "rate_per_turn": 0.2668,
+      "measured_rate": 0.2668,
+      "mean_gain_by_turns_left": {
+        "1": 0.281,
+        "2": 0.53,
+        "3": 0.634,
+        "4": 0.711,
+        "5": 0.835,
+        "6": 0.922,
+        "7": 1.918,
+        "8": 2.586
+      },
+      "pooled_fallback": false
+    },
+    "[egg] in [platform]": {
+      "observations": 2932,
+      "rate_per_turn": 0.3488,
+      "measured_rate": 0.3488,
+      "mean_gain_by_turns_left": {
+        "1": 0.355,
+        "2": 0.887,
+        "3": 0.989,
+        "4": 1.201,
+        "5": 1.316,
+        "6": 1.936,
+        "7": 2.659,
+        "8": 2.198
+      },
+      "pooled_fallback": false
+    },
+    "[egg] in [wetland]": {
+      "observations": 1142,
+      "rate_per_turn": 0.1918,
+      "measured_rate": 0.1918,
+      "mean_gain_by_turns_left": {
+        "1": 0.244,
+        "2": 0.429,
+        "3": 0.44,
+        "4": 0.482,
+        "5": 0.69,
+        "6": 0.75,
+        "7": 1.345,
+        "8": 1.179
+      },
+      "pooled_fallback": false
+    },
+    "[ground] [bird] with [egg]": {
+      "observations": 2264,
+      "rate_per_turn": 0.0821,
+      "measured_rate": 0.0821,
+      "mean_gain_by_turns_left": {
+        "1": 0.158,
+        "2": 0.243,
+        "3": 0.302,
+        "4": 0.345,
+        "5": 0.353,
+        "6": 0.272,
+        "7": 0.258,
+        "8": 1
+      },
+      "pooled_fallback": false
+    },
+    "[platform] [bird] with [egg]": {
+      "observations": 2368,
+      "rate_per_turn": 0.0783,
+      "measured_rate": 0.0783,
+      "mean_gain_by_turns_left": {
+        "1": 0.085,
+        "2": 0.192,
+        "3": 0.249,
+        "4": 0.319,
+        "5": 0.339,
+        "6": 0.333,
+        "7": 0.422,
+        "8": 0.312
+      },
+      "pooled_fallback": false
+    },
+    "sets of [egg][egg][egg] in [wetland][grassland][forest]": {
+      "observations": 2124,
+      "rate_per_turn": 0.2906,
+      "measured_rate": 0.2906,
+      "mean_gain_by_turns_left": {
+        "1": 0.497,
+        "2": 0.738,
+        "3": 0.92,
+        "4": 1.088,
+        "5": 1.091,
+        "6": 1.115,
+        "7": 1.208,
+        "8": 1.167
+      },
+      "pooled_fallback": false
+    },
+    "total [bird]": {
+      "observations": 1612,
+      "rate_per_turn": 0.3131,
+      "measured_rate": 0.3131,
+      "mean_gain_by_turns_left": {
+        "1": 0.368,
+        "2": 0.75,
+        "3": 0.985,
+        "4": 1.426,
+        "5": 1.581,
+        "6": 1.619,
+        "7": 1.554,
+        "8": 2
+      },
+      "pooled_fallback": false
+    }
+  }
+}

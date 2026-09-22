@@ -16,6 +16,7 @@ from wingspan_ai.content.loader import BASE_FOOD_TYPES
 from wingspan_ai.content.schemas import BirdCard, BonusCard, FoodType, Habitat, PowerColor
 from wingspan_ai.rules.base_game import (
     BIRD_FOOD_SELECTION_TOTAL,
+    ROUND_GOAL_GREEN_SCORES,
     InitialSelection,
     choose_default_initial_selection,
     ordered_habitats,
@@ -112,6 +113,18 @@ DEFAULT_OPENING_FOOD_VALUE = 2.5
 #: Share of a bird's play value the measured opener credits when the starting
 #: food cannot pay its cost (it must first be earned with an action).
 DEFAULT_UNAFFORDABLE_DISCOUNT = 0.5
+#: How many of the four end-of-round goals the opener scores kept birds
+#: against. All four are public from setup, but only round 1's was ever
+#: read. ``"all"`` weights round ``r`` by ``GOAL_HORIZON_DISCOUNT ** (r - 1)``:
+#: a later goal is worth more when scored (4/1 → 7/4/3) but is further away
+#: and more likely to be reached by other means. Registered 2026-09-22 as a
+#: null (±1), on the opener precedent: three previous opener variants all
+#: landed within 2 points.
+SETUP_GOAL_HORIZONS = ("first", "all")
+DEFAULT_SETUP_GOAL_HORIZON = "first"
+#: Per-round discount for the later goals, and the round's own placement
+#: scale relative to round 1's (5/4, 6/4, 7/4) — the product is the weight.
+GOAL_HORIZON_DISCOUNT = 0.55
 
 _SETUP_POLICY_IDS = {
     ("tag_overlap", "heuristic"): "potential_points_setup_v1",
@@ -119,6 +132,9 @@ _SETUP_POLICY_IDS = {
     ("expected_points", "measured"): "potential_points_setup_v3",
     ("tag_overlap", "measured"): "potential_points_setup_v3_tag",
 }
+#: Appended to the policy id when the opener reads all four goals, so a
+#: manifest and a holdout can name the variant.
+_ALL_GOALS_SUFFIX = "_allgoals"
 _KEEP_SUFFIX = re.compile(r"^(?P<base>.+?)_keep(?P<count>\d+)$")
 
 
@@ -127,30 +143,40 @@ def potential_points_setup_policy(policy_id: str) -> PotentialPointsSetupPolicy:
 
     ``potential_points_setup_v3_keep3`` is the measured opener at the plain
     opener's keep structure; a bare ``..._v3`` lets the keep count float
-    against the food price.
+    against the food price. An ``_allgoals`` segment reads all four
+    end-of-round goals instead of round 1's alone.
     """
 
-    base_id, target_keep_count = policy_id, None
-    match = _KEEP_SUFFIX.match(policy_id)
-    if match:
-        base_id, target_keep_count = match["base"], int(match["count"])
+    base_id, target_keep_count, goal_horizon = _parse_setup_policy_id(policy_id)
     for (bonus_scoring, bird_scoring), known in _SETUP_POLICY_IDS.items():
         if known == base_id:
             return PotentialPointsSetupPolicy(
                 bonus_scoring=bonus_scoring,
                 bird_scoring=bird_scoring,
                 target_keep_count=target_keep_count,
+                goal_horizon=goal_horizon,
             )
     raise ValueError(
         f"unknown potential_points setup policy id: {policy_id!r}; expected one of "
-        f"{tuple(_SETUP_POLICY_IDS.values())} with an optional _keepN suffix"
+        f"{tuple(_SETUP_POLICY_IDS.values())} with optional {_ALL_GOALS_SUFFIX} and _keepN suffixes"
     )
 
 
-def is_potential_points_setup_policy_id(policy_id: str) -> bool:
+def _parse_setup_policy_id(policy_id: str) -> tuple[str, int | None, str]:
+    """``<base>[_allgoals][_keepN]`` → (base id, keep count, goal horizon)."""
+
+    base_id, target_keep_count = policy_id, None
     match = _KEEP_SUFFIX.match(policy_id)
-    base_id = match["base"] if match else policy_id
-    return base_id in _SETUP_POLICY_IDS.values()
+    if match:
+        base_id, target_keep_count = match["base"], int(match["count"])
+    goal_horizon = DEFAULT_SETUP_GOAL_HORIZON
+    if base_id.endswith(_ALL_GOALS_SUFFIX):
+        base_id, goal_horizon = base_id[: -len(_ALL_GOALS_SUFFIX)], "all"
+    return base_id, target_keep_count, goal_horizon
+
+
+def is_potential_points_setup_policy_id(policy_id: str) -> bool:
+    return _parse_setup_policy_id(policy_id)[0] in _SETUP_POLICY_IDS.values()
 
 
 @dataclass(frozen=True)
@@ -164,6 +190,8 @@ class PotentialPointsSetupPolicy:
     bird_play_values_path: str | None = None
     opening_food_value: float = DEFAULT_OPENING_FOOD_VALUE
     unaffordable_discount: float = DEFAULT_UNAFFORDABLE_DISCOUNT
+    #: ``"first"`` or ``"all"``; see ``SETUP_GOAL_HORIZONS``.
+    goal_horizon: str = DEFAULT_SETUP_GOAL_HORIZON
 
     def __post_init__(self) -> None:
         if self.bonus_scoring not in BONUS_SCORING_KINDS:
@@ -175,7 +203,14 @@ class PotentialPointsSetupPolicy:
             raise ValueError(
                 f"unknown bird_scoring: {self.bird_scoring!r}; expected one of {BIRD_SCORING_KINDS}"
             )
+        if self.goal_horizon not in SETUP_GOAL_HORIZONS:
+            raise ValueError(
+                f"unknown goal_horizon: {self.goal_horizon!r}; expected one of "
+                f"{SETUP_GOAL_HORIZONS}"
+            )
         policy_id = _SETUP_POLICY_IDS[(self.bonus_scoring, self.bird_scoring)]
+        if self.goal_horizon == "all":
+            policy_id = f"{policy_id}{_ALL_GOALS_SUFFIX}"
         if self.target_keep_count is not None:
             policy_id = f"{policy_id}_keep{self.target_keep_count}"
         object.__setattr__(self, "policy_id", policy_id)
@@ -195,12 +230,17 @@ class PotentialPointsSetupPolicy:
                     values,
                     food_value=self.opening_food_value,
                     unaffordable_discount=self.unaffordable_discount,
-                )
+                ) + _round_goal_setup_score(cards, setup_context, self.goal_horizon)
         else:
 
             def selection_scorer(cards, food, bonus_card, setup_context):
                 return _selection_score(
-                    cards, food, bonus_card, setup_context, card_scorer=_potential_card_score
+                    cards,
+                    food,
+                    bonus_card,
+                    setup_context,
+                    card_scorer=_potential_card_score,
+                    goal_horizon=self.goal_horizon,
                 )
 
         return _best_selection(
@@ -379,6 +419,7 @@ def _selection_score(
     context: InitialSelectionContext,
     *,
     card_scorer,
+    goal_horizon: str = DEFAULT_SETUP_GOAL_HORIZON,
 ) -> float:
     selected = tuple(cards)
     score = sum(card_scorer(card, selected, bonus_card, context) for card in cards)
@@ -386,7 +427,7 @@ def _selection_score(
     score += _habitat_balance_score(cards)
     score += _opening_playability_score(cards, food) * 2.5
     score += _bonus_alignment_score(bonus_card, cards) * 1.8
-    score += _round_goal_setup_score(cards, context)
+    score += _round_goal_setup_score(cards, context, goal_horizon)
     score -= max(len(cards) - 3, 0) * 0.45
     score -= max(2 - len(cards), 0) * 0.35
     return score
@@ -617,21 +658,42 @@ def _habitat_balance_score(cards: tuple[BirdCard, ...]) -> float:
 def _round_goal_setup_score(
     cards: tuple[BirdCard, ...],
     context: InitialSelectionContext,
+    goal_horizon: str = DEFAULT_SETUP_GOAL_HORIZON,
 ) -> float:
+    """Alignment of kept birds with the end-of-round goals.
+
+    All four goals are public at setup, but until 2026-09-22 only round 1's
+    was read. ``goal_horizon="all"`` adds the later goals at a discount that
+    trades their higher placement scale (4/1 → 7/4/3) against the chance
+    they are reached anyway.
+    """
+
     if not context.round_goal_names:
         return 0.0
-    first_goal = context.round_goal_names[0].lower()
+    goals = context.round_goal_names if goal_horizon == "all" else context.round_goal_names[:1]
+    score = 0.0
+    for index, goal_name in enumerate(goals):
+        weight = 1.0
+        if index:
+            scale = ROUND_GOAL_GREEN_SCORES.get(index + 1, ROUND_GOAL_GREEN_SCORES[4])
+            base = ROUND_GOAL_GREEN_SCORES[1][0]
+            weight = (GOAL_HORIZON_DISCOUNT**index) * (scale[0] / base)
+        score += weight * _single_goal_setup_score(cards, goal_name.lower())
+    return score
+
+
+def _single_goal_setup_score(cards: tuple[BirdCard, ...], goal: str) -> float:
     score = 0.0
     for card in cards:
-        if "[bird]" in first_goal:
+        if "[bird]" in goal:
             for habitat in ordered_habitats(card.habitats):
-                if habitat.value in first_goal:
+                if habitat.value in goal:
                     score += 1.2
-            if all(habitat.value not in first_goal for habitat in card.habitats):
+            if all(habitat.value not in goal for habitat in card.habitats):
                 score += 0.25
-        if card.nest_type and card.nest_type.value in first_goal:
+        if card.nest_type and card.nest_type.value in goal:
             score += 0.8
-        if "[egg]" in first_goal:
+        if "[egg]" in goal:
             score += min(card.egg_limit, 4) * 0.15
     return score
 

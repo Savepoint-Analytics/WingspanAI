@@ -16,6 +16,8 @@ from wingspan_ai.agents.setup import InitialSelectionContext
 from wingspan_ai.content.schemas import ContentCatalog, Habitat
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import (
+    ROUND_GOAL_GREEN_SCORES,
+    _count_round_goal_items,
     apply_action,
     apply_initial_selection_choice,
     choose_default_initial_selection,
@@ -233,7 +235,15 @@ def run_single_game(
         )
         _notify_agents_of_action(agents, action_state, action, active_player.player_id)
 
-        if state.round_state.round_number != previous_round and not state.round_state.game_over:
+        round_ended = (
+            state.round_state.round_number != previous_round or state.round_state.game_over
+        )
+        if round_ended:
+            # Keyed on the transition that ended the round, so the last
+            # round's goal is recorded too (the game-over branch of
+            # ``_advance_turn`` never reaches a new round number).
+            _emit_round_goal_scored(sink, action_state, state, resolved_run_id, previous_round)
+        if round_ended and not state.round_state.game_over:
             _emit_round_started(sink, state, resolved_run_id)
             current_round = state.round_state.round_number
 
@@ -418,6 +428,67 @@ def _emit_setup_selection_applied(
             public_state_ref=_public_state_ref(state),
             private_state_included=True,
             payload=payload,
+        )
+    )
+
+
+def _emit_round_goal_scored(
+    sink: InMemoryEventSink,
+    before: GameState,
+    after: GameState,
+    simulation_run_id: str,
+    round_number: int,
+) -> None:
+    """Record one round's competitive goal: counts, placement points, margin.
+
+    Emitted from the transition that ended the round, so ``after`` is the
+    state the goal was scored on (teal powers resolve first, the tray
+    refresh does not touch boards, so the counts here are the counts at
+    scoring time). Points are the per-player delta in ``round_goal_points``,
+    which is what ``score_round_goal_competitive`` just awarded.
+
+    The taxonomy has promised this event since 2026-05; until 2026-09-22 the
+    only way to read a goal outcome was to replay the game
+    (``docs/events/simulation_event_taxonomy.md``).
+    """
+
+    goal_index = round_number - 1
+    if goal_index < 0 or goal_index >= len(after.round_goals):
+        return
+    goal = after.round_goals[goal_index]
+    counts = {
+        player.player_id: _count_round_goal_items(goal.name.lower(), player)
+        for player in after.players
+    }
+    points = {
+        player.player_id: player.round_goal_points
+        - next(p.round_goal_points for p in before.players if p.player_id == player.player_id)
+        for player in after.players
+    }
+    ranked = sorted(counts.values(), reverse=True)
+    top = ranked[0] if ranked else 0
+    # Margin over the next *player*, so a tie for first is 0 — the quantity
+    # "how many more items would second place have needed".
+    runner_up = ranked[1] if len(ranked) > 1 else 0
+    winners = [player_id for player_id, count in counts.items() if count == top and count > 0]
+    sink.emit(
+        _base_event(
+            EventName.ROUND_GOAL_SCORED,
+            after,
+            simulation_run_id,
+            goal_round=round_number,
+            goal_name=goal.name,
+            counts=counts,
+            points_awarded=points,
+            agent_ids={player.player_id: player.agent_id for player in after.players},
+            # Placement scale for this round (4/1, 5/2/1, 6/3/2, 7/4/3): what
+            # first place was worth over second, and what the margin was.
+            placement_scores=list(ROUND_GOAL_GREEN_SCORES.get(round_number, ())),
+            top_count=top,
+            margin=top - runner_up,
+            winner_player_ids=sorted(winners),
+            contested=len(winners) > 1,
+            nobody_qualified=top == 0,
         )
     )
 

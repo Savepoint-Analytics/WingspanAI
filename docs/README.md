@@ -27,6 +27,8 @@ Analysis layer:
 - `analysis/bird_play_values.py`: writes the per-bird K=4 play-value table the measured opener reads (`configs/bird_values/`).
 - `flows/human_vs_agent.py`: play one archived, replay-validated game from the terminal against the production agent (human-trace study H1–H3).
 - `analysis/game_viewer.py`: step through an archived game decision by decision from one seat's point of view — board, private hand, legal actions, the search's own ranking, the choice and its effect (`experiments/game_viewer.md`).
+- `analysis/round_goal_report.py`: per-round goal outcomes (winner, margin, ties, points) from `round_goal_scored` events, falling back to replay for older roots.
+- `analysis/fit_round_goal_progress.py`: measures items gained per remaining turn per goal, the placement model's one empirical input (`configs/round_goals/`).
 - `analysis/base_game_bit_identity.py`: the base-game guard — replays an archived `rr_belief_opp` cell with the current code and diffs the action sequences; run after any engine, loader or flow change.
 - `analysis/mirror_seat_effect.py`: turn-order effect in mirror matches, pooled across roots with one observation per seed (rotations of a seed are the same game; averaging them cancels a study-seat config).
 - `analysis/launch_arm.py`: launches a paired arm the standard way (clean worktree at a commit, lineup runners, `--after` queueing) and writes `artifacts/<root>/launch/arm.json` as the record; `--mirror` runs self-play with an optional `--study-search` on lineup position 1. Not reboot-safe: after a reboot, delete the partial artifacts and relaunch.
@@ -70,6 +72,7 @@ Key rules docs:
 - `experiments/round_robin_v5_feeder_odds.md`: corrected dice, and the feeder-odds ablation (null).
 - `experiments/search_food_candidates.md`: bounding gain-food continuations in the search — a third off the decision-time tail for about 1 point.
 - `experiments/feeder_odds_search_rerun.md`: the feeder-odds ablation re-run on the searching agent (still null, +0.49).
+- `experiments/round_goal_placement_model.md`: what the archive says about round goals (the round-1 goal is the first player's, +1.51), the placement model that replaces the reachability heuristic, and the four-goal opener.
 - `experiments/strategy_findings.md`: what the archive says about the game — dominance, hidden information, horizon, the champion's profile, openings, opponent and seat — one table per question with the design and detection limit behind each row, and what it cannot yet say.
 - `experiments/self_play_opponent_plan.md`: registered design for mirror-match (self-play) and human-trace opponents — the test of whether "the opponent barely matters" is a property of the game or of the scripted roster.
 - `experiments/search_opponent_model_test.md`: the Bayesian opponent posterior plays the opponent seats inside the search — decision cost more than halved, score null (+0.31), and the posterior tracks action mix rather than opponent type.

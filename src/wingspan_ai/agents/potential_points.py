@@ -44,6 +44,7 @@ from wingspan_ai.content.schemas import BirdCard, FoodCost, FoodType, Habitat, P
 from wingspan_ai.rules.actions import ActionType, LegalAction, render_action
 from wingspan_ai.rules.base_game import (
     BASE_ACTION_CUBES_BY_ROUND,
+    ROUND_GOAL_GREEN_SCORES,
     TOTAL_ROUNDS,
     apply_action,
     apply_action_in_place,
@@ -181,6 +182,15 @@ DEFAULT_SEARCH_BELIEF_PROFILES = "hand_set"
 #: roster denial was worth −0.01 (2026-09-02, pre-search agent); against a
 #: planning opponent the prediction is +1 to +3.
 DEFAULT_SEARCH_DENIAL_WEIGHT = 0.0
+#: How the current round's end-of-round goal is valued. ``"heuristic"`` is the
+#: historic reachability rule (a gap in items, 0.6 a turn, no placement
+#: table). ``"placement"`` is the expected placement points from
+#: ``agents/round_goal_model.py``: each player's final count as a Poisson
+#: draw at the measured per-turn rate, ranked, scored on the round's real
+#: green-side scale with ties split rounded down. Registered 2026-09-22 at
+#: 0 to +2 at 2p (more at 3p, where second place pays).
+ROUND_GOAL_MODELS = ("heuristic", "placement")
+DEFAULT_ROUND_GOAL_MODEL = "heuristic"
 #: Beam pre-ranking (2026-09-18). Below the root the search expands every
 #: candidate action, evaluates every child and keeps the ``beam_width`` best;
 #: 13 of ~17 expansions and all 17 evaluations at a beamed ply rank children
@@ -274,6 +284,8 @@ class PotentialPointsSearchConfig:
     search_belief_profiles: str = DEFAULT_SEARCH_BELIEF_PROFILES
     #: Root-level denial term weight; see ``DEFAULT_SEARCH_DENIAL_WEIGHT``.
     search_denial_weight: float = DEFAULT_SEARCH_DENIAL_WEIGHT
+    #: ``"heuristic"`` or ``"placement"``; see ``ROUND_GOAL_MODELS``.
+    round_goal_model: str = DEFAULT_ROUND_GOAL_MODEL
     #: Share of games that keep ``search_opponent_holdout_model`` instead, as a
     #: standing control. ``0`` disables the holdout.
     search_opponent_holdout_share: float = DEFAULT_SEARCH_OPPONENT_HOLDOUT_SHARE
@@ -305,6 +317,7 @@ class PotentialPointsSearchConfig:
         "search_opponent_model",
         "search_belief_profiles",
         "search_denial_weight",
+        "round_goal_model",
         "mechanic_synergy",
         "mechanic_synergy_hand",
         "mechanic_synergy_weight",
@@ -393,6 +406,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
     search_belief_profiles: str = DEFAULT_SEARCH_BELIEF_PROFILES
     #: Root-level denial term weight; see ``DEFAULT_SEARCH_DENIAL_WEIGHT``.
     search_denial_weight: float = DEFAULT_SEARCH_DENIAL_WEIGHT
+    #: ``"heuristic"`` or ``"placement"``; see ``ROUND_GOAL_MODELS``.
+    round_goal_model: str = DEFAULT_ROUND_GOAL_MODEL
     #: Engine-potential term; see ``DEFAULT_MECHANIC_SYNERGY``.
     mechanic_synergy: bool = DEFAULT_MECHANIC_SYNERGY
     mechanic_synergy_hand: bool = DEFAULT_MECHANIC_SYNERGY_HAND
@@ -453,6 +468,11 @@ class PotentialPointsAgent(SetupPolicyMixin):
             raise ValueError("search_leaf_candidates must be at least 1 or None")
         if self.search_denial_weight < 0:
             raise ValueError("search_denial_weight must be non-negative")
+        if self.round_goal_model not in ROUND_GOAL_MODELS:
+            raise ValueError(
+                f"unknown round_goal_model: {self.round_goal_model!r}; "
+                f"expected one of {ROUND_GOAL_MODELS}"
+            )
         if self.search_belief_profiles not in SEARCH_BELIEF_PROFILE_SETS:
             raise ValueError(
                 f"unknown search_belief_profiles: {self.search_belief_profiles!r}; "
@@ -698,6 +718,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
                         food_candidates=self.search_food_candidates,
                         opponent_model=self._opponent_model,
                         synergy=self._synergy,
+                        goal_model=self.round_goal_model,
                         fast=self.search_child_expansion == "fast",
                         prerank=self.search_prerank,
                         leaf_candidates=self.search_leaf_candidates,
@@ -757,7 +778,11 @@ class PotentialPointsAgent(SetupPolicyMixin):
     ) -> list[ActionPotentialEvaluation]:
         player_id = state.active_player.player_id
         before = evaluate_state_potential(
-            state, player_id, self.planning_horizon, synergy=self._synergy
+            state,
+            player_id,
+            self.planning_horizon,
+            synergy=self._synergy,
+            goal_model=self.round_goal_model,
         )
         evaluations: list[ActionPotentialEvaluation] = []
         fast = self.search_child_expansion == "fast"
@@ -766,7 +791,11 @@ class PotentialPointsAgent(SetupPolicyMixin):
                 next_state = apply_action(state, action, trusted=fast, lean=fast)
             with profiling.node("state_potential"):
                 after = evaluate_state_potential(
-                    next_state, player_id, self.planning_horizon, synergy=self._synergy
+                    next_state,
+                    player_id,
+                    self.planning_horizon,
+                    synergy=self._synergy,
+                    goal_model=self.round_goal_model,
                 )
             evaluations.append(
                 ActionPotentialEvaluation(
@@ -834,6 +863,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
             "search_opponent_model": self.search_opponent_model,
             "search_belief_profiles": self.search_belief_profiles,
             "search_denial_weight": self.search_denial_weight,
+            "round_goal_model": self.round_goal_model,
             "opponent_model": self._opponent_model.telemetry_payload(),
             "mechanic_synergy": self.mechanic_synergy,
             "mechanic_synergy_table": self._synergy.version if self._synergy else None,
@@ -859,6 +889,7 @@ def evaluate_state_potential(
     horizon: str = DEFAULT_PLANNING_HORIZON,
     *,
     synergy: MechanicSynergyTable | None = None,
+    goal_model: str = DEFAULT_ROUND_GOAL_MODEL,
 ) -> PotentialValueBreakdown:
     """Estimate current final-score potential for one player."""
 
@@ -893,7 +924,7 @@ def evaluate_state_potential(
         habitat_yield_potential=_habitat_yield_potential(state, player, turns_remaining)
         * phase_discount,
         bonus_card_potential=_bonus_card_potential(player, turns_remaining) * phase_discount,
-        round_goal_potential=_round_goal_potential(state, player, turns_remaining),
+        round_goal_potential=_round_goal_potential(state, player, turns_remaining, goal_model),
         endgame_conversion_potential=_endgame_conversion_potential(player, turns_remaining),
         dead_resource_penalty=_dead_resource_penalty(player, turns_remaining),
         mechanic_synergy_potential=(
@@ -920,6 +951,7 @@ def _search_action_value(
     food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
     opponent_model: SearchOpponentModel | None = None,
     synergy: MechanicSynergyTable | None = None,
+    goal_model: str = DEFAULT_ROUND_GOAL_MODEL,
     fast: bool = True,
     prerank: str = DEFAULT_SEARCH_PRERANK,
     leaf_candidates: int | None = DEFAULT_SEARCH_LEAF_CANDIDATES,
@@ -945,6 +977,7 @@ def _search_action_value(
         food_candidates=food_candidates,
         opponent_model=opponent_model,
         synergy=synergy,
+        goal_model=goal_model,
         fast=fast,
         prerank=prerank,
         leaf_candidates=leaf_candidates,
@@ -960,6 +993,7 @@ def _search_value_from_branch(
     food_candidates: int | None = DEFAULT_SEARCH_FOOD_CANDIDATES,
     opponent_model: SearchOpponentModel | None = None,
     synergy: MechanicSynergyTable | None = None,
+    goal_model: str = DEFAULT_ROUND_GOAL_MODEL,
     fast: bool = True,
     prerank: str = DEFAULT_SEARCH_PRERANK,
     leaf_candidates: int | None = DEFAULT_SEARCH_LEAF_CANDIDATES,
@@ -967,7 +1001,7 @@ def _search_value_from_branch(
     if opponent_model is None:
         opponent_model = _default_search_opponent_model()
     if depth <= 1 or branch.round_state.game_over:
-        return _terminal_planning_value(branch, player_id, horizon, synergy)
+        return _terminal_planning_value(branch, player_id, horizon, synergy, goal_model)
     _play_opponent_turns_in_place(branch, player_id, opponent_model, fast=fast)
     player = _get_player(branch, player_id)
     if (
@@ -975,13 +1009,13 @@ def _search_value_from_branch(
         or branch.active_player.player_id != player_id
         or player.action_cubes_available <= 0
     ):
-        return _terminal_planning_value(branch, player_id, horizon, synergy)
+        return _terminal_planning_value(branch, player_id, horizon, synergy, goal_model)
     with profiling.node("branch_legal_actions"):
         all_legal = legal_actions_for_current_player(branch)
     with profiling.node("food_candidate_prune"):
         legal_actions = _search_candidate_actions(branch, player, all_legal, food_candidates)
     if not legal_actions:
-        return _terminal_planning_value(branch, player_id, horizon, synergy)
+        return _terminal_planning_value(branch, player_id, horizon, synergy, goal_model)
 
     at_leaf = depth - 1 <= 1
     # Pre-ranking: cut the candidate list by a cheap score before anything is
@@ -1007,11 +1041,13 @@ def _search_value_from_branch(
         ]
     if at_leaf:
         return max(
-            _terminal_planning_value(child, player_id, horizon, synergy) for child in children
+            _terminal_planning_value(child, player_id, horizon, synergy, goal_model)
+            for child in children
         )
     if keep is None:
         leaf_values = [
-            _terminal_planning_value(child, player_id, horizon, synergy) for child in children
+            _terminal_planning_value(child, player_id, horizon, synergy, goal_model)
+            for child in children
         ]
         ranked = sorted(
             zip(leaf_values, children, strict=True), key=lambda item: item[0], reverse=True
@@ -1031,6 +1067,7 @@ def _search_value_from_branch(
             food_candidates=food_candidates,
             opponent_model=opponent_model,
             synergy=synergy,
+            goal_model=goal_model,
             fast=fast,
             prerank=prerank,
             leaf_candidates=leaf_candidates,
@@ -1138,9 +1175,10 @@ def _terminal_planning_value(
     player_id: str,
     horizon: str = DEFAULT_PLANNING_HORIZON,
     synergy: MechanicSynergyTable | None = None,
+    goal_model: str = DEFAULT_ROUND_GOAL_MODEL,
 ) -> float:
     with profiling.node("terminal_value"):
-        return _terminal_planning_value_timed(state, player_id, horizon, synergy)
+        return _terminal_planning_value_timed(state, player_id, horizon, synergy, goal_model)
 
 
 def _terminal_planning_value_timed(
@@ -1148,8 +1186,11 @@ def _terminal_planning_value_timed(
     player_id: str,
     horizon: str,
     synergy: MechanicSynergyTable | None,
+    goal_model: str = DEFAULT_ROUND_GOAL_MODEL,
 ) -> float:
-    potential = evaluate_state_potential(state, player_id, horizon, synergy=synergy)
+    potential = evaluate_state_potential(
+        state, player_id, horizon, synergy=synergy, goal_model=goal_model
+    )
     player = _get_player(state, player_id)
     turns_remaining = _turns_remaining_for_player(state, player_id, horizon)
     if turns_remaining <= 1:
@@ -1565,6 +1606,7 @@ def _round_goal_potential(
     state: GameState,
     player: PlayerState,
     turns_remaining: int,
+    goal_model: str = DEFAULT_ROUND_GOAL_MODEL,
 ) -> float:
     goal_index = state.round_state.round_number - 1
     if goal_index < 0 or goal_index >= len(state.round_goals):
@@ -1576,6 +1618,10 @@ def _round_goal_potential(
     goal = state.round_goals[goal_index]
     goal_name = goal.name.lower()
     current_count = _round_goal_count(goal_name, player)
+    if goal_model == "placement":
+        return _placement_goal_potential(
+            state, player, goal.name, goal_name, current_count, turns_left_in_round
+        )
     opponent_counts = [
         _round_goal_count(goal_name, candidate)
         for candidate in state.players
@@ -1588,6 +1634,43 @@ def _round_goal_potential(
     if gap > turns_left_in_round:
         return 0.0
     return max(0.0, (turns_left_in_round - gap + 1) * 0.6)
+
+
+def _placement_goal_potential(
+    state: GameState,
+    player: PlayerState,
+    goal_display_name: str,
+    goal_name: str,
+    current_count: int,
+    turns_left_in_round: int,
+) -> float:
+    """Expected placement points for the current round's goal.
+
+    The heuristic this replaces scored a reachability gap at a flat rate and
+    never read the placement scale, so a round-4 goal (7/4/3) was worth the
+    same as a round-1 goal (4/1) and a tie looked like a win. See
+    ``agents/round_goal_model.py``.
+    """
+
+    from wingspan_ai.agents.round_goal_model import (
+        expected_placement_points,
+        load_progress_rates,
+    )
+
+    scale = ROUND_GOAL_GREEN_SCORES.get(state.round_state.round_number)
+    if not scale:
+        return 0.0
+    opponents = [p for p in state.players if p.player_id != player.player_id]
+    rate = load_progress_rates().rate_for(goal_display_name)
+    with profiling.node("round_goal_placement"):
+        return expected_placement_points(
+            own_count=current_count,
+            own_turns_left=turns_left_in_round,
+            opponent_counts=[_round_goal_count(goal_name, other) for other in opponents],
+            opponent_turns_left=[other.action_cubes_available for other in opponents],
+            placement_scores=scale,
+            rate_per_turn=rate,
+        )
 
 
 def _endgame_conversion_potential(player: PlayerState, turns_remaining: int) -> float:
