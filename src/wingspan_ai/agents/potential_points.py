@@ -190,7 +190,12 @@ DEFAULT_SEARCH_DENIAL_WEIGHT = 0.0
 #: green-side scale with ties split rounded down. Registered 2026-09-22 at
 #: 0 to +2 at 2p (more at 3p, where second place pays).
 ROUND_GOAL_MODELS = ("heuristic", "placement")
-DEFAULT_ROUND_GOAL_MODEL = "heuristic"
+#: Default flipped to ``"placement"`` on 2026-09-22 on the registered rule
+#: (``docs/experiments/round_goal_placement_model.md``: adopt at ≥ +1 at
+#: either player count). 3p +1.12 (p=0.13), 2p +0.41 (p=0.69), combined
+#: +0.79 (p=0.17) — a weak-evidence adoption of a structurally correct term
+#: over a structurally wrong one, guarded by the ``heuristic`` holdout below.
+DEFAULT_ROUND_GOAL_MODEL = "placement"
 #: Beam pre-ranking (2026-09-18). Below the root the search expands every
 #: candidate action, evaluates every child and keeps the ``beam_width`` best;
 #: 13 of ~17 expansions and all 17 evaluations at a beamed ply rank children
@@ -248,6 +253,9 @@ DEFAULT_HOLDOUTS: tuple[Holdout, ...] = (
     # Beam pre-ranking, −0.7 n.s. for −58% latency on 2026-09-18; not the
     # unbudgeted default, the budgeted production candidate.
     Holdout("search_prerank", "beam_leaf"),
+    # The reachability goal heuristic the placement model replaced on
+    # 2026-09-22 (+1.12 at 3p, +0.41 at 2p, neither significant).
+    Holdout("round_goal_model", "heuristic"),
 )
 
 

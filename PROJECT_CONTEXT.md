@@ -121,7 +121,7 @@ Root: `README.md`, `AGENTS.md`, `CLAUDE.md`, `COMPANY_CONTEXT.md`,
 | ML sequence | Start with baselines and heuristics before RL/deep learning. | Baselines are easier to debug and provide comparison anchors. | A specific research question requires earlier RL setup. |
 | Reusability | Design a board-game AI template alongside Wingspan-specific implementation. | The case study should become reusable for similar games. | Reuse abstractions delay basic simulator completion. |
 | Evidence standard | Every agent change is a registered prediction, then a seed-paired 80-game arm from a clean worktree, read with `arm_contrast` and `decision_profile_report`. | Unpaired and unregistered comparisons produced two false findings (greedy second; seat-3 advantage). | Never; tighten the design when it fails. |
-| Baseline | `artifacts/rr_belief_opp` at `e218d13` is the default agent's baseline (2026-09-16). | Belief opponent model adopted for cost; every later arm pairs against it. | The next adopted change re-baselines. |
+| Baseline | `artifacts/rr_goal_placement` (2p) and `artifacts/rr3p_goal_placement` (3p) at `1b380e7` are the default agent's baselines (2026-09-22; `rr_belief_opp` before that). | The placement round-goal model was adopted, so the default agent changed. | The next adopted change re-baselines. |
 | Standing holdouts | Every adopted or dropped switch keeps its losing side in a deterministic 5% of games (2026-09-17, generalizing the 2026-09-16 opponent-model control). | False positives at n=80; learning bias once agents learn from archived games. | A holdout accrues ≥100 games and agrees with the decision — retire it. |
 | Attribution | K=4 determinization is the standard for any play-attribution run (2026-09-17). | K=0 pair tables were noise (ρ=0.31 with K=4). | Cheaper attribution that matches K=4 ranks. |
 | Cost | Value per millisecond: an agent calculation is kept only if its measured gain justifies its measured latency; otherwise gated, optimized or dropped (2026-09-17). | Production agents must not bore the player. | Alex sets a different latency budget. |
@@ -3441,3 +3441,32 @@ expansion phase 0.
 Phase 1 is European: content plus one timing rule, the smallest
 structural change. Oceania (nectar, revised mat, dice) is phase 2; Asia
 content phase 3; Duet, Flock and Automa deferred.
+
+## Update: 2026-09-22 - Round goals: the event, the measurement, and the placement model adopted
+
+### What changed
+- `round_goal_scored` is emitted once per round (including round 4) with
+  counts at scoring time, points awarded, the round's placement scale,
+  margin and tie flags. `analysis/round_goal_report.py` reads it and
+  replays older roots. Bit-identity guard unaffected.
+- **Measurement** (160 mirror games, equal agents): the first player takes
+  the round-1 goal 0.581 to 0.156, worth **+1.51 goal points (p<0.0001)** —
+  a quarter of the whole +6.16 first-player advantage. The edge follows the
+  first-player token (round 2 reverses) and fades by round 3. Half of
+  decided rounds turn on one item or a tie.
+- **Placement model** (`agents/round_goal_model.py`): expected placement
+  points from Poisson final-count distributions at rates measured over 410
+  archived games, scored on the round's real green-side scale with ties
+  split rounded down.
+
+### Results and decision
+2p **+0.41 (p=0.69)** with the mechanism confirmed (goal points +0.84,
+p=0.011, paid for by −0.75 birds); 3p **+1.12 (p=0.128)** with a different
+composition (goals +0.46, eggs +0.97, birds −0.27 — it declines contests it
+would lose). Combined +0.79 (p=0.17). **Adopted** on the pre-registered
+≥ +1 rule, weak evidence stated, `heuristic` holdout at 5%, re-baselined.
+Registered follow-up: production-config re-check.
+
+### Follow-up tasks
+- [ ] Read `rr_opener_allgoals` (four-goal opener vs `rr_opener_v2`, registered null).
+- [ ] Production-config re-check with the placement default (80 games).

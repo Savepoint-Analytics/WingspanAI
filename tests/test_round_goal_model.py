@@ -90,10 +90,18 @@ class SwitchTests(TestCase):
     def setUpClass(cls) -> None:
         cls.state = setup_base_game(make_sample_catalog(), player_ids=["p1", "p2"], random_seed=5)
 
-    def test_default_is_the_historic_heuristic(self) -> None:
+    def test_placement_is_the_default_with_the_heuristic_held_out(self) -> None:
+        # Adopted 2026-09-22 on the registered rule; the losing side stays
+        # alive at 5% like every decided switch.
+        from wingspan_ai.agents.potential_points import DEFAULT_HOLDOUTS
+
         self.assertEqual(ROUND_GOAL_MODELS, ("heuristic", "placement"))
-        self.assertEqual(PotentialPointsSearchConfig().round_goal_model, "heuristic")
-        self.assertEqual(PotentialPointsAgent(agent_id="a").round_goal_model, "heuristic")
+        self.assertEqual(PotentialPointsSearchConfig().round_goal_model, "placement")
+        self.assertEqual(PotentialPointsAgent(agent_id="a").round_goal_model, "placement")
+        self.assertIn(
+            ("round_goal_model", "heuristic"),
+            [(holdout.field, holdout.value) for holdout in DEFAULT_HOLDOUTS],
+        )
 
     def test_the_switch_changes_the_term_and_nothing_else(self) -> None:
         heuristic = evaluate_state_potential(self.state, "p1", goal_model="heuristic")

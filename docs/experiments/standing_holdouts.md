@@ -69,6 +69,7 @@ runs, bit-identity checks); leave the defaults on for every arm.
 | `mechanic_synergy` | `False` | `True` (board-only, weight 1.0) | 5% | 2026-09-17 | board-only synergy term +1.31 p=0.17, not adopted | `holdout_guardrail.py` |
 | `search_child_expansion` | `fast` | `copy` | 5% | 2026-09-17 | fast child expansion bit-identical at −53% per child, adopted | `holdout_guardrail.py` |
 | `search_prerank` | `none` | `beam_leaf` | 5% | 2026-09-18 | pre-ranking −0.72 p=0.55 at −58% latency; not the unbudgeted default | `holdout_guardrail.py --field search_prerank` |
+| `round_goal_model` | `placement` | `heuristic` | 5% | 2026-09-22 | placement model +1.12 at 3p (p=0.13), +0.41 at 2p (p=0.69), adopted on the registered ≥ +1 rule with weak evidence | `holdout_guardrail.py --field round_goal_model` |
 | `setup_policy` (flow-resolved) | seat's opener (`default_setup_v1` in round robins) | `potential_points_setup_v3_keep3` | 5% | 2026-09-18 | measured opener −1.90 p=0.13, not adopted | `holdout_guardrail.py --field setup_policy` |
 
 Decisions **not** guarded by a holdout, and why:

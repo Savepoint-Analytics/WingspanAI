@@ -118,6 +118,47 @@ useful null than the synergy and denial losses.
 The 3p arm is the real test: second place pays there (5/2/1, 6/3/2,
 7/4/3), so the marginal action buys placement the 2p game cannot.
 
+### Result at three players, and the decision (2026-09-22)
+
+`artifacts/rr3p_goal_placement` vs `rr3p_opp/belief`, 90 paired games at
+`1b380e7`: **+1.12 (p=0.128)**, win 0.761 → 0.789, 18 identical games.
+Inside the registered +1 to +3 band at its low edge.
+
+| category | heuristic | placement | Δ | p |
+|---|---:|---:|---:|---:|
+| round goals | 12.77 | 13.22 | +0.46 | 0.16 |
+| eggs | 13.29 | 14.26 | +0.97 | 0.11 |
+| birds | 35.12 | 34.86 | −0.27 | 0.66 |
+| bonus | 5.41 | 4.96 | −0.46 | 0.24 |
+| **total** | **74.19** | **75.31** | **+1.12** | 0.128 |
+
+The three-player composition is *not* the two-player one. At 2p the model
+bought +0.84 of goal points and paid −0.75 in birds. At 3p it takes less
+goal value (+0.46) and pays almost nothing for it (−0.27 birds), with the
+gain showing up in eggs (+0.97). That is what a correctly priced goal term
+should do when second place pays: it declines contests it would lose
+(three players, one winner, second place worth 2–4) and spends the action
+on something certain. The heuristic, which ignores second place entirely,
+cannot make that call.
+
+**Decision: adopted**, per the pre-registered rule (≥ +1 at either player
+count). The evidence is weak and the record should say so: +1.12 at
+p=0.128 against a ~2-point detection limit, +0.41 at 2p, combined +0.79
+(p=0.17). Three things carry it past the bar besides the point estimate —
+both counts point the same way, the mechanism is confirmed significantly
+at 2p (goal points +0.84, p=0.011), and the term is *structurally* correct
+where its predecessor was structurally wrong (it reads the round's real
+scale, the opponents' remaining turns, ties, and the player count), which
+matters more as expansion rulesets bring their own goal scales. Cost is
+about 0.1 ms a state.
+
+Guarded as every decided switch is: `Holdout("round_goal_model",
+"heuristic")` keeps the old rule alive in a deterministic 5% of games.
+**Re-baselined**: `rr_goal_placement` (2p) and `rr3p_goal_placement` (3p)
+are the roots later arms pair against. **Registered follow-up**: the
+production configuration (`beam_leaf` + 5 s ladder) gets its own 80-game
+re-check with the new default, as every search change does.
+
 ## 3. Four-goal opener (registered arm, expected null)
 
 All four goals are public at setup; the opener read round 1's alone.
