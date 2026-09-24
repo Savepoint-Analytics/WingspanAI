@@ -59,3 +59,29 @@ Local disk is a single point of failure for evidence behind published results.
   is idempotent, so an interrupted run can be repeated.
 - `code_provenance.reproducible` is false for any run made from a dirty tree.
   Those artifacts must be preserved; clean-tree artifacts can be regenerated.
+
+## Follow-up (2026-09-24): storage tiers, compaction, and a provenance bug
+
+Measured: the bucket held 21.1 GB across 44,096 objects, of which
+**12.0 GB (57%) was `public_state_snapshots.json`** — a full public state per
+turn that nothing reads, because every analysis and the replay validator
+reconstruct state from `events.jsonl`. `scripts/compact_object_storage.py`
+gzips those objects in place (reversible with `--restore`, verified on a
+round trip before the bulk run); `analysis/compact_artifacts.py` does the
+same for the local cache and recovered 2.23 GB.
+
+The tiers are now explicit. **Object storage is the durable, complete log.**
+**PostgreSQL is the queryable analysis layer**, which means it carries
+summaries for every game and events only for the runs under analysis — so
+`insert_events` and the batch flow take `event_names`, and
+`ANALYSIS_EVENT_NAMES` names the eight families the view layer reads. The
+four per-turn decision families left out were 94% of stored payload weight.
+
+**Provenance bug found while backfilling.** Chunked arms write several
+batches into one batch directory and each chunk overwrites
+`batch_manifest.json`, so the surviving manifest lists only the last chunk's
+games: 2,433 manifests covered 5,826 of 10,399 archived games. The lost
+manifests take their `code_provenance`, holdout record and per-seat search
+config with them. `scripts/backfill_summaries.py --source minio-events`
+recovers run, game and score rows directly from the event objects, but the
+fix is for a chunked run to write its manifest under a chunk-unique key.

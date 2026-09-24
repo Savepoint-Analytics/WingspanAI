@@ -170,9 +170,77 @@ def iter_minio(prefix: str | None) -> Iterator[tuple[dict, dict, dict | None]]:
             yield manifest, game, game_ended
 
 
+def iter_minio_events(prefix: str | None) -> Iterator[tuple[dict, dict, dict | None]]:
+    """Yield a synthesized (manifest, game, game_ended) per archived events object.
+
+    Chunked arms rewrite ``batch_manifest.json`` in a shared batch directory,
+    so the surviving manifest lists only the last chunk's games while every
+    chunk's event directory persists: 2,433 manifests cover 5,826 of 10,399
+    archived games. This mode ignores manifests and reads each events object
+    directly — the head for ``game_started`` and the ``setup_selection_applied``
+    events that name each seat's agent, the tail for ``game_ended`` — so
+    coverage does not depend on which chunk wrote last.
+    """
+
+    import boto3
+
+    config = object_storage_config_from_env()
+    if config is None:
+        raise ValueError("object storage is not configured")
+    client = boto3.client(
+        "s3",
+        endpoint_url=config.endpoint_url,
+        aws_access_key_id=config.access_key_id,
+        aws_secret_access_key=config.secret_access_key,
+        region_name=config.region_name,
+    )
+    base = f"{config.prefix.rstrip('/')}/{(prefix or '').strip('/')}".rstrip("/") + "/"
+    paginator = client.get_paginator("list_objects_v2")
+    for page in paginator.paginate(Bucket=config.bucket_name, Prefix=base):
+        for item in page.get("Contents", []):
+            key = item["Key"]
+            if not key.endswith("events.jsonl"):
+                continue
+            parts = key[len(config.prefix.rstrip("/")) + 1 :].split("/")
+            batch_kind = parts[0] if parts else "experiment"
+            batch_label = parts[1] if len(parts) > 1 else "unknown"
+            head = client.get_object(Bucket=config.bucket_name, Key=key, Range="bytes=0-65535")[
+                "Body"
+            ].read()
+            start = max(0, item["Size"] - TAIL_BYTES)
+            tail = client.get_object(Bucket=config.bucket_name, Key=key, Range=f"bytes={start}-")[
+                "Body"
+            ].read()
+            game_ended = last_json_line(tail.decode("utf-8", "ignore"))
+            seats: dict[str, str] = {}
+            ruleset = None
+            for line in head.decode("utf-8", "ignore").splitlines():
+                if '"setup_selection_applied"' not in line and '"game_started"' not in line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                ruleset = ruleset or event.get("ruleset_id")
+                payload = event.get("payload") or {}
+                if event.get("event_name") == "setup_selection_applied":
+                    seats[str(payload.get("player_id"))] = str(payload.get("agent_id"))
+            if game_ended is None:
+                continue
+            outcome = (game_ended.get("payload") or {}).get("outcome") or {}
+            manifest = {"batch_kind": batch_kind, "batch_label": batch_label, "batch_id": None}
+            game = {
+                "outcome": outcome,
+                "ruleset_id": ruleset or game_ended.get("ruleset_id"),
+                "player_count": len(outcome.get("scores") or {}) or None,
+                "seated_agent_ids": [seats[k] for k in sorted(seats)],
+            }
+            yield manifest, game, game_ended
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--source", choices=("local", "minio"), default="local")
+    parser.add_argument("--source", choices=("local", "minio", "minio-events"), default="local")
     parser.add_argument("--root", default="artifacts", help="local artifact root")
     parser.add_argument(
         "--prefix", default=None, help="MinIO sub-prefix under board-games/wingspan"
@@ -183,7 +251,12 @@ def main(argv: list[str] | None = None) -> int:
     import psycopg
 
     load_dotenv()
-    source = iter_local(Path(args.root)) if args.source == "local" else iter_minio(args.prefix)
+    if args.source == "local":
+        source = iter_local(Path(args.root))
+    elif args.source == "minio":
+        source = iter_minio(args.prefix)
+    else:
+        source = iter_minio_events(args.prefix)
 
     runs: dict[str, tuple] = {}
     games: list[tuple] = []
