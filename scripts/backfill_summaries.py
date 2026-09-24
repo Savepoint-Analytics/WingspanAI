@@ -25,6 +25,12 @@ for local artifacts it reads the last line directly.
 
 Idempotent: existing rows are left alone (``ON CONFLICT DO NOTHING``).
 
+**Do not run this against object storage while a bulk mutation of the same
+prefix is in flight.** Paginated listings and concurrent deletes/puts do not
+mix: a run overlapping ``scripts/compact_object_storage.py`` on 2026-09-24
+saw 5,857 of 10,405 event objects because the page markers shifted underneath
+it. The pass is safe to repeat once the mutation has finished.
+
     python scripts/backfill_summaries.py --source local --dry-run
     python scripts/backfill_summaries.py --source local
     python scripts/backfill_summaries.py --source minio
@@ -226,6 +232,8 @@ def iter_minio_events(prefix: str | None) -> Iterator[tuple[dict, dict, dict | N
                 if event.get("event_name") == "setup_selection_applied":
                     seats[str(payload.get("player_id"))] = str(payload.get("agent_id"))
             if game_ended is None:
+                # Surfaced by the caller's without_scores counter.
+                yield {"batch_kind": batch_kind, "batch_label": batch_label}, {}, None
                 continue
             outcome = (game_ended.get("payload") or {}).get("outcome") or {}
             manifest = {"batch_kind": batch_kind, "batch_label": batch_label, "batch_id": None}
@@ -264,7 +272,9 @@ def main(argv: list[str] | None = None) -> int:
     seen_games: set[str] = set()
     without_scores = 0
     skipped_incomplete = 0
+    candidates = 0
     for manifest, game, game_ended in source:
+        candidates += 1
         outcome = game.get("outcome") or {}
         game_id, run_id = outcome.get("game_id"), outcome.get("simulation_run_id")
         if not game_id or not run_id or game_id in seen_games:
@@ -322,6 +332,7 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     print(f"source={args.source}: {len(runs)} runs, {len(games)} games, {len(scores)} score rows")
+    print(f"  candidates seen: {candidates}")
     if without_scores:
         print(f"  {without_scores} games had no readable game_ended event (no score rows)")
     if skipped_incomplete:
