@@ -7,6 +7,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from wingspan_ai.config import database_url_from_env, load_dotenv, object_storage_config_from_env
+from wingspan_ai.telemetry.postgres import POSTGRES_SCHEMA
 
 REPO_ROOT = Path(__file__).parents[1]
 load_dotenv(REPO_ROOT / ".env")
