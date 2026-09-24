@@ -218,6 +218,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--player-count", type=int, default=2, choices=(2, 3))
     parser.add_argument(
+        "--opponent-pairs",
+        default=None,
+        help="3p only: restrict the lineups to these opponent pairs, comma separated, "
+        "each as 'opponent_a+opponent_b'. Fewer pairs on more seeds is how a 3p arm "
+        "gets decks instead of games (results_ledger.md, 'Decks, not games').",
+    )
+    parser.add_argument(
         "--seeds",
         default="1,2,3,4,5",
         help="3p and mirror arms; comma list or a-b range (2p roster arms always use seeds 1-10)",
@@ -302,7 +309,16 @@ def main(argv: list[str] | None = None) -> int:
             search=search,
             overrides=overrides,
         )
-        pairs = [(a, b) for i, a in enumerate(OPPONENTS) for b in OPPONENTS[i + 1 :]]
+        if args.opponent_pairs:
+            pairs = []
+            for item in args.opponent_pairs.split(","):
+                first, _, second = item.strip().partition("+")
+                if first not in OPPONENTS or second not in OPPONENTS:
+                    print(f"unknown opponent pair {item!r}; expected two of {OPPONENTS}")
+                    return 1
+                pairs.append((first, second))
+        else:
+            pairs = [(a, b) for i, a in enumerate(OPPONENTS) for b in OPPONENTS[i + 1 :]]
         launches = "\n".join(
             f'nohup "$MAIN/.venv/bin/python" "$MAIN/artifacts/{args.root}/launch/run_group.py" '
             f'{a} {b} > "$MAIN/artifacts/{args.root}/launch/{a}_{b}.log" 2>&1 &'
@@ -338,6 +354,7 @@ def main(argv: list[str] | None = None) -> int:
                 "search": search,
                 "study_search": study,
                 "mirror": args.mirror,
+                "opponent_pairs": args.opponent_pairs,
                 "overrides": overrides,
                 "player_count": args.player_count,
                 "after": args.after,
