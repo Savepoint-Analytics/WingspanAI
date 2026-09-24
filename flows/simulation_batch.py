@@ -162,6 +162,7 @@ def run_seeded_game(
     decision_profile_mode: str = DEFAULT_PROFILE_MODE,
     content_packs: list[str] | None = None,
     rules_modules: list[str] | None = None,
+    persist_event_names: list[str] | None = None,
 ) -> dict[str, Any]:
     """Run and persist one game within a labelled simulation batch.
 
@@ -174,6 +175,13 @@ def run_seeded_game(
     position only. It is what lets a mirror match (``potential_points`` in
     every seat) vary one seat's search: the study position is a lineup
     position, so it travels with the policy through every seat rotation.
+
+    ``persist_event_names`` restricts which event families reach PostgreSQL;
+    ``None`` stores every one, which is the historic behaviour. Object storage
+    keeps the complete log regardless (ADR 0005), so a batch whose decision
+    telemetry is not under study can pass
+    ``wingspan_ai.telemetry.postgres.ANALYSIS_EVENT_NAMES`` and leave out the
+    four per-turn decision families that are 94% of the stored payload weight.
 
     ``content_packs`` and ``rules_modules`` are the game's expansion
     configuration (``docs/rules/expansion_configuration.md``). Omitted, the
@@ -404,6 +412,7 @@ def run_seeded_game(
                 result,
                 run_label=f"{resolved_batch_kind}:{resolved_batch_label}",
                 metadata=batch_metadata,
+                event_names=persist_event_names,
             )
         except Exception as error:
             if persist_postgres is True:
@@ -976,6 +985,7 @@ def run_simulation_batch(
     decision_profile_mode: str = DEFAULT_PROFILE_MODE,
     content_packs: list[str] | None = None,
     rules_modules: list[str] | None = None,
+    persist_event_names: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Run a labelled, seeded batch for local smoke tests or Prefect orchestration."""
 
@@ -1022,6 +1032,7 @@ def run_simulation_batch(
             decision_profile_mode=decision_profile_mode,
             content_packs=content_packs,
             rules_modules=rules_modules,
+            persist_event_names=persist_event_names,
         )
         for seed in resolved_seeds
     ]

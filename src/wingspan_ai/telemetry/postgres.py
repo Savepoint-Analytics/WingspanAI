@@ -21,6 +21,24 @@ if TYPE_CHECKING:
 POSTGRES_SCHEMA = "wingspan_ai"
 #: Every table the repository owns, in dependency order.
 TELEMETRY_TABLES = ("simulation_runs", "games", "agents", "simulation_events", "game_scores")
+#: Event families every analysis view and KPI function reads. The four
+#: per-turn decision families left out — ``action_selected``,
+#: ``legal_actions_generated``, ``turn_started`` and ``agent_decision_summary``
+#: — were 94% of the stored payload weight (724 MB of 771 MB measured
+#: 2026-09-24) and are read by nothing in the view layer. Pass this as
+#: ``persist_event_names`` for a batch whose decision telemetry is not the
+#: subject of study; object storage keeps the complete log either way
+#: (ADR 0005).
+ANALYSIS_EVENT_NAMES = (
+    "simulation_run_started",
+    "game_started",
+    "setup_selection_applied",
+    "round_started",
+    "action_resolved",
+    "round_goal_scored",
+    "bird_scorecard",
+    "game_ended",
+)
 
 
 class PostgresEventRepository:
@@ -133,20 +151,12 @@ class PostgresEventRepository:
             on simulation_events (simulation_run_id, game_id)
             """,
             """
-            create index if not exists simulation_events_name_time_idx
-            on simulation_events (event_name, occurred_at)
-            """,
-            """
-            create index if not exists simulation_events_turn_idx
-            on simulation_events (game_id, round_number, turn_number, round_action_number)
+            create index if not exists simulation_events_name_run_idx
+            on simulation_events (event_name, simulation_run_id)
             """,
             """
             create index if not exists simulation_events_global_turn_idx
             on simulation_events (game_id, global_turn_number)
-            """,
-            """
-            create index if not exists simulation_events_payload_gin_idx
-            on simulation_events using gin (payload)
             """,
         ]
         with self._connect() as connection:
@@ -161,14 +171,20 @@ class PostgresEventRepository:
         *,
         run_label: str | None = None,
         metadata: dict[str, Any] | None = None,
+        event_names: Sequence[str] | None = None,
     ) -> dict[str, int]:
-        """Persist run/game metadata, scores, and raw telemetry for a result."""
+        """Persist run/game metadata, scores, and raw telemetry for a result.
+
+        ``event_names`` is passed through to :meth:`insert_events`.
+        """
 
         if self.auto_ensure_schema:
             self.ensure_schema()
 
         self._upsert_simulation_metadata(result, run_label=run_label, metadata=metadata)
-        event_count = self.insert_events(result.events, ensure_schema=False)
+        event_count = self.insert_events(
+            result.events, ensure_schema=False, event_names=event_names
+        )
         return {"events": event_count, "games": 1, "runs": 1}
 
     def insert_events(
@@ -176,14 +192,23 @@ class PostgresEventRepository:
         events: Sequence[SimulationEvent],
         *,
         ensure_schema: bool | None = None,
+        event_names: Sequence[str] | None = None,
     ) -> int:
-        """Insert raw events into the `simulation_events` table."""
+        """Insert raw events into the `simulation_events` table.
+
+        ``event_names`` restricts what is stored; ``None`` stores everything,
+        which is the historic behaviour. See ``ANALYSIS_EVENT_NAMES`` for the
+        set the view layer and the KPI functions actually read.
+        """
 
         should_ensure_schema = self.auto_ensure_schema if ensure_schema is None else ensure_schema
         if should_ensure_schema:
             self.ensure_schema()
 
         psycopg, jsonb = _import_psycopg()
+        if event_names is not None:
+            allowed = set(event_names)
+            events = [event for event in events if str(event.event_name) in allowed]
         rows = [_event_row(event, jsonb=jsonb) for event in events]
         with self._connect() as connection:
             with connection.cursor() as cursor:
