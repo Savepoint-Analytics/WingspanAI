@@ -165,6 +165,37 @@ are the roots later arms pair against. **Registered follow-up**: the
 production configuration (`beam_leaf` + 5 s ladder) gets its own 80-game
 re-check with the new default, as every search change does.
 
+### Confirmation on 15 decks (2026-09-24)
+
+The 2026-09-22 adoption rested on five decks with a design effect near 2.
+Re-run with both sides fresh at the same commit and the same holdout set,
+15 seeds × 2 opponent pairs × 3 rotations — 90 games on **15 decks**, six
+games a deck:
+
+| | Δ score | naive p | deck-clustered p | design effect |
+|---|---:|---:|---:|---:|
+| 5-deck arm (2026-09-22) | +1.12 | 0.128 | 0.282 | 2.0 |
+| **15-deck arm (2026-09-24)** | **+1.12** | 0.186 | **0.195** | **1.04** |
+
+The point estimate is identical to two decimal places on independent decks,
+the design effect is now ~1 (so the naive and deck-clustered readings agree),
+and both opponent pairs are positive (+0.91, +1.33). Registered ≥ +1 to
+confirm, < +0.5 to revert: **confirmed**. The adoption stands, and its
+evidence is no longer weak in the way the original record said — two
+independent 90-game contrasts at +1.12, one of them properly decked.
+
+Still not significant at p<0.05, and the honest summary is unchanged in
+kind: this is a ~1-point improvement measured twice, adopted on a
+pre-registered point-estimate bar, guarded by the `heuristic` holdout.
+
+### Production configuration on the placement default (2026-09-24)
+
+`rr_prod_placement` (`beam_leaf` + 5 s ladder) vs `rr_goal_placement`, 80
+paired games: **−0.80 (p=0.50)**, win −0.037, mean decision 3,227 → 1,062 ms,
+p95 by round 1.2 / 3.2 / 3.8 / 4.2 s — under the cap in every round. The
+production configuration survives the search change, as the adoption
+registered it must. +0.37 points per second saved; class **keep**.
+
 ## 3. Four-goal opener (registered arm, expected null)
 
 All four goals are public at setup; the opener read round 1's alone.

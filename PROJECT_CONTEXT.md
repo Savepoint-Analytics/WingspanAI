@@ -260,7 +260,7 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 |---|---|---|
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
-| 1 | Re-run the 3p placement confirmation on a 15-deck design (15 seeds × 2 opponent pairs × 3 rotations = 90 games) against a matching baseline. | Deck-clustered p < 0.1 at ≥ +1 confirms the adoption; below +0.5 reverts it to the heuristic. |
+| 1 | Fix the chunked-arm manifest overwrite: write `batch_manifest.json` under a chunk-unique key so provenance survives (ADR 0005 follow-up). | A chunked arm's manifests all persist; `backfill_summaries.py --source minio` covers the same games as `--source minio-events`. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
@@ -3513,3 +3513,36 @@ p=0.030, stronger by deck).
 effect, flagging any contrast above 1.3. Future 3p arms spread over 15
 seeds rather than 5. Registered: a 15-deck confirmation of the placement
 adoption.
+
+## Update: 2026-09-24 - Placement model confirmed on 15 decks; production config stands; storage architecture rebuilt
+
+### Arms
+- **3p 15-deck confirmation**: `rr3p_goal_place15` vs `rr3p_goal_heur15`, both
+  sides fresh at the same commit and holdout set, 15 seeds × 2 opponent pairs
+  × 3 rotations. **+1.12 (naive p=0.186, deck-clustered p=0.195, design effect
+  1.04)** — the same point estimate as the 5-deck arm, now on independent
+  decks with the clustering gone, both pairs positive. Registered ≥ +1:
+  **the placement adoption is confirmed**.
+- **Production re-check**: `rr_prod_placement` vs `rr_goal_placement`, −0.80
+  (p=0.50), 3,227 → 1,062 ms, p95 1.2 / 3.2 / 3.8 / 4.2 s by round. The
+  production configuration survives the search change.
+
+### Storage architecture (phases 1–4)
+- **Schema**: `wingspan_ai` now holds the five telemetry tables and the 16
+  views; Wingspan no longer shares `public` with MLflow and the other lab
+  simulators (`scripts/migrate_postgres_schema.py`).
+- **Indexes**: dropped the GIN payload index (179 MB, 0 scans), the turn index
+  (41 MB, 0 scans) and the name/time index; added
+  `(event_name, simulation_run_id)`. `simulation_events` 1,576 → 1,282 MB.
+- **Selective persistence**: `insert_events`/`persist_event_names` and
+  `ANALYSIS_EVENT_NAMES` (default unchanged; the four decision families are
+  94% of payload weight).
+- **Backfill**: `scripts/backfill_summaries.py`, games 4,491 → 5,879 so far,
+  final pass running.
+- **Compaction**: **11.88 GB saved** in the bucket (20,771 snapshot and
+  replay-debug objects gzipped, reversible) and 2.23 GB locally.
+- **Found**: chunked arms overwrite `batch_manifest.json` in a shared batch
+  directory, so 2,433 surviving manifests covered 5,826 of 10,405 archived
+  games — losing `code_provenance`, holdout records and per-seat search config
+  for the rest. Worked around with an events-first backfill; the fix is a
+  chunk-unique manifest key (now the top task).
