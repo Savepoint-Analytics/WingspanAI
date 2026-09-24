@@ -12,12 +12,38 @@ if TYPE_CHECKING:
     from wingspan_ai.simulation.runner import SimulationResult
 
 
+#: Schema Wingspan telemetry lives in. Until 2026-09-23 these tables were
+#: unqualified in ``public``, sharing the namespace with MLflow's own tables and
+#: with any other simulator in the lab that persists a ``simulation_events``;
+#: the lab's other simulators are namespaced the same way
+#: (``game_of_thrones_ai``, ``irish_gauge``). Migrate an existing database with
+#: ``scripts/migrate_postgres_schema.py``.
+POSTGRES_SCHEMA = "wingspan_ai"
+#: Every table the repository owns, in dependency order.
+TELEMETRY_TABLES = ("simulation_runs", "games", "agents", "simulation_events", "game_scores")
+
+
 class PostgresEventRepository:
-    """Persist validated simulation results into PostgreSQL."""
+    """Persist validated simulation results into PostgreSQL.
+
+    All statements run with ``search_path`` set to ``POSTGRES_SCHEMA``, so the
+    unqualified table names below resolve there rather than in ``public``.
+    """
 
     def __init__(self, database_url: str, *, auto_ensure_schema: bool = True) -> None:
         self.database_url = database_url
         self.auto_ensure_schema = auto_ensure_schema
+
+    def _connect(self):
+        """Open a connection whose ``search_path`` is the telemetry schema."""
+
+        psycopg, _jsonb = _import_psycopg()
+        connection = psycopg.connect(self.database_url)
+        with connection.cursor() as cursor:
+            cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{POSTGRES_SCHEMA}"')
+            cursor.execute(f'SET search_path TO "{POSTGRES_SCHEMA}"')
+        connection.commit()
+        return connection
 
     def ensure_schema(self) -> None:
         """Create the simulation telemetry schema when it does not exist."""
@@ -123,7 +149,7 @@ class PostgresEventRepository:
             on simulation_events using gin (payload)
             """,
         ]
-        with psycopg.connect(self.database_url) as connection:
+        with self._connect() as connection:
             with connection.cursor() as cursor:
                 for statement in statements:
                     cursor.execute(statement)
@@ -159,7 +185,7 @@ class PostgresEventRepository:
 
         psycopg, jsonb = _import_psycopg()
         rows = [_event_row(event, jsonb=jsonb) for event in events]
-        with psycopg.connect(self.database_url) as connection:
+        with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.executemany(
                     """
@@ -227,7 +253,7 @@ class PostgresEventRepository:
         )
         winners = set(result.outcome.winners)
 
-        with psycopg.connect(self.database_url) as connection:
+        with self._connect() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """

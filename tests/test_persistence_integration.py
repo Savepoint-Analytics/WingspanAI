@@ -71,6 +71,7 @@ class PersistenceIntegrationTests(TestCase):
 
         with psycopg.connect(database_url) as connection:
             with connection.cursor() as cursor:
+                cursor.execute(f'SET search_path TO "{POSTGRES_SCHEMA}"')
                 cursor.execute(
                     """
                     select run_label, metadata ->> 'batch_id'

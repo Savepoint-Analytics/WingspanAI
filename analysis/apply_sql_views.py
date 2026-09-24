@@ -37,6 +37,9 @@ class ViewStatement:
     statement: str
 
 
+from wingspan_ai.telemetry.postgres import POSTGRES_SCHEMA  # noqa: E402
+
+
 def parse_view_statements(sql_text: str) -> list[ViewStatement]:
     """Split the SQL file into individual view statements, preserving order.
 
@@ -71,6 +74,9 @@ def apply_views(database_url: str, sql_path: Path = DEFAULT_SQL_PATH) -> list[st
     applied: list[str] = []
     with psycopg.connect(database_url) as connection:
         with connection.cursor() as cursor:
+            # The view layer lives beside the tables it reads.
+            cursor.execute(f'CREATE SCHEMA IF NOT EXISTS "{POSTGRES_SCHEMA}"')
+            cursor.execute(f'SET search_path TO "{POSTGRES_SCHEMA}"')
             # The view layer is fully derived, so rebuild it from scratch:
             # ``create or replace`` cannot add a column in the middle of a
             # view (adding ``ruleset_id`` to every grain did exactly that).
@@ -91,6 +97,8 @@ def check_views(database_url: str, sql_path: Path = DEFAULT_SQL_PATH) -> dict[st
 
     results: dict[str, str] = {}
     with psycopg.connect(database_url) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(f'SET search_path TO "{POSTGRES_SCHEMA}"')
         for view in load_view_statements(sql_path):
             try:
                 with connection.cursor() as cursor:

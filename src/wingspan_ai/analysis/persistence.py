@@ -4,10 +4,10 @@ The analysis layer is event-first: the simulator writes raw events and every
 KPI is derived from them, so a number in a notebook can always be traced back
 to the events that produced it. Three sources return the same record shape:
 
-* **PostgreSQL** (`public.simulation_events` in the Savepoint Lab database) —
-  the persisted archive, best for cross-run questions. Note that Wingspan
-  writes unqualified tables into ``public`` rather than its own schema, unlike
-  the other simulators in the lab.
+* **PostgreSQL** (``wingspan_ai.simulation_events`` in the Savepoint Lab
+  database) — the persisted archive, best for cross-run questions. The schema
+  is namespaced like the lab's other simulators; before 2026-09-23 these
+  tables were unqualified in ``public``.
 * **MinIO** (``savepoint-ai/board-games/wingspan/...``) — the immutable
   per-game ``events.jsonl`` artifacts.
 * **Local artifacts** (``artifacts/<root>/...``) — the same files before or
@@ -32,12 +32,12 @@ from wingspan_ai.config import (
     object_storage_config_from_env,
 )
 
+#: Namespaced from 2026-09-23 (``scripts/migrate_postgres_schema.py``); the
+#: writer owns the constant so reader and writer can never disagree.
+from wingspan_ai.telemetry.postgres import POSTGRES_SCHEMA
+
 EventRecord = dict[str, Any]
 Row = dict[str, Any]
-
-#: Wingspan telemetry tables are unqualified; the lab's other simulators use a
-#: per-game schema. Kept as a constant so a future migration is one edit.
-POSTGRES_SCHEMA = "public"
 
 
 def _connect(database_url: str | None = None):
