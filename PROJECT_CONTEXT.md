@@ -260,6 +260,7 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 |---|---|---|
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
+| 1 | Extend the 3p placement arm from 15 to 25 decks (seeds 16–25, same 2 pairs × 3 rotations, both sides) to settle the registered criterion. | Deck-clustered p < 0.1 at ≥ +1 confirms; below +0.5 reverts to the heuristic; anything else leaves it unconfirmed and the question is closed on cost grounds. |
 | 1 | Fix the chunked-arm manifest overwrite: write `batch_manifest.json` under a chunk-unique key so provenance survives (ADR 0005 follow-up). | A chunked arm's manifests all persist; `backfill_summaries.py --source minio` covers the same games as `--source minio-events`. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
@@ -3521,8 +3522,10 @@ adoption.
   sides fresh at the same commit and holdout set, 15 seeds × 2 opponent pairs
   × 3 rotations. **+1.12 (naive p=0.186, deck-clustered p=0.195, design effect
   1.04)** — the same point estimate as the 5-deck arm, now on independent
-  decks with the clustering gone, both pairs positive. Registered ≥ +1:
-  **the placement adoption is confirmed**.
+  decks with the clustering gone, both pairs positive. **The registered
+  criterion was deck-clustered p < 0.1 at ≥ +1; p=0.195 does not meet it, and
+  +1.12 does not trigger the +0.5 revert line either. The adoption stands
+  unconfirmed.** 25 decks would reach p<0.1 at the observed effect.
 - **Production re-check**: `rr_prod_placement` vs `rr_goal_placement`, −0.80
   (p=0.50), 3,227 → 1,062 ms, p95 1.2 / 3.2 / 3.8 / 4.2 s by round. The
   production configuration survives the search change.

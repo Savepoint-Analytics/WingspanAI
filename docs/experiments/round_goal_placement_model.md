@@ -179,14 +179,27 @@ games a deck:
 
 The point estimate is identical to two decimal places on independent decks,
 the design effect is now ~1 (so the naive and deck-clustered readings agree),
-and both opponent pairs are positive (+0.91, +1.33). Registered ≥ +1 to
-confirm, < +0.5 to revert: **confirmed**. The adoption stands, and its
-evidence is no longer weak in the way the original record said — two
-independent 90-game contrasts at +1.12, one of them properly decked.
+and both opponent pairs are positive (+0.91, +1.33).
 
-Still not significant at p<0.05, and the honest summary is unchanged in
-kind: this is a ~1-point improvement measured twice, adopted on a
-pre-registered point-estimate bar, guarded by the `heuristic` holdout.
+**The registered criterion was "deck-clustered p < 0.1 at ≥ +1 confirms; below
++0.5 reverts". The effect size clears +1 for the second time; p = 0.195 does
+not clear 0.1. So this arm confirms nothing.** It also does not trigger the
+revert line. The registration left that middle zone unspecified, which is a
+flaw in the registration rather than a result — the lesson for the next one
+is to register a power calculation, not only a decision threshold.
+
+**Status: adopted but unconfirmed.** What argues for leaving it in place
+rather than reverting: +1.12 twice on independent decks, both opponent pairs
+positive, the mechanism significant at 2p (goal points +0.84, p=0.011), and
+essentially zero cost. What argues against treating it as established: one
+arm at p=0.195 is one arm at p=0.195.
+
+**What would settle it.** The per-deck spread is SD 3.35 on a +1.12 effect.
+If that effect and spread are real, 25 decks reach p<0.1 and 35 reach p<0.05;
+70 decks (420 games a side) gives 80% power at p<0.05. Those are conditional
+on the observed numbers, so they are a planning figure, not a promise.
+Extending this arm from 15 to 25 decks is about five hours and is the cheapest
+way to close the registered criterion.
 
 ### Production configuration on the placement default (2026-09-24)
 
