@@ -140,6 +140,51 @@ design effect, and flags any contrast whose design effect exceeds 1.3.
 opponent pairs × 3 rotations = 90 games on 15 decks) rather than more
 lineups on five.
 
+## The per-opponent breakdown is a multiplicity surface (2026-09-24)
+
+Every `arm_contrast` run prints a headline contrast **and** one cell per
+opponent: four at two players, six at three. Those cells are unadjusted
+tests, and the ledger has quoted individual ones as findings:
+
+| arm | cell quoted | p | survives Bonferroni within its own arm (α=0.05/4 = 0.0125)? |
+|---|---|---:|---|
+| synergy term | −7.7 vs `bonus_card_focus` | 0.006 | yes |
+| budget ladder v2 | −4.2 vs `bonus_card_focus` | 0.03 | **no** |
+| resource spending | vs `bonus_card_focus` | 0.07 | no |
+
+The arithmetic: with four cells, P(at least one at p<0.05 by chance) is
+**18.5%**; with six, **26.5%**. Five three-player arms have now been read
+against the same baseline on the same five decks — about 35 score tests, plus
+as many win-rate tests — so a handful of spurious cells is expected, not
+surprising. **A single cell in a single arm is a hypothesis to test, not a
+finding.**
+
+### What pooling the cells actually shows
+
+Pooled over five two-player arms (budget v2, K=1, pre-ranking, competent,
+placement), splitting the same paired deltas by opponent:
+
+| opponent | n | mean Δ | SD | SE |
+|---|---:|---:|---:|---:|
+| `archetype_bonus_card_focus` | 100 | **−2.76** | 9.64 | 0.96 |
+| `greedy_immediate` | 100 | −0.73 | 9.76 | 0.98 |
+| `net_value_response` | 100 | −0.69 | 9.73 | 0.97 |
+| `archetype_engine_builder` | 100 | +0.59 | 9.13 | 0.91 |
+
+The four opponents have **the same variance** (SD 9.1–9.8), so
+`bonus_card_focus` is not simply the noisy cell that keeps winning the
+lottery. The differential against `engine_builder` is 3.35 points at roughly
+2.5 SE, it replicates across five independent switches, and there is already
+a mechanism on record: four of those five arms cut search work, and
+`decision_profiling.md` notes that the plies cut first are the ones that see
+bonus-card scoring.
+
+So the honest form of this finding is **pooled across arms, not read from one
+cell**: cost reductions in the search cost more against a bonus-card opponent
+than against the rest of the roster. Stated that way it is worth acting on;
+stated as "budget v2 lost 4.2 to bonus_card_focus at p=0.03" it was one of
+about five cells that chance alone would have produced.
+
 ## Reading a row fairly
 
 Two conditions, both learned the hard way. **Pair by seed** (2026-09-01,

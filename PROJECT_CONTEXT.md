@@ -651,6 +651,7 @@ The following points are already established unless changed:
 - Register the prediction before the arm; pair by seed; launch from a clean worktree; read score and latency together.
 - Do not adopt or drop a switch without adding its `Holdout`.
 - Do not read an unpaired or sub-detection-limit contrast as a finding; the 80-game limit is ~1.9 points.
+- Do not read a single per-opponent cell as a finding: four cells give an 18.5% chance of a spurious hit, six give 26.5%. Pool the cell across arms, or treat it as a hypothesis for its own arm.
 
 ## Files that should exist near this file
 
