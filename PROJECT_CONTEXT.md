@@ -260,8 +260,9 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 |---|---|---|
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
-| 1 | Read `rr_prerank_v2` (beam pre-ranking as the unbudgeted default, 80 games vs `rr_goal_placement`). **Registered: −0.5 to +0.5 on holdout-free games** — the audit put the original −0.72 at −0.16 like-for-like. ≥ −0.5 adopts it as the default (it is a 58% latency cut for nothing); below −1 confirms the original drop. | Ledger row with both the all-games and holdout-free reads, and the deck-clustered p. |
 | 1 | Read `rr3p_oracle15` (oracle-type opponent model, 15 decks × 2 pairs × 3 rotations vs `rr3p_goal_place15`). **Registered: +0.5 to +2.0, deck-clustered p < 0.05 to promote it from "needs an arm" to a finding.** The 5-deck read was +1.36 at deck p=0.028 but inside the audit's own multiplicity; this is its own pre-registered test. A null closes the opponent-model family at 3p as well as 2p. | Ledger row; if positive, the question becomes whether anything shippable can approximate perfect type knowledge. |
+| 1 | **Run the game-identity migration and reload** (`scripts/migrate_game_identity.py`, then `backfill_summaries.py --source minio-events`, then `analysis/apply_sql_views.py`). Needs approval: it drops 5,969 `games` and ~12,300 `game_scores` rows, all reconstructible from object storage. | `games` reaches ~10,800 rows; the backfill's new `skipped_unidentified` / `duplicate_runs` counters account for the rest of the 10,831 archived games. |
+| 1 | Re-run the KPI pass after the reload and lift the warning banner on `kpi_taxonomy_findings.md`. | Every per-agent and per-matchup KPI recomputed over ~10,800 games; win rates move or they do not, and either way the number is quotable. |
 | 1 | Fix the chunked-arm manifest overwrite: write `batch_manifest.json` under a chunk-unique key so provenance survives (ADR 0005 follow-up). | A chunked arm's manifests all persist; `backfill_summaries.py --source minio` covers the same games as `--source minio-events`. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
@@ -3610,3 +3611,81 @@ systematically against the arm. All three now point at Lens 3 of
 
 **In flight:** `rr_prerank_v2` launched 23:08 (46 of its games done, four
 runners) and `rr3p_oracle15` is queued behind it. Neither is read yet.
+
+## Update: 2026-09-25 (later) - beam pre-ranking is not adopted, and `game_id` was never unique
+
+### `rr_prerank_v2`: not adopted, and the registration was unanswerable
+
+Beam pre-ranking as the **unbudgeted** default, 80 games paired against
+`rr_goal_placement`. Registered: −0.5 to +0.5 on holdout-free games adopts it;
+below −1 confirms the original drop.
+
+| read | n | Δ score | p |
+|---|---:|---:|---:|
+| all games | 80 | −0.86 | 0.451 |
+| **holdout-free** | 74 | **−0.96** | 0.433 |
+| holdout-free, by deck | 10 decks | −1.16 | 0.380 |
+
+Latency is a real win: mean decision 3227 → 1230 ms (×0.38), 84 → 32 s a game.
+
+**Not adopted.** −0.96 misses the adoption band. Two things matter more than
+that verdict:
+
+1. **The audit's −0.16 did not replicate.** I re-opened this question because
+   the 2026-09-25 audit put the original −0.72 at −0.16 like-for-like on
+   holdout-free games. The fresh arm says −0.96. Three reads of this switch now
+   sit at −0.72, −0.80, −0.96 — the audit's correction was itself noise, and
+   the consistent sign across three reads is the actual evidence. Not one of
+   the three is individually significant.
+2. **The arm could not have answered its own registration.** 95% CI
+   [−3.34, +1.43]; detection limit 3.41 points at 80% power. A ±0.5 band
+   against a per-game SD of 10.5 needs ~3,400 games. It got 80.
+
+**New standing rule** (recorded in `results_ledger.md`): a registration must
+state the detection limit its sample will have, and the band must be wider than
+that limit. 80-game 2p arms resolve about ±3 points. ±1 needs ~860 games; ±0.5
+is out of reach on this hardware. If the band cannot be met, do not launch the
+arm — decide on cost or mechanism and say so.
+
+### The backfill gap was a broken primary key, not a bug (ADR 0006)
+
+Three attempts to explain why the backfill stalled near 5,960 games while
+reporting ~10,650 candidates all assumed a defect in `backfill_summaries.py`.
+There is none. **`game_id` is not unique.** It is built as
+`{batch_id}_seed_{seed}`, omitting the lineup and the seat rotation, so every
+game in a batch sharing a seed carries the same id while being a different game
+with its own run id, opponents and scores.
+
+| | count |
+|---|---:|
+| archived `events.jsonl` objects | 10,831 |
+| unique `game_id` values | 6,014 |
+| **games erased by collision** | **4,817 (44.5%)** |
+| rows actually in `games` | 5,969 |
+
+6,014 against 5,969 closes it: the rows were not dropped, they were
+unrepresentable under a `games.game_id` primary key.
+
+**Fixed** (commit `0fd23f3`): `games` keys on `simulation_run_id`,
+`game_scores` on `(simulation_run_id, player_id)`, `game_id` stays as the
+indexed batch-scoped label it always was. Readers follow — and `kpis.py` had a
+real correctness bug from this: grouping by `game_id` merged distinct games, so
+two 2p games became one four-player game in the tempo and win-margin KPIs.
+`game_id` generation is deliberately unchanged: under ADR 0003 `random_seed` is
+the sole reproducibility key and `game_id` is a storage key only.
+
+**What this does and does not invalidate.** Every arm result in
+`results_ledger.md` stands — `arm_contrast.py` reads local artifacts keyed on
+`(lineup, rotation, seed, ruleset_id)` and never touches PostgreSQL. What does
+not stand: the per-agent and per-matchup numbers in
+`kpi_taxonomy_findings.md`, computed over the arbitrary ~55% that survived,
+biased toward one lineup/rotation per (batch, seed). That doc now carries a
+warning banner until the reload.
+
+**Blocked on approval:** `scripts/migrate_game_identity.py` drops and reloads
+rather than migrating, because the survivors are a biased subset. It deletes
+5,969 `games` and ~12,300 `game_scores` rows — all reconstructible from object
+storage, but a deletion, so it is left unrun. Phase 5 (dbt) stays gated until
+the reload shows ~10,800 games.
+
+**In flight:** `rr3p_oracle15` (26 of 90 games at 23:40).
