@@ -101,6 +101,23 @@ opponent model 3%, 5.2 s mean decision. After: 53% / 33%, 2.6 s. Latency by
 round in the archive: 1.8 → 5.9 → 10.5 → 15.7 s mean; a production budget
 has to be per decision.
 
+## Audit, 2026-09-25
+
+Every row was re-read for deck clustering, multiplicity and holdout-set
+mismatch, and the p-value function was found to use a normal approximation
+(exact t now). Nothing reversed; two decisions are better supported than
+recorded, two findings are weaker, one dismissed row needs an arm. Full
+working in `ledger_audit_2026_09_25.md`. The corrections that matter:
+
+| row | as recorded | corrected |
+|---|---|---|
+| 2p placement goal model | +0.41 (p=0.69) | **+1.44 (p=0.20)** like-for-like on holdout-free games |
+| production config at 5 s | −0.59 | **+0.00** like-for-like |
+| beam pre-ranking | −0.72 | **−0.16** like-for-like; the drop is worth revisiting |
+| 3p greedy opponent model | +2.12 (p=0.073) | p=**0.304** by deck; carried by the mirror arm (+1.89, p=0.038 on 30 decks) |
+| 3p oracle-type model | +1.36, "null" | deck p=**0.028**; promoted to "needs its own arm" |
+| layer C P2 pair | +3.48 (p=0.021) | does not survive Bonferroni across its three pre-registered pairs; follow-up null |
+
 ## Decks, not games (2026-09-22)
 
 A seed is a **deck**: every game on it shares the shuffle, the round goals

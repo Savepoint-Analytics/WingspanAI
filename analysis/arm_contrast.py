@@ -92,8 +92,71 @@ def agent_result(game: dict, agent: str) -> tuple[float, float] | None:
     return float(own), win
 
 
+def _beta_continued_fraction(a: float, b: float, x: float) -> float:
+    """Lentz's continued fraction for the incomplete beta function."""
+
+    tiny = 1e-30
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c = 1.0
+    d = 1.0 - qab * x / qap
+    d = tiny if abs(d) < tiny else d
+    d = 1.0 / d
+    result = d
+    for m in range(1, 200):
+        two_m = 2 * m
+        numerator = m * (b - m) * x / ((qam + two_m) * (a + two_m))
+        d = 1.0 + numerator * d
+        d = tiny if abs(d) < tiny else d
+        c = 1.0 + numerator / c
+        c = tiny if abs(c) < tiny else c
+        d = 1.0 / d
+        result *= d * c
+        numerator = -(a + m) * (qab + m) * x / ((a + two_m) * (qap + two_m))
+        d = 1.0 + numerator * d
+        d = tiny if abs(d) < tiny else d
+        c = 1.0 + numerator / c
+        c = tiny if abs(c) < tiny else c
+        d = 1.0 / d
+        step = d * c
+        result *= step
+        if abs(step - 1.0) < 3e-16:
+            break
+    return result
+
+
+def _incomplete_beta(a: float, b: float, x: float) -> float:
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    front = math.exp(
+        math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log1p(-x)
+    )
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * _beta_continued_fraction(a, b, x) / a
+    return 1.0 - front * _beta_continued_fraction(b, a, 1.0 - x) / b
+
+
+def student_t_two_sided_p(t_statistic: float, degrees_of_freedom: int) -> float:
+    """Exact two-sided p for a t statistic.
+
+    The normal approximation this replaced (``erfc(|t|/sqrt(2))``) is fine at
+    n=80 and badly wrong at small n: a 3p arm read by deck has five
+    observations and four degrees of freedom, where the approximation reported
+    p=0.001 for what is really p=0.028 (2026-09-25 audit).
+    """
+
+    if degrees_of_freedom <= 0:
+        return 1.0
+    return _incomplete_beta(
+        degrees_of_freedom / 2.0,
+        0.5,
+        degrees_of_freedom / (degrees_of_freedom + t_statistic * t_statistic),
+    )
+
+
 def paired_test(deltas: list[float]) -> tuple[float, float]:
-    """(mean delta, two-sided p) under a normal approximation to the paired t."""
+    """(mean delta, two-sided p) from the paired t distribution."""
 
     if len(deltas) < 2:
         return (mean(deltas) if deltas else 0.0), 1.0
@@ -101,7 +164,7 @@ def paired_test(deltas: list[float]) -> tuple[float, float]:
     if spread == 0:
         return mean(deltas), 1.0
     t_statistic = mean(deltas) / (spread / math.sqrt(len(deltas)))
-    return mean(deltas), math.erfc(abs(t_statistic) / math.sqrt(2))
+    return mean(deltas), student_t_two_sided_p(t_statistic, len(deltas) - 1)
 
 
 def contrast(

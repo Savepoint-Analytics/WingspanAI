@@ -55,6 +55,7 @@ Key rules docs:
 - `events/postgresql_event_table_design.md`: draft event-log database tables and indexes.
 - `experiments/case_study.md`: the case-study body — problem, what was built, the five findings, the method, limitations — written from the ledger.
 - `experiments/case_study_outline.md`: public case-study narrative outline.
+- `experiments/ledger_audit_2026_09_25.md`: every claim re-read for deck clustering, multiplicity and holdout-set mismatch, plus the normal-approximation p-value bug the audit found; what changed and what did not.
 - `experiments/results_ledger.md`: one row per registered arm and study — score delta, p, latency, points per second, decision — and the round-robin and card-study headlines.
 - `experiments/standing_holdouts.md`: registry of every decided switch kept alive at 5% as a long-run guardrail, how the draw works, how to read and retire one.
 - `experiments/lookahead_compute_profile.md`: `apply_action` deep-copy profile and budgeted lookahead-agent probes.
