@@ -263,7 +263,6 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 | 1 | Read `rr3p_oracle15` (oracle-type opponent model, 15 decks × 2 pairs × 3 rotations vs `rr3p_goal_place15`). **Registered: +0.5 to +2.0, deck-clustered p < 0.05 to promote it from "needs an arm" to a finding.** The 5-deck read was +1.36 at deck p=0.028 but inside the audit's own multiplicity; this is its own pre-registered test. A null closes the opponent-model family at 3p as well as 2p. | Ledger row; if positive, the question becomes whether anything shippable can approximate perfect type knowledge. |
 | 1 | **Run the game-identity migration and reload** (`scripts/migrate_game_identity.py`, then `backfill_summaries.py --source minio-events`, then `analysis/apply_sql_views.py`). Needs approval: it drops 5,969 `games` and ~12,300 `game_scores` rows, all reconstructible from object storage. | `games` reaches ~10,800 rows; the backfill's new `skipped_unidentified` / `duplicate_runs` counters account for the rest of the 10,831 archived games. |
 | 1 | Re-run the KPI pass after the reload and lift the warning banner on `kpi_taxonomy_findings.md`. | Every per-agent and per-matchup KPI recomputed over ~10,800 games; win rates move or they do not, and either way the number is quotable. |
-| 1 | Fix the chunked-arm manifest overwrite: write `batch_manifest.json` under a chunk-unique key so provenance survives (ADR 0005 follow-up). | A chunked arm's manifests all persist; `backfill_summaries.py --source minio` covers the same games as `--source minio-events`. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
@@ -3689,3 +3688,31 @@ storage, but a deletion, so it is left unrun. Phase 5 (dbt) stays gated until
 the reload shows ~10,800 games.
 
 **In flight:** `rr3p_oracle15` (26 of 90 games at 23:40).
+
+### Manifest overwrite fixed, and it was a different shape than recorded
+
+The task said "chunked arms rewrite `batch_manifest.json` in a shared batch
+directory". Measured, the shape is narrower but the effect is worse:
+
+- Manifests are **not** missing: 2,643 of 2,654 batch directories in object
+  storage have one. The 11 without hold 43 games, one of them the oracle arm
+  still running.
+- But **every manifest under-lists its own directory**: in a 120-directory
+  sample, 120 of 120 listed exactly one game while archiving up to 240. Sampled
+  totals were 120 manifest games against 683 archived.
+
+The cause is not chunking as such. Several invocations share one
+`batch_kind/batch_label/batch_id` triple — the `fp_*` forced-play and
+`bkeepeb_*` bird-keep probes run one game per invocation under one batch id —
+and the manifest object key was built from that triple alone, so each
+invocation overwrote the last. Each chunk's `code_provenance` went with it.
+
+Fixed (commit `e805602`) by nesting the object under
+`manifests/<start>_seeds_<first>-<last>/`. The filename is unchanged, so
+`rglob("batch_manifest.json")` and the backfill's `endswith` check keep working
+with no reader changes.
+
+**The arms were never affected**: each arm chunk gets its own `batch_label`, so
+their manifests never shared a key. That is why `arm_contrast` reads every game
+and why the ledger is sound. The loss was confined to the probe batches and to
+manifest-driven backfill reads.
