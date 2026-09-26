@@ -188,15 +188,68 @@ revert line. The registration left that middle zone unspecified, which is a
 flaw in the registration rather than a result — the lesson for the next one
 is to register a power calculation, not only a decision threshold.
 
-**Status: adopted but unconfirmed.** What argues for leaving it in place
-rather than reverting: +1.12 twice on independent decks, both opponent pairs
-positive, the mechanism significant at 2p (goal points +0.84, p=0.011), and
-essentially zero cost. What argues against treating it as established: one
-arm at p=0.195 is one arm at p=0.195.
+**Status at 15 decks: adopted but unconfirmed.** What argued for leaving it
+in place rather than reverting: +1.12 twice on independent decks, both
+opponent pairs positive, the mechanism significant at 2p (goal points +0.84,
+p=0.011), and essentially zero cost. What argued against treating it as
+established: one arm at p=0.195 is one arm at p=0.195.
 
-**What would settle it.** The per-deck spread is SD 3.35 on a +1.12 effect.
-If that effect and spread are real, 25 decks reach p<0.1 and 35 reach p<0.05;
-70 decks (420 games a side) gives 80% power at p<0.05. Those are conditional
+The 25-deck extension below resolves this.
+
+### Confirmation on 25 decks (2026-09-25)
+
+Seeds 16-25 were added at the same commit, same two opponent pairs, same
+three rotations, both sides fresh - 60 more games, 10 more decks. The
+registration written before launch: *"Deck-clustered p < 0.1 at >= +1
+confirms; below +0.5 reverts to the heuristic; anything else leaves it
+unconfirmed and the question is closed on cost grounds."*
+
+| | Delta score | deck-clustered p | decks | win Delta |
+|---|---:|---:|---:|---:|
+| decks 1-15 (2026-09-24) | +1.122 | 0.216 | 15 | +0.061 |
+| decks 16-25 (new) | +1.117 | 0.306 | 10 | +0.000 |
+| **pooled 1-25** | **+1.120** | **0.097** | **25** | +0.037 |
+
+The new decks replicate the effect to three decimal places without being
+rounded to it - +1.117 against +1.122 - which is a genuine out-of-sample
+replication and the strongest single fact in this section.
+
+**The registered criterion is met: +1.120 >= +1 and deck p=0.0971 < 0.1. The
+placement goal model is confirmed by its pre-registered rule.** That reverses
+the "unconfirmed" label above, and it is honoured as written rather than
+re-argued after seeing the data.
+
+#### But the confirmation is fragile, and the effect is smaller than +1.12
+
+Three robustness checks, none of them pre-registered and all of them run
+immediately after the read:
+
+| Check | Result | Reading |
+|---|---|---|
+| Leave-one-deck-out | removing any of **14 of 25** decks pushes p above 0.1 | the verdict is one deck from flipping |
+| - worst three | deck 2 (+10.2) -> Delta=+0.74, p=0.190; deck 25 (+7.0) -> +0.88, p=0.176; deck 17 (+5.8) -> +0.92, p=0.165 | it leans on a few high-scoring decks |
+| Sign test | 16/25 decks positive, two-sided **p=0.230** | direction alone is not significant |
+| 20% trimmed mean | **+0.85** | below the +1 bar once outer decks are trimmed |
+
+Between-deck SD is 3.24 on a +1.12 effect: which deck you are dealt moves
+the score about three times more than this switch does. Taking the
+leave-one-out range (+0.74 to +1.12) and the trimmed mean (+0.85) together,
+the defensible effect size is **roughly +0.8 to +1.1 points**, with +1.12 at
+the optimistic end.
+
+So: the switch stays the default, and every estimate clears the +0.5 revert
+line comfortably. What is not licensed is quoting +1.12 as a measured
+constant, or presenting this as a clean positive in the case study. It is a
+real but modest effect, confirmed on a threshold it barely crosses.
+
+**What would settle it properly.** The per-deck spread is SD 3.24-3.35 on a
+~+1 effect. 35 decks reach p<0.05 and 70 decks (420 games a side) gives 80%
+power at p<0.05. On cost grounds the registration closed the question at 25
+either way, so those are a planning figure for a future re-open, not a
+commitment. The lesson carried forward: register a power calculation, not
+only a decision threshold, and register the robustness checks too - had
+leave-one-out been part of the rule, this arm would read as "directionally
+positive, underpowered" rather than as a confirmation with an asterisk.
 on the observed numbers, so they are a planning figure, not a promise.
 Extending this arm from 15 to 25 decks is about five hours and is the cheapest
 way to close the registered criterion.
@@ -260,8 +313,11 @@ commit.** When the arm carries holdouts the baseline lacks, the holdout
 deviation is attributed to the arm. Ledger rows from 2026-09-17 to
 2026-09-22 paired against `rr_belief_opp` (no `DEFAULT_HOLDOUTS`) while
 carrying two to four of them, so each of those rows is biased downward by
-Σ share × cost ≈ 0.1–0.4 points — inside every one of their detection
-limits, so no conclusion changes, but the direction is known. The
+Σ share × cost. I estimated 0.1–0.4 points; the 2026-09-25 audit measured
+**0.5–1.0**, two to three times that and systematically against the arm
+(`ledger_audit_2026_09_25.md`, Lens 3). Still inside most of those rows'
+detection limits, but it is large enough to have changed one verdict: the 2p
+placement arm reads +1.44 rather than +0.41 on holdout-free games. The
 2026-09-22 re-baseline fixes this going forward: `rr_goal_placement` and
 `rr3p_goal_placement` carry the same four holdouts every future arm will.
 

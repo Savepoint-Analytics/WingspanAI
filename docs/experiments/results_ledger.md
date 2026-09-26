@@ -70,7 +70,8 @@ detail, and the depth-3 search was the first change large enough to see.
 | 2026-09-20 | A2 `mirror_2p_greedy` | position 1 on `search_opponent_model="greedy"`, 80 games paired vs `mirror_2p` | study seat **+0.46 (p=0.62)**, win −0.006; decision ×1.55. Registered +1 to +3 failed: **the 2p opponent question closes** — a planning opponent changes nothing either. Seat pooled A1+A2 (160 games, 40 decks): seat 1 **+3.9 (p=0.014), win 0.559** |
 | 2026-09-20 | A2 `mirror_3p_greedy` | position 1 on `greedy`, 90 games paired vs `mirror_3p` | study seat **+1.89 (p=0.072)**, win −0.011; decision ×1.55 (+0.18 points/s). Registered +2 to +4: point estimate just under. With the roster result (+2.12, p=0.073) two independent contrasts agree: **≈+2 at 3p is real** (combined p≈0.01), a score not a win effect, and four cheap reproductions failed. Not adopted for cost; belief stays |
 | 2026-09-20 | A3 `mirror_2p_denial` | position 1 with `search_denial_weight=1.0`, 80 games paired vs `mirror_2p` | study seat **−5.94 (p<0.001)**, win −0.156; cost ×0.89. Registered +1 to +3 failed: the term pays the agent to draw tray cards (draw share 24% → 33%, tray draws 371 → 657) against a refilling supply. Dropped; 3p arm stopped as answered |
-| 2026-09-24 | **3p 15-deck confirmation**: placement vs heuristic goal model, both sides fresh at 15 seeds × 2 opponent pairs × 3 rotations | rr3p_goal_heur15 | **+1.12** | 0.186 | +0.06 | ≈ | — | **does not meet its registered criterion** (deck-clustered p < 0.1 at ≥ +1): the effect size replicates exactly on 15 independent decks with design effect 1.04, but p=0.195. Above the +0.5 revert line, so the adoption stands **unconfirmed**; 25 decks would settle it at the observed effect |
+| 2026-09-24 | **3p 15-deck confirmation**: placement vs heuristic goal model, both sides fresh at 15 seeds × 2 opponent pairs × 3 rotations | rr3p_goal_heur15 | **+1.12** | 0.186 | +0.06 | ≈ | — | at 15 decks this **did not** meet its registered criterion (deck p=0.195 against a p<0.1 bar). Superseded by the 25-deck pool below, which does — read the two together, not this row alone |
+| 2026-09-25 | **3p 25-deck extension**: seeds 16–25 added to the above, same 2 pairs × 3 rotations, both sides (`rr3p_goal_place25` / `rr3p_goal_heur25`) | rr3p_goal_heur25 | **+1.12** | **0.097** | +0.04 | ≈ | — | **meets the registered criterion** (deck-clustered p < 0.1 at ≥ +1) → the placement goal model is **confirmed**, reversing the 2026-09-24 "unconfirmed" label. New decks 16–25 replicate almost exactly (+1.117 vs +1.122 on 1–15). **But the verdict is fragile** — see below |
 | 2026-09-24 | production config (`beam_leaf` + 5 s ladder) re-checked on the placement default | rr_goal_placement | −0.80 | 0.50 | −0.04 | 3,227 → 1,062 | +0.37 saved | **production config stands**: p95 by round 1.2 / 3.2 / 3.8 / 4.2 s, all under the cap |
 | 2026-09-22 | four-goal opener (`v2_allgoals`) vs the round-1-only opener (`v2`) | rr_opener_v2 | −1.21 | 0.037 | −0.01 | — | — | **invalid as a goal-horizon test**: the switch changed the opening in 2/80 games, 64 games were bit-identical, and the −1.21 is the arm's standing holdouts (the 2026-09-16 baseline has none). Registered null confirmed; not adopted |
 | 2026-09-22 | 3p: placement round-goal model vs the heuristic | rr3p_opp/belief | **+1.12** | 0.128 | +0.03 | ≈ (0.1 ms a state) | — | meets the registered +1 bar → **adopted (H)**; re-baseline `rr_goal_placement` (2p) / `rr3p_goal_placement` (3p). Composition differs from 2p: goals +0.46, eggs +0.97, birds only −0.27 |
@@ -100,6 +101,34 @@ Before the fast expansion: `expand_children` 73%, `terminal_value` 17%,
 opponent model 3%, 5.2 s mean decision. After: 53% / 33%, 2.6 s. Latency by
 round in the archive: 1.8 → 5.9 → 10.5 → 15.7 s mean; a production budget
 has to be per decision.
+
+## The 25-deck placement confirmation is fragile
+
+The pooled 25-deck read (Δ=+1.120, deck-clustered p=0.0971, 25 decks) clears
+the pre-registered bar, and the registration is honoured: the rule was fixed
+before launch and it is met. But three robustness checks all say the verdict
+sits on a knife edge, and a reader who quotes "confirmed, p<0.1" without them
+is over-reading the row.
+
+| Check | Result | Reading |
+|---|---|---|
+| Leave-one-deck-out | removing any of **14 of 25** decks pushes p above 0.1 | the verdict, not just the p-value, is one deck from flipping |
+| — worst three | drop deck 2 (+10.2) → Δ=+0.74, p=0.190; deck 25 (+7.0) → +0.88, p=0.176; deck 17 (+5.8) → +0.92, p=0.165 | the confirmation leans on a few high-scoring decks |
+| Sign test | 16/25 decks positive, two-sided **p=0.230** | direction alone is not significant |
+| 20% trimmed mean | **+0.85** | below the +1 adoption bar once outer decks are trimmed |
+
+Between-deck SD is 3.24 on a +1.12 effect, so a deck's identity moves the
+score three times more than the switch does. The honest effect size is
+**about +0.8 to +1.1**, with +1.12 at the optimistic end of that range: the
+leave-one-out Δ spans +0.74 to +1.12 and the trimmed mean lands at +0.85.
+
+What this changes: the switch stays the default (it was already adopted, and
+nothing here argues for reverting — the revert line was +0.5 and every
+estimate clears it). What it forbids is treating +1.12 as a measured
+constant, or citing this row as a clean positive in the case study. If the
+placement model's value ever needs to be known to better than ±0.3 points,
+that needs decks in the hundreds, not 25 — and on cost grounds the
+registration already closed the question either way.
 
 ## Audit, 2026-09-25
 
@@ -209,7 +238,9 @@ after a greedy agent ranked second and a seat-3 advantage that were both
 artefacts). **Match the holdout set**: an arm carrying standing holdouts
 its baseline lacks is charged for the deviation (2026-09-22, the four-goal
 opener arm). Rows from 2026-09-17 to 2026-09-22 paired against
-`rr_belief_opp` carry a downward bias of about 0.1–0.4 points from this,
+`rr_belief_opp` carry a downward bias of about 0.5–1.0 points from this
+(estimated at 0.1–0.4 until the 2026-09-25 audit measured it on holdout-free
+games; the estimate was 2–3× too small and the bias runs against the arm),
 inside their detection limits; the 2026-09-22 re-baseline removes it.
 
 ## How to add a row

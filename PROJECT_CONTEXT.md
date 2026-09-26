@@ -262,7 +262,6 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
 | 1 | Read `rr_prerank_v2` (beam pre-ranking as the unbudgeted default, 80 games vs `rr_goal_placement`). **Registered: −0.5 to +0.5 on holdout-free games** — the audit put the original −0.72 at −0.16 like-for-like. ≥ −0.5 adopts it as the default (it is a 58% latency cut for nothing); below −1 confirms the original drop. | Ledger row with both the all-games and holdout-free reads, and the deck-clustered p. |
 | 1 | Read `rr3p_oracle15` (oracle-type opponent model, 15 decks × 2 pairs × 3 rotations vs `rr3p_goal_place15`). **Registered: +0.5 to +2.0, deck-clustered p < 0.05 to promote it from "needs an arm" to a finding.** The 5-deck read was +1.36 at deck p=0.028 but inside the audit's own multiplicity; this is its own pre-registered test. A null closes the opponent-model family at 3p as well as 2p. | Ledger row; if positive, the question becomes whether anything shippable can approximate perfect type knowledge. |
-| 1 | Extend the 3p placement arm from 15 to 25 decks (seeds 16–25, same 2 pairs × 3 rotations, both sides) to settle the registered criterion. | Deck-clustered p < 0.1 at ≥ +1 confirms; below +0.5 reverts to the heuristic; anything else leaves it unconfirmed and the question is closed on cost grounds. |
 | 1 | Fix the chunked-arm manifest overwrite: write `batch_manifest.json` under a chunk-unique key so provenance survives (ADR 0005 follow-up). | A chunked arm's manifests all persist; `backfill_summaries.py --source minio` covers the same games as `--source minio-events`. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
@@ -3488,7 +3487,8 @@ in its strongest form — the term almost never changes the decision.
 
 **Method rule added:** a paired arm must share its baseline's *holdout
 set*, not just its commit. Rows from 2026-09-17 to 2026-09-22 paired
-against `rr_belief_opp` carry a downward bias of ≈0.1–0.4 points from
+against `rr_belief_opp` carry a downward bias of ≈0.5–1.0 points (measured
+2026-09-25; my original ≈0.1–0.4 estimate was 2–3× too small) from
 this; inside every affected detection limit, so nothing flips, and the
 2026-09-22 re-baseline removes it going forward. Also measured: the
 per-field guardrail remains unreadable (6–33 held-out games, limits
@@ -3552,3 +3552,61 @@ adoption.
   games — losing `code_provenance`, holdout records and per-seat search config
   for the rest. Worked around with an events-first backfill; the fix is a
   chunk-unique manifest key (now the top task).
+
+## Update: 2026-09-25 - The placement model is confirmed on 25 decks, on a threshold it barely crosses
+
+**The registered criterion is met.** Seeds 16-25 were added to the 3p
+placement arm (`rr3p_goal_place25` / `rr3p_goal_heur25`, 60 games each, same
+two opponent pairs, same three rotations, both sides fresh). Registration, as
+written before launch: *"Deck-clustered p < 0.1 at >= +1 confirms; below +0.5
+reverts to the heuristic; anything else leaves it unconfirmed and the question
+is closed on cost grounds."*
+
+| | Delta score | deck p | decks | win Delta |
+|---|---:|---:|---:|---:|
+| decks 1-15 | +1.122 | 0.216 | 15 | +0.061 |
+| decks 16-25 | +1.117 | 0.306 | 10 | +0.000 |
+| **pooled 1-25** | **+1.120** | **0.097** | **25** | +0.037 |
+
++1.120 >= +1 and p=0.0971 < 0.1, so the placement round-goal model is
+confirmed by its own pre-registered rule. That **reverses the "unconfirmed"
+label I recorded on 2026-09-24**, and it is honoured as written rather than
+re-argued after the fact. The out-of-sample replication is the strongest fact
+here: decks 16-25 came in at +1.117 against +1.122 on decks 1-15, genuinely
+and not by rounding.
+
+**The confirmation is fragile, and I am recording that in the same breath.**
+Four checks run straight after the read:
+
+- **Leave-one-deck-out: removing any of 14 of the 25 decks pushes p above
+  0.1.** Worst three: drop deck 2 (+10.2) and it is +0.74 at p=0.190; deck 25
+  (+7.0) gives +0.88 at p=0.176; deck 17 (+5.8) gives +0.92 at p=0.165.
+- **Sign test: 16/25 decks positive, two-sided p=0.230.** Direction alone is
+  not significant.
+- **20% trimmed mean: +0.85** - under the +1 bar once outer decks are trimmed.
+- Between-deck SD is 3.24 on a +1.12 effect: the deck you are dealt moves the
+  score roughly 3x more than this switch does.
+
+So the honest effect size is **about +0.8 to +1.1 points**, with +1.12 sitting
+at the optimistic end. Nothing here argues for reverting - the revert line was
++0.5 and every estimate clears it comfortably - so the switch stays the
+default. What is now forbidden is quoting +1.12 as a measured constant or
+citing this as a clean positive in the case study. It is a real but modest
+effect, confirmed on a threshold it barely crosses.
+
+**Process lesson, carried forward:** register the robustness checks alongside
+the decision threshold, and register a power calculation. Had leave-one-out
+been in the rule, this arm would read "directionally positive, underpowered"
+rather than "confirmed, with an asterisk". 35 decks would reach p<0.05 and 70
+decks give 80% power; on cost grounds the registration closed the question at
+25 either way.
+
+Also corrected in this pass: the holdout-set mismatch bias was still recorded
+as ~0.1-0.4 points in three places (`results_ledger.md`,
+`round_goal_placement_model.md`, and above in this file). The 2026-09-25 audit
+measured it at **0.5-1.0 points** on holdout-free games, 2-3x my estimate and
+systematically against the arm. All three now point at Lens 3 of
+`ledger_audit_2026_09_25.md`.
+
+**In flight:** `rr_prerank_v2` launched 23:08 (46 of its games done, four
+runners) and `rr3p_oracle15` is queued behind it. Neither is read yet.
