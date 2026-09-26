@@ -55,3 +55,49 @@ class GameIdentityTests(TestCase):
     def test_game_id_is_indexed_for_grouping_by_batch(self) -> None:
         joined = "\n".join(SCHEMA_STATEMENTS)
         self.assertIn("games_game_id_idx on games (game_id)", joined)
+
+
+class ManifestObjectKeyTests(TestCase):
+    """Several invocations can share a batch_kind/batch_label/batch_id triple.
+
+    The manifest object key was built from that triple alone, so each
+    invocation overwrote the last: 120 of 120 sampled batch directories held a
+    manifest listing one game while archiving up to 240. The segment below is
+    what keeps them apart.
+    """
+
+    def test_segment_separates_invocations_by_seed_range(self) -> None:
+        from flows.simulation_batch import _manifest_segment
+
+        started = "2026-09-17T10:40:17+00:00"
+        self.assertNotEqual(
+            _manifest_segment(started, [1, 2]), _manifest_segment(started, [3, 4])
+        )
+
+    def test_segment_separates_invocations_by_start_time(self) -> None:
+        from flows.simulation_batch import _manifest_segment
+
+        self.assertNotEqual(
+            _manifest_segment("2026-09-17T10:40:17+00:00", [1]),
+            _manifest_segment("2026-09-17T10:40:18+00:00", [1]),
+        )
+
+    def test_segment_is_a_safe_single_path_element(self) -> None:
+        from flows.simulation_batch import _manifest_segment
+
+        segment = _manifest_segment("2026-09-17T10:40:17.123456+00:00", [1, 4])
+        self.assertNotIn("/", segment)
+        self.assertNotIn(":", segment)
+        self.assertEqual(segment, "20260917T104017_seeds_1-4")
+
+    def test_segment_tolerates_a_missing_start_time_and_no_seeds(self) -> None:
+        from flows.simulation_batch import _manifest_segment
+
+        self.assertEqual(_manifest_segment("", []), "unknown_seeds_noseeds")
+
+    def test_filename_is_unchanged_so_existing_readers_still_match(self) -> None:
+        """``rglob("batch_manifest.json")`` and ``endswith`` readers must keep working."""
+
+        from flows.simulation_batch import MANIFEST_FILENAME
+
+        self.assertEqual(MANIFEST_FILENAME, "batch_manifest.json")

@@ -121,6 +121,17 @@ MAX_PLAYER_COUNT = 5
 DEFAULT_ARTIFACT_ROOT = "artifacts"
 DEFAULT_RUN_LABEL = "core_random_vs_greedy"
 MANIFEST_FILENAME = "batch_manifest.json"
+#: Object-storage manifests are nested one level deeper than the batch
+#: directory, under a per-invocation segment. Several invocations can share a
+#: ``batch_kind/batch_label/batch_id`` triple -- the forced-play and
+#: bird-keep probes run one game per invocation under one batch id -- and the
+#: manifest key was built from that triple alone, so each invocation
+#: overwrote the last. Sampled after the fact: 120 of 120 batch directories
+#: had a manifest listing exactly one game while holding up to 240, so
+#: manifest-driven reads (``backfill_summaries.py --source minio``) saw a
+#: fraction of the archive and lost each chunk's code provenance with it.
+#: The filename is unchanged so ``rglob``/``endswith`` readers still match.
+MANIFEST_DIRNAME = "manifests"
 MANIFEST_SCHEMA_VERSION = "wingspan.simulation_batch_manifest.v1"
 
 
@@ -803,6 +814,14 @@ def _batch_directory(
     return Path(artifact_root) / batch_kind / batch_label / batch_id
 
 
+def _manifest_segment(started_at: str, seeds: list[int]) -> str:
+    """A per-invocation path segment: when it ran and which seeds it covered."""
+
+    stamp = re.sub(r"[^0-9A-Za-z]", "", started_at)[:15] or "unknown"
+    span = f"{min(seeds)}-{max(seeds)}" if seeds else "noseeds"
+    return f"{stamp}_seeds_{span}"
+
+
 def _batch_object_prefix(
     configured_prefix: str,
     batch_kind: str,
@@ -1095,6 +1114,8 @@ def run_simulation_batch(
                                 resolved_batch_label,
                                 resolved_batch_id,
                             )
+                        }/{MANIFEST_DIRNAME}/{
+                            _manifest_segment(started_at, resolved_seeds)
                         }/{MANIFEST_FILENAME}"
                     ),
                 )
