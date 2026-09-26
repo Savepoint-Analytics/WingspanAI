@@ -260,7 +260,6 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 |---|---|---|
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
-| 1 | Read `rr3p_oracle15` (oracle-type opponent model, 15 decks × 2 pairs × 3 rotations vs `rr3p_goal_place15`). **Registered: +0.5 to +2.0, deck-clustered p < 0.05 to promote it from "needs an arm" to a finding.** The 5-deck read was +1.36 at deck p=0.028 but inside the audit's own multiplicity; this is its own pre-registered test. A null closes the opponent-model family at 3p as well as 2p. | Ledger row; if positive, the question becomes whether anything shippable can approximate perfect type knowledge. |
 | 1 | **Run the game-identity migration and reload** (`scripts/migrate_game_identity.py`, then `backfill_summaries.py --source minio-events`, then `analysis/apply_sql_views.py`). Needs approval: it drops 5,969 `games` and ~12,300 `game_scores` rows, all reconstructible from object storage. | `games` reaches ~10,800 rows; the backfill's new `skipped_unidentified` / `duplicate_runs` counters account for the rest of the 10,831 archived games. |
 | 1 | Re-run the KPI pass after the reload and lift the warning banner on `kpi_taxonomy_findings.md`. | Every per-agent and per-matchup KPI recomputed over ~10,800 games; win rates move or they do not, and either way the number is quotable. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
@@ -3687,7 +3686,7 @@ rather than migrating, because the survivors are a biased subset. It deletes
 storage, but a deletion, so it is left unrun. Phase 5 (dbt) stays gated until
 the reload shows ~10,800 games.
 
-**In flight:** `rr3p_oracle15` (26 of 90 games at 23:40).
+**In flight:** `rr3p_oracle15` — completed 01:02, read below.
 
 ### Manifest overwrite fixed, and it was a different shape than recorded
 
@@ -3716,3 +3715,50 @@ with no reader changes.
 their manifests never shared a key. That is why `arm_contrast` reads every game
 and why the ledger is sound. The loss was confined to the probe batches and to
 manifest-driven backfill reads.
+
+## Update: 2026-09-26 - the oracle arm is a clean null, and the opponent-model family is closed
+
+`rr3p_oracle15`: an oracle opponent model (perfect opponent-type knowledge from
+turn one) against the belief model, 15 decks × 2 pairs × 3 rotations, 90 games
+each side. Registered **+0.5 to +2.0 with deck p<0.05** to promote it from
+"needs an arm" to a finding.
+
+**Measured: +0.00, p=1.000.** The paired deltas sum to exactly zero across 90
+games; 7/15 decks positive; deck-clustered p=1.000; 95% CI [−2.15, +2.15].
+
+Verified this is not an artifact of comparing an arm against itself: the configs
+differ (`belief` vs `oracle`), and 79 of the 90 games have a nonzero delta
+ranging −35 to +19, 43 up and 36 down. The switch genuinely changes play. It
+just does not change the score. An exact zero sum is about a 0.4% coincidence
+and that is all it is.
+
+**Consequences.**
+
+1. **The opponent-model family is closed at 3p as well as 2p.** Five models have
+   now been tried at both counts (greedy, belief, competent, oracle, plus the
+   denial term) and the only one with a defensible effect is greedy at 3p
+   (≈+2, not adopted on cost). Perfect type knowledge — the ceiling of the whole
+   family — is worth zero.
+2. **The audit's second promotion also failed.** Both rows the 2026-09-25 audit
+   reopened have now been tested by a pre-registered arm and both reverted:
+   beam pre-ranking (−0.16 → −0.96) and this one (+1.36 at deck p=0.028 →
+   +0.00). The audit's *method* corrections stand; its *re-ranked results* were
+   hypotheses from ~95 unadjusted re-reads, and the two worth testing both died.
+   New rule in the ledger: **a re-read of existing data never changes a verdict,
+   it only nominates a question for a fresh arm.**
+3. **`strategy_findings.md` §2 is now the strongest section in the document.**
+   Four independent kinds of privileged knowledge are each worth nothing or
+   less: deck order (−2.4, actively harmful), opponent's hand, feeder roll
+   (null ×3), opponent's type (+0.00). The reading: at strong play Wingspan is
+   very nearly a solitaire optimization problem. Interaction is real but runs
+   through the shared board — tray, birdfeeder, round goals — not through
+   anyone's plan. That is why denial costs −5.9 and why the one interaction term
+   that pays is the round-goal placement model, which reasons about the shared
+   scoring surface rather than an opponent's intentions.
+
+**The caveat that matters for the case study:** this is established against this
+roster and in self-play against a copy of the champion. No genuinely
+adversarial opponent — one that blocks, or plays to deny a known bonus card —
+has ever been in a lineup. The ten human games are the first thing that could
+disturb it, which raises their value considerably: they are now the main
+outstanding threat to the headline finding rather than a nice-to-have.

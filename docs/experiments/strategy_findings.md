@@ -37,11 +37,33 @@ refining the evaluator and priced its cost instead.
 | Letting the search read the deck and the opponent's hand makes it **worse** (−2.4) than determinizing four samples. | `determinized_search_test.md` | 80 paired, p=0.008 | established |
 | Knowing the feeder roll in advance is worth nothing (−0.3 n.s.). | `reroll_chance_node.md` | 80 paired | null |
 | Feeder odds valuation is worth nothing, three times over (+0.5, −0.1, +0.2). | `round_robin_v5_feeder_odds.md`, `feeder_odds_search_rerun.md` | 80–200 paired | null ×3 |
+| **Knowing the opponent's type perfectly is worth nothing** at either player count: +0.24 (p=0.83) at 2p, **+0.00 (p=1.000)** at 3p. | `results_ledger.md` 2026-09-18, 2026-09-26 | 80 + 90 paired | established |
 
-**Reading.** The hidden information in base-game Wingspan is not where
-the points are. Peeking overfits the plan to one deck order; averaging
-over samples is better because the plan has to survive several. The dice
-are close enough to fair that pricing them is noise.
+**Reading.** The hidden information in base-game Wingspan is not where the
+points are, and this is now the most robust claim in this document — four
+independent kinds of privileged knowledge are each worth nothing or less:
+the deck order, the opponent's hand, the feeder roll, and the opponent's
+type.
+
+Peeking at the deck actively hurts, because it overfits the plan to one
+ordering; averaging over samples is better because the plan has to survive
+several. The dice are close enough to fair that pricing them is noise. And
+perfect knowledge of *who you are playing* changes the agent's decisions in
+79 of 90 games while leaving the score exactly unchanged.
+
+The reading that ties these together: **at strong play, Wingspan is very
+nearly a solitaire optimization problem.** Interaction is real but it runs
+through the shared board — the tray, the birdfeeder, the round goals — not
+through anyone's plan. You contest those by scoring faster, not by predicting
+an opponent. That is why denial is worth −5.9, why the opponent-model family
+is closed at both player counts, and why the one interaction term that does
+pay is the round-goal placement model, which reasons about the *shared*
+scoring surface rather than about an opponent's intentions.
+
+The caveat this needs: it is established against this roster and in self-play
+against a copy of the champion. A genuinely adversarial opponent — one that
+blocks, or that plays to deny a known bonus card — has never been in the
+lineup, and the human-trace study is the first thing that could disturb it.
 
 ## 3. Horizon: the round is the unit of planning
 
@@ -142,6 +164,7 @@ card-choice lever with a measured, transferable payoff is the bonus card.
 | Claim | Evidence | Design | Status |
 |---|---|---|---|
 | At two players, what the search assumes the opponent will do is worth ≈0 (greedy, belief, oracle within ±0.3). | `search_opponent_model_test.md` | 80 paired ×3 | established (vs this roster) |
+| **Perfect opponent-type knowledge is worth exactly nothing at 3p.** An oracle model that knows each opponent's type from turn one scores **+0.00 (p=1.000)** over the belief model across 15 decks — the paired deltas sum to exactly zero, 7/15 decks positive. It does change play (79 of 90 games differ, deltas −35 to +19); it just does not change the score. With the 2p null this **closes the opponent-model family at both player counts**. | `results_ledger.md` 2026-09-26 | 90 paired 3p, pre-registered | **established (3p)** |
 | At three players it is worth ≈2: greedy +2.1 over belief vs the roster (p=0.07) **and** +1.9 in the mirror (p=0.07) — two independent contrasts, combined p≈0.01. A score effect, not a win effect; costs ×1.55; four cheaper models fail to reproduce it. | `search_opponent_model_test.md`, `self_play_opponent_plan.md` A2 | 90 + 90 paired 3p | established (3p), not adopted for cost |
 | The gain is not from predicting the real opponent: greedy predicts the archetypes' families *less* often (35–47%) than the belief model (36–54%), and `belief_apply` was null. The working hypothesis is responsiveness on branch states; the `competent` arm (in flight) tests it. | 2026-09-19 refit + benchmark | 6,760 real decisions | open |
 | A fourth cheap opponent model (`competent`: argmax public value on the branch) is null at both counts (+0.1 / −0.7). Whatever the greedy model has at 3p is the applied branch state itself, at its full cost; nothing cheaper reproduces it. | `search_opponent_model_test.md` 2026-09-20 | 90 + 80 paired | closed (vs this roster) |

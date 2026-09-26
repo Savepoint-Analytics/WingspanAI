@@ -71,6 +71,7 @@ detail, and the depth-3 search was the first change large enough to see.
 | 2026-09-20 | A2 `mirror_3p_greedy` | position 1 on `greedy`, 90 games paired vs `mirror_3p` | study seat **+1.89 (p=0.072)**, win −0.011; decision ×1.55 (+0.18 points/s). Registered +2 to +4: point estimate just under. With the roster result (+2.12, p=0.073) two independent contrasts agree: **≈+2 at 3p is real** (combined p≈0.01), a score not a win effect, and four cheap reproductions failed. Not adopted for cost; belief stays |
 | 2026-09-20 | A3 `mirror_2p_denial` | position 1 with `search_denial_weight=1.0`, 80 games paired vs `mirror_2p` | study seat **−5.94 (p<0.001)**, win −0.156; cost ×0.89. Registered +1 to +3 failed: the term pays the agent to draw tray cards (draw share 24% → 33%, tray draws 371 → 657) against a refilling supply. Dropped; 3p arm stopped as answered |
 | 2026-09-24 | **3p 15-deck confirmation**: placement vs heuristic goal model, both sides fresh at 15 seeds × 2 opponent pairs × 3 rotations | rr3p_goal_heur15 | **+1.12** | 0.186 | +0.06 | ≈ | — | at 15 decks this **did not** meet its registered criterion (deck p=0.195 against a p<0.1 bar). Superseded by the 25-deck pool below, which does — read the two together, not this row alone |
+| 2026-09-26 | **3p oracle-type opponent model** (perfect opponent-type knowledge from turn one), 15 decks × 2 pairs × 3 rotations, pre-registered after the audit promoted the 5-deck read | rr3p_goal_place15 | **+0.00** | **1.000** | +0.011 | ≈ belief | — | **clean null; the opponent-model family is now closed at 3p as well as 2p.** Registered +0.5 to +2.0 at deck p<0.05; measured exactly 0.00 over 90 games (sum of paired deltas exactly zero, 7/15 decks positive, deck p=1.000). The audit's 5-deck +1.36 at deck p=0.028 was noise. 79 of 90 games differ (deltas −35 to +19, 43 up / 36 down), so the switch does change play — it just does not change the score |
 | 2026-09-25 | beam pre-ranking as the **unbudgeted** default, re-run after the audit put the original −0.72 at −0.16 like-for-like | rr_goal_placement | −0.86 all / **−0.96 holdout-free** | 0.43 | −0.04 | **3227 → 1230 ms (×0.38)** | 84 → 32 s a game | **not adopted.** Registered −0.5 to +0.5 on holdout-free games; −0.96 misses it. The audit's −0.16 did **not** replicate — three reads of this switch now sit at −0.72, −0.80, −0.96. But the 95% CI is [−3.34, +1.43] and the detection limit is 3.41 points, so **the arm cannot tell the adoption band from the drop**: at sd=10.5 the registered ±0.5 needs ~3,400 games. The registration was unanswerable at 80 games — see below |
 | 2026-09-25 | **3p 25-deck extension**: seeds 16–25 added to the above, same 2 pairs × 3 rotations, both sides (`rr3p_goal_place25` / `rr3p_goal_heur25`) | rr3p_goal_heur25 | **+1.12** | **0.097** | +0.04 | ≈ | — | **meets the registered criterion** (deck-clustered p < 0.1 at ≥ +1) → the placement goal model is **confirmed**, reversing the 2026-09-24 "unconfirmed" label. New decks 16–25 replicate almost exactly (+1.117 vs +1.122 on 1–15). **But the verdict is fragile** — see below |
 | 2026-09-24 | production config (`beam_leaf` + 5 s ladder) re-checked on the placement default | rr_goal_placement | −0.80 | 0.50 | −0.04 | 3,227 → 1,062 | +0.37 saved | **production config stands**: p95 by round 1.2 / 3.2 / 3.8 / 4.2 s, all under the cap |
@@ -102,6 +103,29 @@ Before the fast expansion: `expand_children` 73%, `terminal_value` 17%,
 opponent model 3%, 5.2 s mean decision. After: 53% / 33%, 2.6 s. Latency by
 round in the archive: 1.8 → 5.9 → 10.5 → 15.7 s mean; a production budget
 has to be per decision.
+
+## Both of the audit's promotions failed their pre-registered arms
+
+The 2026-09-25 audit re-read every row by deck and on holdout-free games, and
+two rows changed enough to reopen a closed question. Both have now been tested
+by a pre-registered arm, and both reverted:
+
+| Row | audit's re-read | pre-registered arm | verdict |
+|---|---|---|---|
+| beam pre-ranking (2p) | −0.72 → **−0.16** holdout-free | **−0.96** on 74 holdout-free games | the audit's number was noise; the original drop stands |
+| 3p oracle-type model | "null" → **deck p=0.028**, +1.36 | **+0.00, p=1.000** on 15 decks | the audit's number was noise; the original null stands |
+
+This is the multiplicity surface recorded above doing exactly what that section
+warned it would. The audit ran roughly 95 unadjusted per-cell re-reads; two
+came back interesting; both were selection effects. The audit's *corrections to
+method* (exact t instead of the normal approximation, deck clustering, the
+holdout-free like-for-like) were real and are kept. Its *re-ranked results*
+were hypotheses, and the two worth testing both died.
+
+**The rule this earns:** a re-read of existing data never changes a verdict on
+its own. It can only nominate a question for a fresh pre-registered arm. Where
+an arm is too expensive to run, the row keeps its original verdict and the
+re-read is recorded as a caveat, not a correction.
 
 ## Two registrations in a row asked questions their arms could not answer
 
@@ -174,7 +198,7 @@ working in `ledger_audit_2026_09_25.md`. The corrections that matter:
 | production config at 5 s | −0.59 | **+0.00** like-for-like |
 | beam pre-ranking | −0.72 | **−0.16** like-for-like; the drop is worth revisiting |
 | 3p greedy opponent model | +2.12 (p=0.073) | p=**0.304** by deck; carried by the mirror arm (+1.89, p=0.038 on 30 decks) |
-| 3p oracle-type model | +1.36, "null" | deck p=**0.028**; promoted to "needs its own arm" |
+| 3p oracle-type model | +1.36, "null" | deck p=**0.028**; promoted to "needs its own arm" — **the arm ran 2026-09-26 and returned +0.00 (p=1.000). The promotion was a multiplicity artifact; the original "null" was right.** |
 | layer C P2 pair | +3.48 (p=0.021) | does not survive Bonferroni across its three pre-registered pairs; follow-up null |
 
 ## Decks, not games (2026-09-22)
