@@ -71,6 +71,7 @@ detail, and the depth-3 search was the first change large enough to see.
 | 2026-09-20 | A2 `mirror_3p_greedy` | position 1 on `greedy`, 90 games paired vs `mirror_3p` | study seat **+1.89 (p=0.072)**, win −0.011; decision ×1.55 (+0.18 points/s). Registered +2 to +4: point estimate just under. With the roster result (+2.12, p=0.073) two independent contrasts agree: **≈+2 at 3p is real** (combined p≈0.01), a score not a win effect, and four cheap reproductions failed. Not adopted for cost; belief stays |
 | 2026-09-20 | A3 `mirror_2p_denial` | position 1 with `search_denial_weight=1.0`, 80 games paired vs `mirror_2p` | study seat **−5.94 (p<0.001)**, win −0.156; cost ×0.89. Registered +1 to +3 failed: the term pays the agent to draw tray cards (draw share 24% → 33%, tray draws 371 → 657) against a refilling supply. Dropped; 3p arm stopped as answered |
 | 2026-09-24 | **3p 15-deck confirmation**: placement vs heuristic goal model, both sides fresh at 15 seeds × 2 opponent pairs × 3 rotations | rr3p_goal_heur15 | **+1.12** | 0.186 | +0.06 | ≈ | — | at 15 decks this **did not** meet its registered criterion (deck p=0.195 against a p<0.1 bar). Superseded by the 25-deck pool below, which does — read the two together, not this row alone |
+| 2026-09-25 | beam pre-ranking as the **unbudgeted** default, re-run after the audit put the original −0.72 at −0.16 like-for-like | rr_goal_placement | −0.86 all / **−0.96 holdout-free** | 0.43 | −0.04 | **3227 → 1230 ms (×0.38)** | 84 → 32 s a game | **not adopted.** Registered −0.5 to +0.5 on holdout-free games; −0.96 misses it. The audit's −0.16 did **not** replicate — three reads of this switch now sit at −0.72, −0.80, −0.96. But the 95% CI is [−3.34, +1.43] and the detection limit is 3.41 points, so **the arm cannot tell the adoption band from the drop**: at sd=10.5 the registered ±0.5 needs ~3,400 games. The registration was unanswerable at 80 games — see below |
 | 2026-09-25 | **3p 25-deck extension**: seeds 16–25 added to the above, same 2 pairs × 3 rotations, both sides (`rr3p_goal_place25` / `rr3p_goal_heur25`) | rr3p_goal_heur25 | **+1.12** | **0.097** | +0.04 | ≈ | — | **meets the registered criterion** (deck-clustered p < 0.1 at ≥ +1) → the placement goal model is **confirmed**, reversing the 2026-09-24 "unconfirmed" label. New decks 16–25 replicate almost exactly (+1.117 vs +1.122 on 1–15). **But the verdict is fragile** — see below |
 | 2026-09-24 | production config (`beam_leaf` + 5 s ladder) re-checked on the placement default | rr_goal_placement | −0.80 | 0.50 | −0.04 | 3,227 → 1,062 | +0.37 saved | **production config stands**: p95 by round 1.2 / 3.2 / 3.8 / 4.2 s, all under the cap |
 | 2026-09-22 | four-goal opener (`v2_allgoals`) vs the round-1-only opener (`v2`) | rr_opener_v2 | −1.21 | 0.037 | −0.01 | — | — | **invalid as a goal-horizon test**: the switch changed the opening in 2/80 games, 64 games were bit-identical, and the −1.21 is the arm's standing holdouts (the 2026-09-16 baseline has none). Registered null confirmed; not adopted |
@@ -101,6 +102,35 @@ Before the fast expansion: `expand_children` 73%, `terminal_value` 17%,
 opponent model 3%, 5.2 s mean decision. After: 53% / 33%, 2.6 s. Latency by
 round in the archive: 1.8 → 5.9 → 10.5 → 15.7 s mean; a production budget
 has to be per decision.
+
+## Two registrations in a row asked questions their arms could not answer
+
+Both arms read on 2026-09-25 registered a decision band narrower than the arm
+could resolve. That is a design fault in the registration, not a result, and
+it is now the most common way an arm wastes compute here.
+
+| Arm | registered band | measured | detection limit at 80% power | games needed for the band |
+|---|---|---:|---:|---:|
+| beam pre-ranking, unbudgeted | −0.5 to +0.5 | −0.96 (CI −3.34 to +1.43) | **3.41** | **~3,400** |
+| 3p placement, 25 decks | ≥ +1 at deck p<0.1 | +1.12 (deck p=0.097) | ~2.9 by deck | ~35 decks for p<0.05 |
+
+The pre-ranking arm is the clearer case: a ±0.5 band against a per-game SD of
+10.5 needs about 3,400 games, and it got 80. Whatever it returned, the answer
+was going to be "inside the noise" — so the arm could only ever have produced
+a point estimate dressed as a verdict.
+
+**Standing rule from here: a registration must state the detection limit its
+sample will have, and the band must be wider than that limit.** If it cannot
+be, the arm should not be launched — decide on cost, mechanism or theory
+instead and say so. Per-game score SD in 2p arms is 9–11 points, so an 80-game
+paired arm resolves about ±3 points and nothing finer. Bands of ±1 need ~860
+games; bands of ±0.5 are out of reach on this hardware.
+
+This also reframes the pre-ranking decision honestly: it is **not adopted
+because three independent reads all land near −0.8** (−0.72, −0.80, −0.96),
+not because any one of them was significant. None was. The consistency of the
+sign across reads with different baselines is the evidence; each individual
+p-value is not.
 
 ## The 25-deck placement confirmation is fragile
 

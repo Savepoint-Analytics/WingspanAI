@@ -41,6 +41,118 @@ ANALYSIS_EVENT_NAMES = (
 )
 
 
+
+
+#: Every DDL statement the telemetry schema needs, in dependency order.
+#: Module-level so the keys can be asserted without a live database; see
+#: ``tests/test_postgres_schema.py``.
+SCHEMA_STATEMENTS: tuple[str, ...] = (
+    """
+    create table if not exists simulation_runs (
+        simulation_run_id text primary key,
+        run_started_at timestamptz not null default now(),
+        run_label text,
+        ruleset_id text,
+        random_seed integer,
+        metadata jsonb not null default '{}'::jsonb
+    )
+    """,
+    """
+    create table if not exists games (
+        -- ADR 0006: the run id is a game's identity. ``game_id`` omits
+        -- the lineup and rotation, so it collides across every game in
+        -- a batch that shares a seed -- 44.5% of the archive. It is
+        -- kept as the batch-scoped label it has always been.
+        simulation_run_id text primary key
+            references simulation_runs(simulation_run_id),
+        game_id text not null,
+        random_seed integer not null,
+        ruleset_id text not null,
+        player_count integer not null,
+        started_at timestamptz not null default now(),
+        ended_at timestamptz,
+        terminal_reason text,
+        outcome jsonb not null default '{}'::jsonb
+    )
+    """,
+    """
+    create index if not exists games_game_id_idx on games (game_id)
+    """,
+    """
+    create table if not exists agents (
+        agent_instance_id text primary key,
+        simulation_run_id text not null references simulation_runs(simulation_run_id),
+        player_id text not null,
+        agent_id text not null,
+        config jsonb not null default '{}'::jsonb
+    )
+    """,
+    """
+    create table if not exists simulation_events (
+        event_id text primary key,
+        event_name text not null,
+        event_version text not null,
+        occurred_at timestamptz not null,
+        simulation_run_id text not null references simulation_runs(simulation_run_id),
+        -- No FK: ``games.game_id`` is not unique (ADR 0006). Join
+        -- through ``simulation_run_id`` instead.
+        game_id text,
+        ruleset_id text,
+        player_id text,
+        agent_id text,
+        round_number integer,
+        turn_number integer,
+        round_action_number integer,
+        global_turn_number integer,
+        random_seed integer,
+        public_state_ref text,
+        private_state_included boolean not null default false,
+        payload jsonb not null default '{}'::jsonb,
+        received_at timestamptz not null default now()
+    )
+    """,
+    """
+    create table if not exists game_scores (
+        simulation_run_id text not null
+            references games(simulation_run_id) on delete cascade,
+        game_id text not null,
+        player_id text not null,
+        agent_id text,
+        total_score integer not null,
+        bird_points integer not null default 0,
+        bonus_points integer not null default 0,
+        round_goal_points integer not null default 0,
+        egg_points integer not null default 0,
+        cached_food_points integer not null default 0,
+        tucked_card_points integer not null default 0,
+        is_winner boolean not null default false,
+        primary key (simulation_run_id, player_id)
+    )
+    """,
+    """
+    alter table simulation_events
+    add column if not exists round_action_number integer
+    """,
+    """
+    alter table simulation_events
+    add column if not exists global_turn_number integer
+    """,
+    """
+    create index if not exists simulation_events_run_game_idx
+    on simulation_events (simulation_run_id, game_id)
+    """,
+    """
+    create index if not exists simulation_events_name_run_idx
+    on simulation_events (event_name, simulation_run_id)
+    """,
+    """
+    -- Ordered by run id, not game_id: ADR 0006, game_id is not unique so an
+    -- index on it does not identify one game's turn sequence.
+    create index if not exists simulation_events_run_turn_idx
+    on simulation_events (simulation_run_id, global_turn_number)
+    """,
+)
+
 class PostgresEventRepository:
     """Persist validated simulation results into PostgreSQL.
 
@@ -66,102 +178,10 @@ class PostgresEventRepository:
     def ensure_schema(self) -> None:
         """Create the simulation telemetry schema when it does not exist."""
 
-        psycopg, _jsonb = _import_psycopg()
-        statements = [
-            """
-            create table if not exists simulation_runs (
-                simulation_run_id text primary key,
-                run_started_at timestamptz not null default now(),
-                run_label text,
-                ruleset_id text,
-                random_seed integer,
-                metadata jsonb not null default '{}'::jsonb
-            )
-            """,
-            """
-            create table if not exists games (
-                game_id text primary key,
-                simulation_run_id text not null references simulation_runs(simulation_run_id),
-                random_seed integer not null,
-                ruleset_id text not null,
-                player_count integer not null,
-                started_at timestamptz not null default now(),
-                ended_at timestamptz,
-                terminal_reason text,
-                outcome jsonb not null default '{}'::jsonb
-            )
-            """,
-            """
-            create table if not exists agents (
-                agent_instance_id text primary key,
-                simulation_run_id text not null references simulation_runs(simulation_run_id),
-                player_id text not null,
-                agent_id text not null,
-                config jsonb not null default '{}'::jsonb
-            )
-            """,
-            """
-            create table if not exists simulation_events (
-                event_id text primary key,
-                event_name text not null,
-                event_version text not null,
-                occurred_at timestamptz not null,
-                simulation_run_id text not null references simulation_runs(simulation_run_id),
-                game_id text references games(game_id),
-                ruleset_id text,
-                player_id text,
-                agent_id text,
-                round_number integer,
-                turn_number integer,
-                round_action_number integer,
-                global_turn_number integer,
-                random_seed integer,
-                public_state_ref text,
-                private_state_included boolean not null default false,
-                payload jsonb not null default '{}'::jsonb,
-                received_at timestamptz not null default now()
-            )
-            """,
-            """
-            create table if not exists game_scores (
-                game_id text not null references games(game_id),
-                player_id text not null,
-                agent_id text,
-                total_score integer not null,
-                bird_points integer not null default 0,
-                bonus_points integer not null default 0,
-                round_goal_points integer not null default 0,
-                egg_points integer not null default 0,
-                cached_food_points integer not null default 0,
-                tucked_card_points integer not null default 0,
-                is_winner boolean not null default false,
-                primary key (game_id, player_id)
-            )
-            """,
-            """
-            alter table simulation_events
-            add column if not exists round_action_number integer
-            """,
-            """
-            alter table simulation_events
-            add column if not exists global_turn_number integer
-            """,
-            """
-            create index if not exists simulation_events_run_game_idx
-            on simulation_events (simulation_run_id, game_id)
-            """,
-            """
-            create index if not exists simulation_events_name_run_idx
-            on simulation_events (event_name, simulation_run_id)
-            """,
-            """
-            create index if not exists simulation_events_global_turn_idx
-            on simulation_events (game_id, global_turn_number)
-            """,
-        ]
+        _psycopg, _jsonb = _import_psycopg()
         with self._connect() as connection:
             with connection.cursor() as cursor:
-                for statement in statements:
+                for statement in SCHEMA_STATEMENTS:
                     cursor.execute(statement)
             connection.commit()
 
@@ -318,8 +338,8 @@ class PostgresEventRepository:
                 cursor.execute(
                     """
                     insert into games (
-                        game_id,
                         simulation_run_id,
+                        game_id,
                         random_seed,
                         ruleset_id,
                         player_count,
@@ -329,8 +349,8 @@ class PostgresEventRepository:
                         outcome
                     )
                     values (
-                        %(game_id)s,
                         %(simulation_run_id)s,
+                        %(game_id)s,
                         %(random_seed)s,
                         %(ruleset_id)s,
                         %(player_count)s,
@@ -339,7 +359,8 @@ class PostgresEventRepository:
                         %(terminal_reason)s,
                         %(outcome)s
                     )
-                    on conflict (game_id) do update set
+                    on conflict (simulation_run_id) do update set
+                        game_id = excluded.game_id,
                         terminal_reason = excluded.terminal_reason,
                         ended_at = excluded.ended_at,
                         outcome = excluded.outcome
@@ -394,6 +415,7 @@ class PostgresEventRepository:
                     cursor.execute(
                         """
                         insert into game_scores (
+                            simulation_run_id,
                             game_id,
                             player_id,
                             agent_id,
@@ -407,6 +429,7 @@ class PostgresEventRepository:
                             is_winner
                         )
                         values (
+                            %(simulation_run_id)s,
                             %(game_id)s,
                             %(player_id)s,
                             %(agent_id)s,
@@ -419,7 +442,8 @@ class PostgresEventRepository:
                             %(tucked_card_points)s,
                             %(is_winner)s
                         )
-                        on conflict (game_id, player_id) do update set
+                        on conflict (simulation_run_id, player_id) do update set
+                            game_id = excluded.game_id,
                             agent_id = excluded.agent_id,
                             total_score = excluded.total_score,
                             bird_points = excluded.bird_points,
@@ -431,6 +455,7 @@ class PostgresEventRepository:
                             is_winner = excluded.is_winner
                         """,
                         {
+                            "simulation_run_id": result.outcome.simulation_run_id,
                             "game_id": result.outcome.game_id,
                             "player_id": player.player_id,
                             "agent_id": player.agent_id,

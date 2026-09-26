@@ -232,7 +232,10 @@ def iter_minio_events(prefix: str | None) -> Iterator[tuple[dict, dict, dict | N
                 if event.get("event_name") == "setup_selection_applied":
                     seats[str(payload.get("player_id"))] = str(payload.get("agent_id"))
             if game_ended is None:
-                # Surfaced by the caller's without_scores counter.
+                # The caller has no ids for these, so they land in its
+                # ``skipped_unidentified`` count -- not ``without_scores``,
+                # which needs a game the caller could identify. The comment
+                # here used to claim otherwise and hid the drop entirely.
                 yield {"batch_kind": batch_kind, "batch_label": batch_label}, {}, None
                 continue
             # Older games' game_ended payload does not nest an outcome; the
@@ -284,17 +287,28 @@ def main(argv: list[str] | None = None) -> int:
     runs: dict[str, tuple] = {}
     games: list[tuple] = []
     scores: list[tuple] = []
-    seen_games: set[str] = set()
+    # ADR 0006: dedupe on the run id. ``game_id`` omits the lineup and
+    # rotation, so deduping on it silently discarded 44.5% of the archive --
+    # 10,831 archived games collapse to 6,014 distinct ``game_id`` values.
+    seen_runs: set[str] = set()
     without_scores = 0
     skipped_incomplete = 0
+    skipped_unidentified = 0
+    duplicate_runs = 0
     candidates = 0
     for manifest, game, game_ended in source:
         candidates += 1
         outcome = game.get("outcome") or {}
         game_id, run_id = outcome.get("game_id"), outcome.get("simulation_run_id")
-        if not game_id or not run_id or game_id in seen_games:
+        if not game_id or not run_id:
+            # Chiefly games whose events object has no parseable ``game_ended``;
+            # the iterators yield an empty game dict for those.
+            skipped_unidentified += 1
             continue
-        seen_games.add(game_id)
+        if run_id in seen_runs:
+            duplicate_runs += 1
+            continue
+        seen_runs.add(run_id)
         run_label = f"{manifest.get('batch_kind')}:{manifest.get('batch_label')}"
         runs.setdefault(
             run_id,
@@ -317,12 +331,12 @@ def main(argv: list[str] | None = None) -> int:
         player_count = game.get("player_count") or len(outcome.get("scores") or {}) or None
         if player_count is None:
             skipped_incomplete += 1
-            seen_games.discard(game_id)
+            seen_runs.discard(run_id)
             continue
         games.append(
             (
-                game_id,
                 run_id,
+                game_id,
                 outcome.get("random_seed"),
                 game.get("ruleset_id") or "core_base_game_v1",
                 player_count,
@@ -337,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:
         for row in _score_rows(game_ended, seated, outcome.get("winners") or []):
             scores.append(
                 (
+                    run_id,
                     game_id,
                     row["player_id"],
                     row["agent_id"],
@@ -348,6 +363,10 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"source={args.source}: {len(runs)} runs, {len(games)} games, {len(scores)} score rows")
     print(f"  candidates seen: {candidates}")
+    if skipped_unidentified:
+        print(f"  {skipped_unidentified} skipped: no readable game_id/run_id")
+    if duplicate_runs:
+        print(f"  {duplicate_runs} skipped: simulation_run_id already seen")
     if without_scores:
         print(f"  {without_scores} games had no readable game_ended event (no score rows)")
     if skipped_incomplete:
@@ -373,20 +392,20 @@ def main(argv: list[str] | None = None) -> int:
         cursor.executemany(
             """
             INSERT INTO games
-                (game_id, simulation_run_id, random_seed, ruleset_id, player_count,
+                (simulation_run_id, game_id, random_seed, ruleset_id, player_count,
                  terminal_reason, outcome)
             VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb)
-            ON CONFLICT (game_id) DO NOTHING
+            ON CONFLICT (simulation_run_id) DO NOTHING
             """,
             games,
         )
         cursor.executemany(
             f"""
             INSERT INTO game_scores
-                (game_id, player_id, agent_id, total_score,
+                (simulation_run_id, game_id, player_id, agent_id, total_score,
                  {", ".join(SCORE_CATEGORIES)}, is_winner)
-            VALUES (%s, %s, %s, %s, {", ".join(["%s"] * len(SCORE_CATEGORIES))}, %s)
-            ON CONFLICT (game_id, player_id) DO NOTHING
+            VALUES (%s, %s, %s, %s, %s, {", ".join(["%s"] * len(SCORE_CATEGORIES))}, %s)
+            ON CONFLICT (simulation_run_id, player_id) DO NOTHING
             """,
             scores,
         )

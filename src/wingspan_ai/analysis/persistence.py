@@ -62,7 +62,7 @@ def list_persisted_runs(limit: int = 50, *, database_url: str | None = None) -> 
         cursor.execute(
             f"""
             SELECT r.simulation_run_id, r.run_label, r.ruleset_id, r.run_started_at,
-                   COUNT(g.game_id) AS games
+                   COUNT(g.simulation_run_id) AS games
             FROM {POSTGRES_SCHEMA}.simulation_runs r
             LEFT JOIN {POSTGRES_SCHEMA}.games g USING (simulation_run_id)
             GROUP BY r.simulation_run_id, r.run_label, r.ruleset_id, r.run_started_at
@@ -106,16 +106,17 @@ def load_game_scores(
     with _connect(database_url) as connection, connection.cursor() as cursor:
         cursor.execute(
             f"""
-            SELECT s.game_id, s.player_id, s.agent_id, s.total_score, s.bird_points,
+            SELECT s.simulation_run_id, s.game_id, s.player_id, s.agent_id,
+                   s.total_score, s.bird_points,
                    s.bonus_points, s.round_goal_points, s.egg_points,
                    s.cached_food_points, s.tucked_card_points, s.is_winner,
-                   g.random_seed, g.player_count, g.ruleset_id, g.simulation_run_id,
+                   g.random_seed, g.player_count, g.ruleset_id,
                    r.run_label
             FROM {POSTGRES_SCHEMA}.game_scores s
-            JOIN {POSTGRES_SCHEMA}.games g USING (game_id)
+            JOIN {POSTGRES_SCHEMA}.games g USING (simulation_run_id)
             JOIN {POSTGRES_SCHEMA}.simulation_runs r USING (simulation_run_id)
             {where}
-            ORDER BY s.game_id, s.player_id
+            ORDER BY s.simulation_run_id, s.player_id
             {suffix}
             """,
             params,
@@ -138,7 +139,7 @@ def load_games(
             FROM {POSTGRES_SCHEMA}.games g
             JOIN {POSTGRES_SCHEMA}.simulation_runs r USING (simulation_run_id)
             {where}
-            ORDER BY g.game_id
+            ORDER BY g.simulation_run_id
             """,
             params,
         )
@@ -195,7 +196,7 @@ def load_postgres_event_records(
             FROM {POSTGRES_SCHEMA}.simulation_events e
             JOIN {POSTGRES_SCHEMA}.simulation_runs r USING (simulation_run_id)
             WHERE {" AND ".join(clauses)}
-            ORDER BY e.game_id, e.global_turn_number, e.event_id
+            ORDER BY e.simulation_run_id, e.global_turn_number, e.event_id
             {suffix}
             """,
             params,

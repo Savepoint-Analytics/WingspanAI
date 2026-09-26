@@ -51,6 +51,20 @@ def agent_key(agent_id: object) -> str:
     return text.rsplit("_p", 1)[0] if "_p" in text else text
 
 
+def game_key(row: Mapping[str, Any]) -> str:
+    """A game's identity: the run id, not ``game_id`` (ADR 0006).
+
+    ``game_id`` omits the lineup and seat rotation, so every game in a batch
+    sharing a seed carries the same one -- 44.5% of the archive collides.
+    Grouping by it merges distinct games, which silently corrupted the tempo
+    and win-margin KPIs (two games' players became one four-player game).
+    Older local event records predate the field, so fall back rather than
+    raise.
+    """
+
+    return str(row.get("simulation_run_id") or row.get("game_id") or "unknown")
+
+
 # ------------------------------------------------------------------ core scoring
 
 
@@ -187,7 +201,7 @@ def bonus_card_kpis(events: Iterable[Mapping[str, Any]]) -> dict[str, list[Row]]
     selections: dict[tuple[str, str], Row] = {}
     for event in _named(rows, "setup_selection_applied"):
         payload = event["payload"]
-        key = (str(event.get("game_id")), str(payload.get("player_id")))
+        key = (game_key(event), str(payload.get("player_id")))
         kept = list(payload.get("kept_bonus_card_names") or [])
         discarded = list(payload.get("discarded_bonus_card_names") or [])
         selections[key] = {
@@ -202,7 +216,7 @@ def bonus_card_kpis(events: Iterable[Mapping[str, Any]]) -> dict[str, list[Row]]
     fulfilment: list[Row] = []
     for event in _named(rows, "bird_scorecard"):
         payload = event["payload"]
-        key = (str(event.get("game_id")), str(payload.get("player_id")))
+        key = (game_key(event), str(payload.get("player_id")))
         selection = selections.get(key, {})
         held = [str(name) for name in (payload.get("bonus_card_names") or [])]
         birds = list(payload.get("birds") or [])
@@ -367,7 +381,7 @@ def action_kpis(
         actions.append(
             {
                 "agent": agent_key(event.get("agent_id")),
-                "game_id": event.get("game_id"),
+                "game_key": game_key(event),
                 "round_number": event.get("round_number"),
                 "action_type": kind,
                 "habitat": action.get("habitat") or ACTION_HABITAT.get(kind),
@@ -380,7 +394,7 @@ def action_kpis(
         agent = str(row["agent"])
         counts_by_agent[agent][str(row["action_type"])] += 1
         counts_by_round[(agent, int(row["round_number"] or 0))][str(row["action_type"])] += 1
-        actions_per_game[(str(row["game_id"]), agent)] += 1
+        actions_per_game[(str(row["game_key"]), agent)] += 1
 
     def mix(counter: Counter) -> Row:
         total = max(sum(counter.values()), 1)
@@ -401,14 +415,14 @@ def action_kpis(
     efficiency: list[Row] = []
     if score_rows is not None:
         scores = {
-            (str(row.get("game_id")), agent_key(row.get("agent_id"))): _number(
+            (game_key(row), agent_key(row.get("agent_id"))): _number(
                 row.get("total_score")
             )
             for row in score_rows
         }
         per_agent: dict[str, list[float]] = defaultdict(list)
-        for (game_id, agent), action_count in actions_per_game.items():
-            score = scores.get((game_id, agent))
+        for (game, agent), action_count in actions_per_game.items():
+            score = scores.get((game, agent))
             if score and action_count:
                 per_agent[agent].append(score / action_count)
         efficiency = [
@@ -471,17 +485,17 @@ def comparative_kpis(score_rows: Iterable[Mapping[str, Any]]) -> dict[str, list[
     rows = [dict(row) for row in score_rows]
     by_game: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for row in rows:
-        by_game[str(row.get("game_id"))].append(row)
+        by_game[game_key(row)].append(row)
 
     margins: list[Row] = []
-    for game_id, players in by_game.items():
+    for game, players in by_game.items():
         if len(players) < 2:
             continue
         ordered = sorted(players, key=lambda row: -_number(row.get("total_score")))
         best, second = ordered[0], ordered[1]
         margins.append(
             {
-                "game_id": game_id,
+                "game_key": game,
                 "winner_agent": agent_key(best.get("agent_id")),
                 "runner_up_agent": agent_key(second.get("agent_id")),
                 "winning_score": _number(best.get("total_score")),

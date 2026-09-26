@@ -102,8 +102,10 @@ select
     run.power_implementation_coverage,
     run.multiplayer_rules_verified
 from game_scores s
+-- ADR 0006: join on the run id. ``game_id`` omits the lineup and rotation, so
+-- joining on it fans out across every game in a batch that shares a seed.
 join games g
-    on g.game_id = s.game_id
+    on g.simulation_run_id = s.simulation_run_id
 join v_simulation_runs run
     on run.simulation_run_id = g.simulation_run_id;
 
@@ -225,11 +227,13 @@ select
     a.action_type,
     count(*)                                          as action_count,
     round(
-        100.0 * count(*) / nullif(sum(count(*)) over (partition by a.game_id, a.agent_id), 0),
+        100.0 * count(*) / nullif(
+            sum(count(*)) over (partition by a.simulation_run_id, a.agent_id), 0
+        ),
         2
     )                                                 as action_share_pct
 from v_action_events a
-group by a.game_id, a.simulation_run_id, a.agent_id, a.player_id, a.action_type;
+group by a.simulation_run_id, a.game_id, a.agent_id, a.player_id, a.action_type;
 
 -- ---------------------------------------------------------------------------
 -- Grain: one row per agent per run factor combination.
@@ -292,7 +296,7 @@ select
     a.replay_is_valid
 from v_game_player_scores a
 join v_game_player_scores b
-    on b.game_id = a.game_id
+    on b.simulation_run_id = a.simulation_run_id
    and b.player_id <> a.player_id;
 
 -- ---------------------------------------------------------------------------
@@ -366,7 +370,7 @@ select
     round(avg(scores.bird_points), 2)                            as avg_bird_points
 from v_setup_selections sel
 join v_game_player_scores scores
-    on scores.game_id = sel.game_id
+    on scores.simulation_run_id = sel.simulation_run_id
    and scores.player_id = sel.player_id
 where scores.replay_is_valid is not false
 group by

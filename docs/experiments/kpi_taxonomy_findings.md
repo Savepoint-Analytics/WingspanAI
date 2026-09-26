@@ -1,5 +1,23 @@
 # Wingspan KPI taxonomy: what the persisted archive can answer
 
+> **Every per-agent and per-matchup number below is suspect as of 2026-09-25.**
+> `game_id` turned out not to be unique (ADR 0006): it omits the lineup and
+> rotation, so 44.5% of archived games could not be represented under a
+> `games.game_id` primary key. The 4,491 games this pass read are an arbitrary
+> ~55% subset - arbitrary because which colliding game survived depended on
+> object listing order - and the survivors are biased, keeping one
+> lineup/rotation per (batch, seed) and discarding the rest.
+>
+> What survives the finding: the coverage and taxonomy mapping (which KPIs the
+> archive can answer at all, and from which table), and anything read per event
+> rather than per game. What does not: every win rate, per-agent mean, and
+> matchup split. Re-run after the schema migration and reload; expect ~10,800
+> games.
+>
+> Arm results in `results_ledger.md` are **not** affected - those read local
+> artifacts and never touch this database.
+
+
 Run 2026-09-22 against the Savepoint Lab PostgreSQL (`public.*`, 4,491 games /
 8,982 player-games / 1,215,761 events) with
 `notebooks/wingspan_kpi_walkthrough.ipynb` and the functions in
