@@ -235,7 +235,22 @@ def iter_minio_events(prefix: str | None) -> Iterator[tuple[dict, dict, dict | N
                 # Surfaced by the caller's without_scores counter.
                 yield {"batch_kind": batch_kind, "batch_label": batch_label}, {}, None
                 continue
-            outcome = (game_ended.get("payload") or {}).get("outcome") or {}
+            # Older games' game_ended payload does not nest an outcome; the
+            # event's own envelope carries the ids and seed either way.
+            outcome = dict((game_ended.get("payload") or {}).get("outcome") or {})
+            outcome.setdefault("game_id", game_ended.get("game_id"))
+            outcome.setdefault("simulation_run_id", game_ended.get("simulation_run_id"))
+            outcome.setdefault("random_seed", game_ended.get("random_seed"))
+            outcome.setdefault("terminal_reason", "game_over")
+            if not outcome.get("scores"):
+                breakdowns = (game_ended.get("payload") or {}).get("score_breakdowns") or {}
+                outcome["scores"] = {
+                    player: sum(int(v) for k, v in (b or {}).items() if k in SCORE_CATEGORIES)
+                    for player, b in breakdowns.items()
+                }
+            if not outcome.get("winners") and outcome.get("scores"):
+                best = max(outcome["scores"].values())
+                outcome["winners"] = [p for p, v in outcome["scores"].items() if v == best]
             manifest = {"batch_kind": batch_kind, "batch_label": batch_label, "batch_id": None}
             game = {
                 "outcome": outcome,
