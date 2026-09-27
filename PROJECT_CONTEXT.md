@@ -258,10 +258,9 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
+| 1 | **Load events into PostgreSQL from object storage.** `simulation_events` covers 4,491 of 10,956 games and the slice is lopsided — 93% `engine_builder_p1`, 99.9% `greedy_immediate_p2`, 10.7% champion, 0% everything else — so every event-derived KPI describes the forced-play study. Add an events mode to `backfill_summaries.py` (~10,900 objects, ~3M rows). | `simulation_events` covers ≥10,900 runs with per-seat coverage within a few points of uniform; the event sections of `kpi_taxonomy_findings.md` are re-run and their staleness notes removed. |
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
-| 1 | **Run the game-identity migration and reload** (`scripts/migrate_game_identity.py`, then `backfill_summaries.py --source minio-events`, then `analysis/apply_sql_views.py`). Needs approval: it drops 5,969 `games` and ~12,300 `game_scores` rows, all reconstructible from object storage. | `games` reaches ~10,800 rows; the backfill's new `skipped_unidentified` / `duplicate_runs` counters account for the rest of the 10,831 archived games. |
-| 1 | Re-run the KPI pass after the reload and lift the warning banner on `kpi_taxonomy_findings.md`. | Every per-agent and per-matchup KPI recomputed over ~10,800 games; win rates move or they do not, and either way the number is quotable. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | Read the pooled holdout guardrail now that six more default-agent roots exist. | `holdout_guardrail.py` over every default-agent root; any field over 100 games that agrees with its decision is retired. |
 | 2 | Human-trace study H1–H3: Alex plays ten seat-swapped games with `flows/human_vs_agent.py` (built 2026-09-20). | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
@@ -3762,3 +3761,104 @@ adversarial opponent — one that blocks, or plays to deny a known bonus card �
 has ever been in a lineup. The ten human games are the first thing that could
 disturb it, which raises their value considerably: they are now the main
 outstanding threat to the headline finding rather than a nice-to-have.
+
+## Update: 2026-09-27 - migration, reload, and the KPI re-run
+
+### The reload is clean: 5,969 -> 10,956 games, nothing deleted
+
+`scripts/migrate_game_identity.py` was rewritten to migrate **in place** rather
+than drop and reload. The drop version deleted 5,969 games and 12,311 score rows
+to replace them with a superset, which is a needless deletion — the survivors
+are a biased subset but they are valid rows, and the reload is additive. The
+in-place version adds `game_scores.simulation_run_id`, fills it from the 1:1
+join that still holds while `game_id` is the `games` primary key, swaps both
+primary keys, and re-adds the foreign key on the new one. Verified: 5,969 games
+and 12,311 score rows before and after, and the script aborts if the counts move.
+
+Then `backfill_summaries.py --source minio-events`:
+
+| | before | after |
+|---|---:|---:|
+| games | 5,969 | **10,956** |
+| game_scores | 12,311 | **23,346** |
+| distinct `game_id` (the old key) | — | 6,073 |
+
+**10,934 candidates in, 10,934 games out — a 1:1 conversion with zero drops.**
+No `skipped_unidentified`, no `duplicate_runs`, no `without_scores`. ADR 0006's
+prediction held exactly, and 6,073 distinct `game_id` against 10,956 games is
+the collision measured from the other side.
+
+Integrity checks after rebuilding all 16 views: `v_game_player_scores` = 23,346
+rows (no fan-out), zero score-integrity failures, every game's player-row count
+equal to its `player_count`. 132 games have more than one winner, which is
+legitimate — Wingspan ties.
+
+### The KPI corrections are large, and they cross-check
+
+| | 2026-09-22 (4,491 games) | 2026-09-27 (10,956) |
+|---|---|---|
+| `potential_points` player-games | 463 | **6,020** |
+| `potential_points` win rate | 0.952 | **0.731** |
+| `potential_points` mean score | 88.3 | **75.6** |
+| `engine_builder` player-games | 4,244 | 6,342 |
+| players scoring zero bonus points | 50% | **37%** |
+
+The bias was extremely non-uniform: the champion's sample grew 13x while engine
+builder's grew 1.5x, because which game survived a collision depended on object
+listing order and `potential_points-vs-...` sorts after `archetype_*` and
+`greedy_*`.
+
+**The corrected figure cross-checks against instruments that never touched this
+database.** `arm_contrast` independently puts the champion at 75.3 in mirror
+self-play and 78-80 against the roster, from local artifacts. The new KPI mean is
+75.6. The old 88.3 agreed with nothing — which is the check that should have
+caught this in September.
+
+What survived unchanged: the *shape* of the score (birds just under half, round
+goals a fifth), and the round-goal flatness finding (greedy scores 83% of the
+champion's goal points against 46% of its bird points; goals are 25.3% of
+greedy's own score against the champion's 18.1%).
+
+### New: a head-to-head dominance matrix, and it is strictly transitive
+
+All 10 pairs are consistent with one ordering: `potential_points` >
+`engine_builder` > `bonus_card_focus` > `net_value_response` >
+`greedy_immediate`. **No intransitive triple anywhere** — there is no
+rock-paper-scissors among these policies, so no archetype beats a stronger one
+by exploiting it. This is the first direct answer to the "is one heuristic
+dominant" question, and it is yes, with a strict order.
+
+Two details worth keeping: the champion's edge is roughly constant against the
+three mid agents (+15.0 to +17.6), not opponent-specific — the same separability
+the opponent-model nulls show from the other direction. And `engine_builder` vs
+`bonus_card_focus` is the one near-tie (+1.1, outscored rate 0.52 over 390
+player-games), making it the only pair where a seed-paired arm might find a real
+interaction.
+
+Care taken on one number: the matrix's rate is an *outscored* rate, not a game
+win rate, so self-play cells sit at 0.485-0.493 rather than 0.5. That is entirely
+the 2.87% same-agent tie rate — (1 - 0.0287)/2 = 0.486 — and **not** seat
+advantage, which cancels in a self-play cell by symmetry. My first draft of that
+paragraph got it wrong.
+
+### What is still not fixed: the event layer
+
+`simulation_events` still covers **4,491 of 10,956 games**, because the backfill
+loads runs, games and scores but not events. Worse, that slice is lopsided:
+
+| seat | event coverage |
+|---|---:|
+| `greedy_immediate_p2` | 99.9% |
+| `engine_builder_p1` | 93.1% |
+| `potential_points_p1` | 10.7% |
+| every other seat | **0%** |
+
+So bonus-card fulfilment, bird utilization, action mix and tempo all describe
+the forced-play study rather than the archive. Those sections of
+`kpi_taxonomy_findings.md` now carry staleness notes instead of a blanket
+warning, and loading events is now the top open task (~10,900 objects, ~3M rows).
+
+Also added `analysis/kpi_report.py`, a reproducible entry point for the pass.
+The original existed only as a notebook, which is exactly why it could not be
+re-run or diffed when the archive changed underneath it — the same lesson as the
+registrations: if a result cannot be re-run on demand, it will silently go stale.
