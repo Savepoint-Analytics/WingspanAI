@@ -13,22 +13,30 @@ stalling near 5,960 games.
 
 What it does
 ------------
-Rebuilds ``games`` and ``game_scores`` with ``simulation_run_id`` as the key,
-keeping ``game_id`` as the plain, indexed, batch-scoped label it always was.
-Existing rows are **not** migrated: they are the arbitrary ~55% subset that
-survived the collision, so they are dropped and reloaded from object storage,
-which is the durable log under ADR 0005. Nothing is lost that the archive does
-not still hold.
+Migrates the keys **in place**, deleting nothing:
 
-The derived views are dropped so ``analysis/apply_sql_views.py`` rebuilds them
-against the new keys.
+1. adds ``game_scores.simulation_run_id`` and fills it from ``games`` (a 1:1
+   join today, because ``game_id`` is still that table's primary key);
+2. drops the two foreign keys that pointed at ``games(game_id)`` -- a
+   reference that requires uniqueness ``game_id`` never had;
+3. swaps ``games`` onto ``simulation_run_id`` and ``game_scores`` onto
+   ``(simulation_run_id, player_id)``;
+4. re-adds ``game_scores -> games`` on the new key with ``on delete cascade``,
+   and indexes ``games.game_id`` so grouping by batch stays cheap.
+
+The existing rows are kept. They are a biased subset -- the arbitrary ~55% that
+survived the collision -- but they are *valid* rows, and a reload inserts the
+~4,800 missing games alongside them rather than replacing them. So no row is
+deleted at any point, and a re-run of the backfill is additive.
+
+Idempotent: re-running after a successful migration is a no-op.
 
     python scripts/migrate_game_identity.py --dry-run
     python scripts/migrate_game_identity.py
-    python scripts/backfill_summaries.py --source minio-events   # reload
-    python analysis/apply_sql_views.py
+    python scripts/backfill_summaries.py --source minio-events   # adds the rest
+    python analysis/apply_sql_views.py                           # rebuild views
 
-Expect roughly 10,800 games after the reload rather than ~5,960.
+Expect roughly 10,800 games afterwards rather than ~5,960.
 """
 
 from __future__ import annotations
@@ -41,24 +49,85 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from wingspan_ai.config import database_url_from_env, load_dotenv  # noqa: E402
-from wingspan_ai.telemetry.postgres import (  # noqa: E402
-    POSTGRES_SCHEMA,
-    PostgresEventRepository,
+from wingspan_ai.telemetry.postgres import POSTGRES_SCHEMA  # noqa: E402
+
+#: Ordered, and every step is additive or a constraint swap. No DROP TABLE, no
+#: DELETE: the rows that survived the collision are valid and are kept.
+STEPS: tuple[tuple[str, str], ...] = (
+    (
+        "add game_scores.simulation_run_id",
+        "alter table {s}.game_scores add column if not exists simulation_run_id text",
+    ),
+    (
+        "fill it from games (1:1 while game_id is still the games pk)",
+        "update {s}.game_scores t set simulation_run_id = g.simulation_run_id "
+        "from {s}.games g where g.game_id = t.game_id "
+        "and t.simulation_run_id is distinct from g.simulation_run_id",
+    ),
+    (
+        "drop the fk from game_scores to games(game_id)",
+        "alter table {s}.game_scores drop constraint if exists game_scores_game_id_fkey",
+    ),
+    (
+        "drop the fk from simulation_events to games(game_id)",
+        "alter table {s}.simulation_events drop constraint if exists "
+        "simulation_events_game_id_fkey",
+    ),
+    (
+        "swap the games primary key onto simulation_run_id",
+        "alter table {s}.games drop constraint if exists games_pkey",
+    ),
+    (
+        "  add it",
+        "alter table {s}.games add primary key (simulation_run_id)",
+    ),
+    (
+        "require game_scores.simulation_run_id",
+        "alter table {s}.game_scores alter column simulation_run_id set not null",
+    ),
+    (
+        "swap the game_scores primary key onto (simulation_run_id, player_id)",
+        "alter table {s}.game_scores drop constraint if exists game_scores_pkey",
+    ),
+    (
+        "  add it",
+        "alter table {s}.game_scores add primary key (simulation_run_id, player_id)",
+    ),
+    (
+        "re-add game_scores -> games on the new key",
+        "alter table {s}.game_scores add constraint game_scores_simulation_run_id_fkey "
+        "foreign key (simulation_run_id) references {s}.games(simulation_run_id) "
+        "on delete cascade",
+    ),
+    (
+        "index games.game_id so grouping by batch stays cheap",
+        "create index if not exists games_game_id_idx on {s}.games (game_id)",
+    ),
+    (
+        "index simulation_events by run and turn",
+        "create index if not exists simulation_events_run_turn_idx "
+        "on {s}.simulation_events (simulation_run_id, global_turn_number)",
+    ),
 )
+
+
+def already_migrated(cursor) -> bool:
+    cursor.execute(
+        """
+        select 1 from pg_constraint con
+        join pg_class rel on rel.oid = con.conrelid
+        join pg_namespace n on n.oid = rel.relnamespace
+        where n.nspname = %s and rel.relname = 'games' and con.contype = 'p'
+          and pg_get_constraintdef(con.oid) = 'PRIMARY KEY (simulation_run_id)'
+        """,
+        (POSTGRES_SCHEMA,),
+    )
+    return cursor.fetchone() is not None
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument(
-        "--keep-rows",
-        action="store_true",
-        help=(
-            "migrate surviving rows instead of dropping them. Kept for "
-            "completeness; the reload is preferred because the survivors are a "
-            "biased subset (one lineup/rotation per batch+seed)."
-        ),
-    )
     args = parser.parse_args(argv)
 
     load_dotenv()
@@ -70,45 +139,38 @@ def main(argv: list[str] | None = None) -> int:
     import psycopg
 
     with psycopg.connect(database_url) as connection, connection.cursor() as cursor:
-        cursor.execute(
-            """
-            select column_name from information_schema.columns
-            where table_schema = %s and table_name = 'game_scores'
-              and column_name = 'simulation_run_id'
-            """,
-            (POSTGRES_SCHEMA,),
-        )
-        if cursor.fetchone() is not None:
-            print("already re-keyed: game_scores.simulation_run_id exists")
+        if already_migrated(cursor):
+            print("already migrated: games is keyed on simulation_run_id")
             return 0
 
         cursor.execute(f"select count(*) from {POSTGRES_SCHEMA}.games")
-        before = cursor.fetchone()[0]
-        print(f"games before: {before:,} (the ~55% that survived the collision)")
+        games_before = cursor.fetchone()[0]
+        cursor.execute(f"select count(*) from {POSTGRES_SCHEMA}.game_scores")
+        scores_before = cursor.fetchone()[0]
+        print(f"before: {games_before:,} games, {scores_before:,} score rows (all kept)")
 
-        statements = [
-            f"drop view if exists {POSTGRES_SCHEMA}.v_head_to_head_games cascade",
-            f"drop view if exists {POSTGRES_SCHEMA}.v_game_player_scores cascade",
-            f"drop table if exists {POSTGRES_SCHEMA}.game_scores",
-            f"drop table if exists {POSTGRES_SCHEMA}.games",
-        ]
-        if args.keep_rows:
-            print("--keep-rows is not implemented; the reload is the supported path")
-            return 1
         if args.dry_run:
             print("dry run, would run:")
-            for statement in statements:
-                print(f"  {statement}")
-            print("  then ensure_schema() to recreate both tables re-keyed")
+            for label, statement in STEPS:
+                print(f"  {label}")
+                print(f"      {statement.format(s=POSTGRES_SCHEMA)}")
             return 0
-        for statement in statements:
-            cursor.execute(statement)
-        connection.commit()
-        print("dropped games, game_scores and the two dependent views")
 
-    PostgresEventRepository(database_url).ensure_schema()
-    print("recreated games (pk simulation_run_id) and game_scores (pk run_id, player_id)")
-    print("next: python scripts/backfill_summaries.py --source minio-events")
+        for label, statement in STEPS:
+            cursor.execute(statement.format(s=POSTGRES_SCHEMA))
+            print(f"  {label}: {cursor.rowcount if cursor.rowcount >= 0 else 'ok'}")
+        connection.commit()
+
+        cursor.execute(f"select count(*) from {POSTGRES_SCHEMA}.games")
+        games_after = cursor.fetchone()[0]
+        cursor.execute(f"select count(*) from {POSTGRES_SCHEMA}.game_scores")
+        scores_after = cursor.fetchone()[0]
+        print(f"after:  {games_after:,} games, {scores_after:,} score rows")
+        if (games_after, scores_after) != (games_before, scores_before):
+            print("WARNING: row counts changed; this migration should not lose rows")
+            return 1
+
+    print("\nnext: python scripts/backfill_summaries.py --source minio-events")
     print("      python analysis/apply_sql_views.py")
     return 0
 
