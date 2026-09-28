@@ -31,7 +31,6 @@ from wingspan_ai.analysis.persistence import (  # noqa: E402
     load_games,
     load_postgres_event_records,
 )
-from wingspan_ai.telemetry.postgres import ANALYSIS_EVENT_NAMES  # noqa: E402
 
 Row = Mapping[str, Any]
 
@@ -124,15 +123,30 @@ def main(argv: list[str] | None = None) -> int:
     lines += section("Comparative", kpis.comparative_kpis(scores), "comparative")
 
     if args.events:
-        events = load_postgres_event_records(
-            run_labels=args.run_labels, event_names=list(ANALYSIS_EVENT_NAMES)
+        # Load per family rather than the whole log. action_resolved alone is
+        # 606k rows; pulling every family at once costs gigabytes for no gain,
+        # and load_postgres_event_records' own docstring says as much.
+        def load(*names: str) -> list[dict]:
+            return load_postgres_event_records(
+                run_label=args.run_labels[0] if args.run_labels else None,
+                event_names=list(names),
+            )
+
+        goals = load("round_goal_scored", "game_ended")
+        lines.append(f"\n_round-goal events: {len(goals):,}_\n")
+        lines += section("Round goals", kpis.round_goal_kpis(scores, goals), "round_goal")
+
+        cards = load("setup_selection_applied", "bird_scorecard")
+        lines.append(f"\n_selection + scorecard events: {len(cards):,}_\n")
+        lines += section("Bonus cards", kpis.bonus_card_kpis(cards), "bonus_card")
+        lines += section("Tempo", kpis.tempo_kpis(cards), "tempo")
+
+        actions = load("action_resolved")
+        lines.append(f"\n_action events: {len(actions):,}_\n")
+        lines += section("Actions", kpis.action_kpis(actions, scores), "action")
+        lines += section(
+            "Bird utilization", kpis.bird_utilization_kpis(actions + cards), "bird"
         )
-        lines.append(f"\n_event records loaded: {len(events):,}_\n")
-        lines += section("Round goals", kpis.round_goal_kpis(scores, events), "round_goal")
-        lines += section("Bonus cards", kpis.bonus_card_kpis(events), "bonus_card")
-        lines += section("Bird utilization", kpis.bird_utilization_kpis(events), "bird")
-        lines += section("Actions", kpis.action_kpis(events, scores), "action")
-        lines += section("Tempo", kpis.tempo_kpis(events), "tempo")
 
     report = "\n".join(lines) + "\n"
     if args.out:

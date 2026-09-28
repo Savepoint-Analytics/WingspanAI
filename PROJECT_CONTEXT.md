@@ -258,7 +258,7 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | **Load events into PostgreSQL from object storage.** `simulation_events` covers 4,491 of 10,956 games and the slice is lopsided — 93% `engine_builder_p1`, 99.9% `greedy_immediate_p2`, 10.7% champion, 0% everything else — so every event-derived KPI describes the forced-play study. Add an events mode to `backfill_summaries.py` (~10,900 objects, ~3M rows). | `simulation_events` covers ≥10,900 runs with per-seat coverage within a few points of uniform; the event sections of `kpi_taxonomy_findings.md` are re-run and their staleness notes removed. |
+| 1 | **Counterfactual near-tie study.** Extend `play_counterfactuals.py` beyond `play_bird` to card and bonus-card choices; re-derive the agent's valuation of every candidate on reconstructed states so near-ties (two options within ~0.2) can be identified retroactively; log top-K candidate scores going forward. First target: bonus-card choice. | A near-tie sample with thousands of paired decisions; a pre-registered read on one bonus-card question (Breeding Manager is the obvious one); the selection-on-state-distribution limit stated in the write-up. |
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
@@ -3862,3 +3862,98 @@ Also added `analysis/kpi_report.py`, a reproducible entry point for the pass.
 The original existed only as a notebook, which is exactly why it could not be
 re-run or diffed when the archive changed underneath it — the same lesson as the
 registrations: if a result cannot be re-run on demand, it will silently go stale.
+
+## Update: 2026-09-28 - the event log is loaded; the archive is now fully queryable
+
+`scripts/load_events_from_object_storage.py` (new) streams each archived
+`events.jsonl`, keeps the eight families the view layer and KPI functions read,
+and bulk-loads them with `COPY` through an unlogged staging table merged on
+`event_id` — so the load is idempotent and additive. `executemany` over this
+volume was not viable; `COPY` is the difference between minutes and hours.
+
+**10,934 objects, 723,168 rows read, 440,437 newly inserted, zero failures.**
+
+| | before | after |
+|---|---:|---:|
+| games carrying events | 4,491 | **10,936 of 10,956** |
+| `potential_points_p1` coverage | 10.7% | **99.6%** |
+| `engine_builder_p1` | 93.1% | 100% |
+| `greedy_immediate_p2` | 99.9% | 100% |
+| every other seat | **0%** | **99.1-100%** |
+
+The remaining limit is real but narrow: `round_goal_scored` has 3,208 rows
+because the event dates from 2026-09-22, so per-round goal *placement* covers
+recent games only. Goal totals come from `game_scores` and are complete.
+
+### What the load immediately bought
+
+**Breeding Manager is now a finding, not a hypothesis.** It was flagged from 25
+games as "worth a proper paired study rather than a claim". On **391 games** it
+is still last of 26 bonus cards, matching 0.68 birds a game against the best
+card's 3.79 (fulfilment 0.082 vs 0.577). The old numbers were *harsher* than the
+truth (0.031 → 0.082) because they came from weaker agents' decks, but the
+ranking held. The real spread across cards is 7-fold, not the tenfold the small
+sample suggested.
+
+**The archetypes behave as advertised** — a behavioural check that was
+impossible before:
+
+| agent | birds played | matching the kept bonus card | fulfilment |
+|---|---:|---:|---:|
+| `bonus_card_focus` | 7.02 | 4.13 | **0.597** |
+| `potential_points` | 7.71 | 3.49 | 0.442 |
+| `engine_builder` | 8.36 | 2.83 | 0.334 |
+| `greedy_immediate` | 3.93 | 1.29 | 0.310 |
+
+`bonus_card_focus` steers plays toward its card at nearly twice greedy's rate
+while playing fewer birds than `engine_builder`. And the champion sits
+mid-table at 0.442: it is **not** chasing its bonus card, it scores 5.4 bonus
+points by playing well and taking the points where they fall. Against
+`bonus_card_focus`'s 0.597 fulfilment and highest-of-any-agent 6.0 bonus points
+for 14 fewer points overall, that is the engine-vs-objective tradeoff in two
+rows.
+
+### A suspicion I raised and then disproved
+
+Reading the card table I saw `Anatomist [swift_start_asia]` being dealt and kept
+512 times in base-game games and started writing it up as a rule-fidelity bug.
+It is not one. `docs/rules/bonus_card_composition.md` settled this on
+2026-09-16: the workbook's `Set` column reads `core, asia` because the Asia
+swift-start pack **reprints** a core card, and the suffix is a naming artifact.
+The core pool is exactly 26 cards, the right count, and the loader correctly
+excludes `Forest Ranger [swift_start_asia]` (set `asia` only) and the five
+automa cards. Recorded here so the question is not raised a third time.
+
+### Counterfactual replay: feasible, and mostly already built
+
+Asked whether archived games can be rewound to a decision point and replayed
+down the other branch. Yes — `analysis/play_counterfactuals.py` already does it
+for `play_bird` decisions, and three things make it general: the replay is exact
+(ADR 0003 put only `random_seed` in the RNG), the **full** legal-action set is
+logged at every decision, and the reconstruction under that script yields every
+resolved action, not just plays.
+
+Two things worth recording from that conversation:
+
+1. **There is no "perfect" counterfactual.** Once play diverges, the outcome
+   depends on the continuation policy for both seats, the deck order, and the
+   opponents' hidden cards. The continuation policy *defines* what the number
+   means; the existing script is explicit that its values are "what this play
+   was worth to a competent but non-searching continuation", and
+   `--continuation-samples K` averages over resampled worlds so the answer does
+   not hinge on one shuffle.
+2. **The near-tie design is the valuable part, and it is available
+   retroactively.** Restricting to decisions where the agent's own evaluation
+   had two options within ~0.2 points gives thousands of naturally occurring
+   randomised trials, because noise decided which won. The log records the
+   winning option's score but not the runner-up's — however, since the state
+   rebuild is exact and the evaluator deterministic, every candidate's value can
+   be **re-derived** on all 10,956 archived games without new instrumentation.
+
+Why this matters more than another arm: an 80-game arm resolves about ±3 points,
+which is why three recent registrations were unanswerable. Decision-level
+pairing gives thousands of paired observations with deck and opponent luck
+differenced out, putting ±0.5 effects in reach. The honest limit is selection on
+the state distribution — the decisions available are the ones this agent reached
+via its own earlier choices, so the value learned is conditional on that agent's
+trajectory. Near-tie filtering reduces but does not remove it.
