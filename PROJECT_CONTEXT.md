@@ -4114,3 +4114,39 @@ use: a per-decision effect measured at near-ties is **not** an estimate of a
 whole-game effect, because a switch that captures it also changes unrelated
 decisions. Measure the per-decision effect to *find* candidates, then always
 budget the arm on whole-game variance.
+
+## Update: 2026-09-30 (later) - arm worktrees now reap themselves
+
+Seven `WingspanAI-arm-*` folders had accumulated beside the repo and looked like
+duplicated projects. They were not: each carried a `.git` **file** pointing into
+`WingspanAI/.git/worktrees/`, so one 18 MB object store was shared across all
+eight checkouts, and each folder held only ~4.4 MB of source at a pinned commit.
+Every arm writes its results to `MAIN/artifacts/<root>` — verified, the
+worktrees contained **zero** outcome files — so nothing of value ever lived
+outside the project repo.
+
+**Why arms run in a separate checkout at all.** Two requirements collide: an arm
+must run at one pinned commit (the launcher refuses to start on a dirty tree,
+because provenance has to record `dirty: false`), and arms run for one to eight
+hours while work continues. This session is the proof — the schema re-key, the
+KPI rewrite, the near-tie instrument and an agent change all landed while arms
+were in flight. Run from the main tree, those arms would have been executing
+against code being mutated underneath them.
+
+**The actual defect was cleanup.** The launcher has always printed "remove the
+worktree when the arm is done", and that reminder was missed **7 times out of
+9** — a design problem, not a diligence problem. Fixed:
+
+- `queue.sh` now reaps its own worktree after every runner group reports
+  `GROUP COMPLETE`, waiting for the runner processes to exit first (the marker is
+  the last line of `run_group.py`, not proof the process is gone) and `cd`-ing to
+  the main tree before removing the checkout it was standing in.
+- `analysis/launch_arm.py --prune` cleans up worktrees whose queue died before
+  reaping, with `--dry-run` support. It keeps anything still running, anything
+  without `GROUP COMPLETE` in every runner log, and anything dirty — surfacing
+  git's own refusal rather than forcing.
+
+Verified end to end: incomplete arm kept, complete arm removed, dirty worktree
+kept with the reason shown, generated `queue.sh` passes `zsh -n`, and
+`arm_worktrees()` never returns the main checkout. The seven stale worktrees are
+removed; `git worktree list` shows only the main tree.

@@ -11,7 +11,17 @@ as a tool. It
   group, five two-seed chunks each, mirroring the ``rr_belief_opp``
   baseline so every (lineup, rotation, seed) game pairs) and
   ``queue.sh`` (waits for ``--after`` roots to finish, then starts the
-  runners), and starts the queue in the background.
+  runners), and starts the queue in the background;
+- **reaps its own worktree** once every runner group reports
+  ``GROUP COMPLETE``. This used to be a printed reminder to run
+  ``git worktree remove`` by hand, which was missed 7 times out of 9 and left
+  seven stale checkouts sitting beside the repo looking like duplicated
+  projects. ``--prune`` cleans up the ones whose queue died before reaping.
+
+Nothing of value lives in a worktree: the runners write every artifact to
+``MAIN/artifacts/<root>``, and the worktree holds only source at the pinned
+commit. It exists so an arm's code is frozen while the main tree keeps moving --
+provenance has to say ``dirty: false``, and arms run for hours.
 
 Two-player arms use the four standard lineup groups. ``--player-count 3``
 runs one process per pair of opponents from the same roster, all three
@@ -29,6 +39,8 @@ potential_points@1``).
     python analysis/launch_arm.py rr3p_belief --player-count 3 \\
         --search '{"search_opponent_model": "belief"}'
     python analysis/launch_arm.py mirror_2p --mirror --seeds 1-40 --runners 4
+    python analysis/launch_arm.py --prune            # remove finished worktrees
+    python analysis/launch_arm.py --prune --dry-run  # say what it would remove
     python analysis/launch_arm.py mirror_2p_greedy --mirror --seeds 1-40 --runners 4 \\
         --study-search '{"search_opponent_model": "greedy"}' --after mirror_2p:4
 
@@ -186,6 +198,20 @@ cd "$WT" || exit 1
 echo "$(date) launched {root}" >> "$MAIN/artifacts/{root}/launch/queue.log"
 wait_for "$MAIN/artifacts/{root}/launch" {runner_count}
 echo "$(date) finished {root}" >> "$MAIN/artifacts/{root}/launch/queue.log"
+# Reap the worktree. Every group has printed GROUP COMPLETE by here, but that is
+# the last line of run_group.py rather than proof the process has exited, so wait
+# for the processes to go before pulling the checkout out from under them.
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  pgrep -f "artifacts/{root}/launch/run_group.py" >/dev/null || break
+  sleep 6
+done
+cd "$MAIN" || exit 1
+if git worktree remove "$WT" 2>/dev/null; then
+  echo "$(date) reaped worktree $WT" >> "$MAIN/artifacts/{root}/launch/queue.log"
+else
+  echo "$(date) worktree $WT left in place; run 'python analysis/launch_arm.py --prune'" \
+    >> "$MAIN/artifacts/{root}/launch/queue.log"
+fi
 """
 
 
@@ -202,9 +228,91 @@ def git(*args: str) -> str:
     ).stdout
 
 
+def arm_worktrees() -> list[tuple[Path, str]]:
+    """``(path, root)`` for every arm worktree this launcher created."""
+
+    prefix = f"{MAIN.name}-arm-"
+    out: list[tuple[Path, str]] = []
+    for line in git("worktree", "list", "--porcelain").splitlines():
+        if not line.startswith("worktree "):
+            continue
+        path = Path(line.removeprefix("worktree ").strip())
+        if path != MAIN and path.name.startswith(prefix):
+            out.append((path, path.name.removeprefix(prefix)))
+    return out
+
+
+def arm_is_running(root: str) -> bool:
+    patterns = (f"artifacts/{root}/launch/run_group.py", f"artifacts/{root}/launch/queue.sh")
+    return any(
+        subprocess.run(["pgrep", "-f", pattern], capture_output=True).returncode == 0
+        for pattern in patterns
+    )
+
+
+def arm_is_complete(root: str) -> bool:
+    """Every runner group printed GROUP COMPLETE.
+
+    The same marker ``queue.sh`` waits on, so this agrees with the queue's own
+    notion of done rather than inventing a second one.
+    """
+
+    launch = MAIN / "artifacts" / root / "launch"
+    skip = {"queue.log", "queue_runner.log"}
+    logs = [path for path in launch.glob("*.log") if path.name not in skip]
+    return bool(logs) and all("GROUP COMPLETE" in path.read_text(errors="ignore") for path in logs)
+
+
+def prune_worktrees(dry_run: bool = False) -> int:
+    """Remove arm worktrees whose arms are finished.
+
+    The launcher has printed "remove the worktree when the arm is done" since it
+    was written and that reminder was missed 7 times out of 9, so the queue now
+    reaps its own worktree and this cleans up the ones whose queue died first.
+    ``git worktree remove`` refuses a dirty worktree, which is the safety net:
+    nothing with uncommitted work is removed here.
+    """
+
+    worktrees = arm_worktrees()
+    if not worktrees:
+        print("no arm worktrees")
+        return 0
+    removed = kept = 0
+    for path, root in worktrees:
+        if arm_is_running(root):
+            print(f"  keep   {path.name}: still running")
+            kept += 1
+            continue
+        if not arm_is_complete(root):
+            print(f"  keep   {path.name}: no GROUP COMPLETE in every runner log")
+            kept += 1
+            continue
+        if dry_run:
+            print(f"  would remove {path.name}")
+            removed += 1
+            continue
+        try:
+            git("worktree", "remove", str(path))
+            print(f"  removed {path.name}")
+            removed += 1
+        except subprocess.CalledProcessError as error:
+            detail = (error.stderr or "").strip().splitlines()
+            print(f"  keep   {path.name}: {detail[-1] if detail else 'removal refused'}")
+            kept += 1
+    print(f"{removed} {'would be removed' if dry_run else 'removed'}, {kept} kept")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("root", help="artifact root name under artifacts/, e.g. rr_prod_5s")
+    parser.add_argument(
+        "root", nargs="?", help="artifact root name under artifacts/, e.g. rr_prod_5s"
+    )
+    parser.add_argument(
+        "--prune",
+        action="store_true",
+        help="remove arm worktrees whose arms are finished, then exit",
+    )
     parser.add_argument("--commit", default="HEAD")
     parser.add_argument(
         "--search", default="{}", help="JSON kwargs for PotentialPointsSearchConfig"
@@ -249,6 +357,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="write the scripts, do not start")
     args = parser.parse_args(argv)
 
+    if args.prune:
+        return prune_worktrees(dry_run=args.dry_run)
+    if not args.root:
+        parser.error("root is required unless --prune is passed")
     if not args.dry_run and git("status", "--porcelain").strip():
         print("main tree is dirty; commit or stash first (provenance must say dirty: false)")
         return 1
