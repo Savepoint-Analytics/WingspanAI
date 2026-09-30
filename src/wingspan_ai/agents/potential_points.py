@@ -182,6 +182,21 @@ DEFAULT_SEARCH_BELIEF_PROFILES = "hand_set"
 #: roster denial was worth −0.01 (2026-09-02, pre-search agent); against a
 #: planning opponent the prediction is +1 to +3.
 DEFAULT_SEARCH_DENIAL_WEIGHT = 0.0
+#: Points subtracted from a root action that rerolls the birdfeeder, when a
+#: non-reroll alternative exists. ``0.0`` is the historic behaviour.
+#:
+#: Registered 2026-09-30 from a near-tie nomination: among 29 archived decisions
+#: where the champion valued "take this food" and "reroll, then take" within 0.2
+#: of each other, declining the reroll realized **+2.40** (23/29 positive,
+#: CI [+1.20, +3.60]). The reroll outcome is *not* uncertain to the search --
+#: it resolves deterministically inside ``apply_action``, verified on six real
+#: decisions -- so this is not a risk-discount. The candidate mechanism is
+#: horizon: a reroll re-randomises the feeder for the player's own later turns
+#: and for opponents, and a short-horizon evaluator books the immediate food
+#: without the downstream cost. The penalty is therefore **empirical**, and only
+#: bites where both a reroll and a non-reroll option are legal, which is exactly
+#: the near-tie case.
+DEFAULT_REROLL_PENALTY = 0.0
 #: How the current round's end-of-round goal is valued. ``"heuristic"`` is the
 #: historic reachability rule (a gap in items, 0.6 a turn, no placement
 #: table). ``"placement"`` is the expected placement points from
@@ -292,6 +307,8 @@ class PotentialPointsSearchConfig:
     search_belief_profiles: str = DEFAULT_SEARCH_BELIEF_PROFILES
     #: Root-level denial term weight; see ``DEFAULT_SEARCH_DENIAL_WEIGHT``.
     search_denial_weight: float = DEFAULT_SEARCH_DENIAL_WEIGHT
+    #: See ``DEFAULT_REROLL_PENALTY``.
+    reroll_penalty: float = DEFAULT_REROLL_PENALTY
     #: ``"heuristic"`` or ``"placement"``; see ``ROUND_GOAL_MODELS``.
     round_goal_model: str = DEFAULT_ROUND_GOAL_MODEL
     #: Share of games that keep ``search_opponent_holdout_model`` instead, as a
@@ -325,6 +342,7 @@ class PotentialPointsSearchConfig:
         "search_opponent_model",
         "search_belief_profiles",
         "search_denial_weight",
+        "reroll_penalty",
         "round_goal_model",
         "mechanic_synergy",
         "mechanic_synergy_hand",
@@ -414,6 +432,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
     search_belief_profiles: str = DEFAULT_SEARCH_BELIEF_PROFILES
     #: Root-level denial term weight; see ``DEFAULT_SEARCH_DENIAL_WEIGHT``.
     search_denial_weight: float = DEFAULT_SEARCH_DENIAL_WEIGHT
+    #: See ``DEFAULT_REROLL_PENALTY``.
+    reroll_penalty: float = DEFAULT_REROLL_PENALTY
     #: ``"heuristic"`` or ``"placement"``; see ``ROUND_GOAL_MODELS``.
     round_goal_model: str = DEFAULT_ROUND_GOAL_MODEL
     #: Engine-potential term; see ``DEFAULT_MECHANIC_SYNERGY``.
@@ -476,6 +496,8 @@ class PotentialPointsAgent(SetupPolicyMixin):
             raise ValueError("search_leaf_candidates must be at least 1 or None")
         if self.search_denial_weight < 0:
             raise ValueError("search_denial_weight must be non-negative")
+        if self.reroll_penalty < 0:
+            raise ValueError("reroll_penalty must be non-negative")
         if self.round_goal_model not in ROUND_GOAL_MODELS:
             raise ValueError(
                 f"unknown round_goal_model: {self.round_goal_model!r}; "
@@ -710,13 +732,15 @@ class PotentialPointsAgent(SetupPolicyMixin):
         if depth is None:
             depth = self._search_depth_for(state, player_id)
         denial = self._root_denial_values(state, legal_actions, player_id)
+        reroll = self._root_reroll_penalties(legal_actions)
+        adjust = [d + r for d, r in zip(denial, reroll, strict=True)]
         if depth > 0:
             scores = []
             for index, action in enumerate(legal_actions):
                 if deadline is not None and perf_counter() > deadline:
                     return None
                 with profiling.node("search_root_action", search_depth=depth):
-                    value = denial[index] + _search_action_value(
+                    value = adjust[index] + _search_action_value(
                         state,
                         action,
                         player_id,
@@ -739,9 +763,24 @@ class PotentialPointsAgent(SetupPolicyMixin):
             return scores
         with profiling.node("evaluate_actions", candidate_count=len(legal_actions)):
             return [
-                (evaluation.value_delta + denial[index], evaluation.realized_delta)
+                (evaluation.value_delta + adjust[index], evaluation.realized_delta)
                 for index, evaluation in enumerate(self.evaluate_actions(state, legal_actions))
             ]
+
+    def _root_reroll_penalties(self, legal_actions: list[LegalAction]) -> list[float]:
+        """``-reroll_penalty`` for each root action that rerolls the feeder.
+
+        Applied only when a non-reroll action is also legal: with no
+        alternative the penalty would shift every candidate equally and change
+        nothing, and the feeder is rerolled anyway when it is empty.
+        """
+
+        if self.reroll_penalty <= 0:
+            return [0.0] * len(legal_actions)
+        rerolls = [bool(getattr(action, "reroll_birdfeeder", False)) for action in legal_actions]
+        if all(rerolls):
+            return [0.0] * len(legal_actions)
+        return [-self.reroll_penalty if is_reroll else 0.0 for is_reroll in rerolls]
 
     def _root_denial_values(
         self, state: GameState, legal_actions: list[LegalAction], player_id: str
