@@ -51,6 +51,16 @@ denial term, so it affects both the search and one-ply paths.
 **Arm value: 2.0**, chosen close to the measured +2.4 margin bias. One value
 only; a sweep follows if and only if this arm is positive.
 
+**Caveat on what the switch actually does.** Probed on 17 archived
+reroll-eligible decisions, the penalty changed 4 of them. One was the intended
+case (`Gain rodent if rolled, after rerolling` -> `Gain rodent`), but two pushed
+food-gaining below a different action type entirely (`-> Draw tray cards 2`, and
+`-> Gain seed and fish by discarding a card`). So a flat penalty is broader than
+"decline the reroll": it can demote food-gaining altogether. That is a fair
+consequence of the intervention, but it means a positive result would not
+localise cleanly to the near-tie finding, and a negative result could be a
+penalty that is simply too blunt rather than a refutation of the nomination.
+
 ## Design
 
 - 2p, **seeds 1–20 × 4 opponents × 2 rotations = 160 games per side**, both
