@@ -258,7 +258,6 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
-| 1 | Read the first near-tie collection against its pre-registration (`docs/experiments/near_tie_counterfactuals.md`): band −0.3 to +0.3 on overall realized delta, Bonferroni p<0.005 on the by-pair table. Report delivered n and SD so the power claim is checkable. | A ledger row; any per-pair result either clears p<0.005 or is recorded as a nomination for its own arm, never as a finding. |
 | 1 | Ten human games (Alex) with `flows/human_vs_agent.py`, seat-swapped; then H1–H3. The first-player advantage (+6 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human vs every roster kind; H2 disagreement list. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
@@ -4043,3 +4042,75 @@ anything. And if it is built, **register the win-rate band, not the score band**
 the mechanism is converting score into wins, so a score registration would
 declare it null by construction, and win rates need far more games for the same
 power.
+
+## Update: 2026-09-30 - the reroll_penalty arm lands in the middle zone, and I registered a design the launcher cannot build
+
+### Result
+
+`reroll_penalty=2.0` vs a fresh default baseline, both sides at the same commit.
+
+| read | n | Δ | p | SD | limit | 95% CI |
+|---|---:|---:|---:|---:|---:|---|
+| primary, all games | 80 | **−0.388** | 0.553 | 5.81 | 1.82 | [−1.66, +0.89] |
+| by deck | 10 | −0.388 | 0.501 | — | — | — |
+| differing games only | 41 | −0.756 | 0.556 | 8.15 | 3.56 | [−3.25, +1.74] |
+
+**Middle zone by the registered rule: not adopted, not refuted.** The point
+estimate is mildly negative — the opposite sign to the nomination.
+
+**What it does settle:** the CI's upper bound of +0.89 excludes both the +1.5
+adopt threshold and the +1.44 the nomination predicted, so **the near-tie +2.40
+a decision does not transfer to whole-game score.** The strong form is dead.
+What remains unresolved is anything inside ±0.9.
+
+**The power model held**, which is worth noting after three arms where it did
+not: predicted 47% bit-identical games against 49% delivered, predicted SD 6.5
+against 5.81.
+
+### My error, and the rule it earns
+
+I registered **160 games over 20 decks**. The arm delivered **80 over 10**,
+because `analysis/launch_arm.py --seeds` is ignored for 2p roster arms — its own
+help text says "2p roster arms always use seeds 1-10". I dry-ran the launcher but
+only checked that it wrote its scripts, not that it would produce the registered
+number of games.
+
+That matters rather than being cosmetic: the realized detection limit is **1.82**,
+*above* the registered +1.5 adopt threshold, so the delivered arm could not
+reliably detect its own adoption criterion. Fourth registration this month to
+outrun its sample, and the first where the cause was a tooling assumption rather
+than an optimistic variance estimate.
+
+**Added to the standing registration rule (2026-09-25): verify a dry run's game
+count against the registered n before launching, not just that it wrote its
+scripts.**
+
+### Closed on cost grounds
+
+Resolving ±0.7 at the realized SD needs **540 games**; a 2p roster arm caps at
+80, so it would need mirror mode. Not worth it: the prior was 29 post-hoc
+decisions, the mechanism I proposed was falsified before launch (rerolls resolve
+deterministically, so the search already sees the roll), feeder-odds valuation is
+already null three times over, the point estimate is negative, and the strong
+form is excluded. Recorded as closed with the nomination noted as *untested below
+±0.9* rather than refuted.
+
+If ever reopened, the better intervention is pricing the post-reroll feeder state
+for the player's own later turns — the horizon mechanism — rather than a flat
+penalty, which probing showed is blunt: 2 of 4 flipped decisions demoted
+food-gaining below an unrelated action type instead of just declining the reroll.
+
+### Net position on the near-tie programme
+
+Two registered reads, both honest nulls, both cheap, and both closing a
+direction:
+
+1. Evaluator tie-breaking carries no recoverable signal (+0.062, CI inside the
+   ±0.3 band). Tie-break tuning is not productive.
+2. The one nomination worth testing did not transfer to whole-game score.
+
+That is the instrument working as designed. The lesson to carry into any future
+use: a per-decision effect measured at near-ties is **not** an estimate of a
+whole-game effect, because a switch that captures it also changes unrelated
+decisions. Measure the per-decision effect to *find* candidates, then always
+budget the arm on whole-game variance.
