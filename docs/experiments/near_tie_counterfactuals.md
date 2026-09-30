@@ -116,7 +116,71 @@ top-valued candidate is not always the one taken, and reading `top[0]` as
 "chosen" would silently flip the sign of `realized_delta` on exactly the
 decisions this instrument exists to study.
 
-## Results
+## Results, first collection (2026-09-29)
 
-_Pending the first collection. Fill in against the registration above, and state
-the delivered n and SD so the power claim can be checked rather than trusted._
+230 games from the placement-default roots, epsilon 0.2, two determinized
+samples. **2,045 near-tie decisions across 90 games** (only 90 of the 230 games
+carried a champion seat with ranked decisions).
+
+**The registration was answerable as committed.** Delivered n = 2,045 (floor was
+1,400) and SD = 4.88 (ceiling was 5.5), so the power claim holds rather than
+needing to be trusted. The realized detection limit is **0.302** against the
+0.25 predicted, because the SD came in at 4.88 rather than the assumed 4.0 —
+which sits a hair *outside* the band's 0.3 half-width, so the power margin is
+thinner than registered and the confirmation below rests on the confidence
+interval rather than on the limit.
+
+### Primary: indifference confirmed
+
+| | value |
+|---|---|
+| mean realized delta | **+0.062** |
+| p | 0.565 |
+| 95% CI | **[−0.149, +0.273]** |
+| registered band | −0.3 to +0.3 |
+
+The whole interval sits inside the registered band, which is the strong form of
+the result: this is not a failure to reject, it is a positive finding of
+indifference. **Where the searching agent says two options are within a hair, it
+is right — its tie-breaking carries no recoverable signal.**
+
+A third of near-ties (688 of 2,045, **33.6%**) end with *exactly* zero realized
+difference: both branches converge to the same final score. Those decisions do
+not merely look close, they are genuinely inert.
+
+### Secondary: no per-pair finding, two nominations
+
+Sixteen pairs reached n ≥ 20, not the ~10 the registration anticipated, so the
+true Bonferroni threshold is **0.0031** rather than the registered 0.005. Under
+either, **nothing qualifies as a finding.** The two smallest p-values, recorded
+as nominations for their own arms and not as results:
+
+| pair | n | realized Δ | p | note |
+|---|---:|---:|---:|---|
+| `play_bird` chosen over `draw_cards` | 63 | **−1.508** | 0.024 | mechanistically plausible: over-eagerness to play a bird when drawing is equally valued. n=63 cannot detect anything under ~1.4, so this is at the edge of what the cell could ever show |
+| `gain_food` vs `gain_food` | 393 | +0.434 | 0.051 | which food to take; the largest cell to show any signal |
+
+Neither is quotable. The first is the more interesting one and the cheaper to
+test: a registered arm that biases the evaluator's `play_bird` versus
+`draw_cards` tradeoff at the margin.
+
+### What this does and does not settle
+
+**Settles:** there is no free ≥0.3 points sitting in the evaluator's
+tie-breaking, so tie-break tuning is not a productive direction. That closes a
+line of work cheaply, which is the main value here.
+
+**Does not settle:** effects smaller than ~0.3 points; effects confined to
+contexts too rare to power in 2,045 decisions; and anything about the
+*continuation* policy, since both branches were rolled out by the same cheap
+one-ply agent. A stronger continuation could surface differences this design
+averages away — the project has already measured that two-ply search is worth
+−10.4 points, so continuation strength is not a monotone dial and a re-run at
+greater depth is not obviously more truthful.
+
+**Available but not run:** the collected rows carry `chosen_final` and
+`runner_up_final` from identical states, so the spread of realized outcomes is a
+direct measure of outcome variance. That makes this dataset a cheap pre-test for
+a distributional/risk-aware evaluator — the question being whether realized
+deltas at near-ties correlate with a variance proxy. Unregistered, so it would
+be exploratory and nomination-only.

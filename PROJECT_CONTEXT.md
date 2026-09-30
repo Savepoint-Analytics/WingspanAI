@@ -3957,3 +3957,89 @@ differenced out, putting ±0.5 effects in reach. The honest limit is selection o
 the state distribution — the decisions available are the ones this agent reached
 via its own earlier choices, so the value learned is conditional on that agent's
 trajectory. Near-tie filtering reduces but does not remove it.
+
+## Update: 2026-09-29 - near-tie counterfactuals confirm indifference; tie-break tuning closed
+
+First collection read against the registration written before it
+(`docs/experiments/near_tie_counterfactuals.md`). **2,045 near-tie decisions
+across 90 games** from the placement-default roots.
+
+**The registration was answerable as committed** — delivered n=2,045 against a
+1,400 floor and SD=4.88 against a 5.5 ceiling. This is the first arm in four
+where the power claim held, which is the 2026-09-25 rule working. One honest
+caveat: the realized detection limit is 0.302 rather than the predicted 0.25
+(SD came in at 4.88, not the assumed 4.0), which is a hair outside the band's
+0.3 half-width, so the verdict rests on the confidence interval rather than on
+the limit.
+
+**Result: +0.062, p=0.565, 95% CI [−0.149, +0.273]** — the whole interval inside
+the registered −0.3 to +0.3 band. That is the strong form: a positive finding of
+indifference, not a failure to reject. Where the champion says two options are
+within a hair, it is right, and its tie-breaking carries no recoverable signal.
+**33.6% of near-ties end in exactly zero realized difference** — genuinely inert,
+not merely close.
+
+**No per-pair finding.** Sixteen cells reached n≥20, not the ~10 anticipated, so
+the true Bonferroni threshold is 0.0031 rather than the registered 0.005;
+nothing clears either. Two nominations recorded as nominations: `play_bird`
+chosen over `draw_cards` at −1.51 (p=0.024, n=63 — mechanistically plausible
+over-eagerness to play birds, and at the edge of what a 63-decision cell could
+ever detect) and `gain_food` vs `gain_food` at +0.43 (p=0.051, n=393).
+
+**What this buys: a line of work closed cheaply.** There is no free ≥0.3 points
+in evaluator tie-breaking, so tuning it is not productive. Negative results that
+close directions are the point of this instrument.
+
+### Margins against a peer are half what they are against the roster
+
+Measured while answering a design question, and it reframes several things:
+
+| regime | mean winning margin | games within 5 points |
+|---|---:|---:|
+| vs the weak roster (2p) | 24.8 | 13.8% |
+| **champion vs champion (2p)** | **12.4** | **30.3%** |
+
+Outcome noise from an identical state is SD 4.88. So against a peer the noise is
+the same order as the deciding margin in about a third of games, while against
+the roster most games are blowouts. Any risk-aware or distributional idea is
+capped by that ~30%, and is worth nothing at all in roster games — which is also
+a caution about reading roster win rates as skill measurements.
+
+### Gaussian-Markov agent: assessed, not built
+
+Asked what a Gaussian Markov chain agent would look like. Three readings, two
+dead on this project's own evidence:
+
+- **Kalman-filtering opponents' hidden state** — dead. Perfect opponent-type
+  knowledge measures +0.00, and a filter cannot beat the oracle it approximates.
+- **A GMRF over bird/board synergies** — the nearest prior attempt, the
+  engine-potential mechanic-pair term, measured −4.51 (p=0.001).
+- **A round-indexed linear-Gaussian forecast of final score used as a
+  distributional leaf evaluator** — the live one.
+
+The argument for the third is the score/win disconnect already in the ledger:
+the oracle gained +0.00 score but +0.011 win; the 3p greedy opponent model gained
++1.89 score and *lost* 0.011 win. The evaluator returns a scalar, so the agent
+cannot express "when ahead take the low-variance line, when behind gamble".
+P(win) = Φ((μ_me − μ_opp)/√(σ²_me + σ²_opp − 2cov)) can, and the shared
+tray/feeder/goals make that covariance term mandatory rather than optional.
+
+Design constraints worth keeping: `A_r` must be round-indexed (four rounds of
+8/7/6/5 turns is non-stationary by construction); round goals are rank
+statistics and should stay with the existing Poisson placement model rather than
+be forced into a Gaussian; scoring is end-loaded so the chain should model engine
+state with a separate terminal emission; and the model must never select actions,
+only evaluate leaves, because hard constraints like food costs are inexpressible
+in linear dynamics.
+
+**The blocker is one cheap emitter:** per-round score snapshots are not emitted
+(already flagged in the KPI coverage table), and a Markov chain over rounds
+cannot be fit without round states. Adding it makes future games yield ~4
+transitions each.
+
+**Sequencing advice given:** pre-test the premise on the near-tie rows, which
+already measure outcome variance from identical states, before building
+anything. And if it is built, **register the win-rate band, not the score band** —
+the mechanism is converting score into wins, so a score registration would
+declare it null by construction, and win rates need far more games for the same
+power.
