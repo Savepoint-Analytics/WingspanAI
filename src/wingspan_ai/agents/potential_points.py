@@ -731,9 +731,13 @@ class PotentialPointsAgent(SetupPolicyMixin):
         player_id = state.active_player.player_id
         if depth is None:
             depth = self._search_depth_for(state, player_id)
-        denial = self._root_denial_values(state, legal_actions, player_id)
-        reroll = self._root_reroll_penalties(legal_actions)
-        adjust = [d + r for d, r in zip(denial, reroll, strict=True)]
+        adjust = self._root_denial_values(state, legal_actions, player_id)
+        if self.reroll_penalty > 0:
+            # Only pay for the combination when the switch is on: this runs once
+            # per decision on the latency-budgeted path, which measures its own
+            # cost against a deadline.
+            reroll = self._root_reroll_penalties(legal_actions)
+            adjust = [d + r for d, r in zip(adjust, reroll, strict=True)]
         if depth > 0:
             scores = []
             for index, action in enumerate(legal_actions):

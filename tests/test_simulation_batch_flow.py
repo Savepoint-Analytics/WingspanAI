@@ -127,6 +127,7 @@ class SimulationBatchFlowTests(TestCase):
                     "search_opponent_model": "belief",
                     "search_belief_profiles": "hand_set",
                     "search_denial_weight": 0.0,
+                    "reroll_penalty": 0.0,
                     "round_goal_model": "placement",
                     "search_opponent_holdout_share": 0.05,
                     "search_opponent_holdout_model": "greedy",
