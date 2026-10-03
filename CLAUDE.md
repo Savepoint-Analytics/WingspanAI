@@ -206,7 +206,8 @@ Important docs:
 - `CLAUDE.md` for Claude-specific operating instructions.
 - `AGENTS.md` for cross-agent operating instructions.
 - `COMPANY_CONTEXT.md` for public/research/case-study positioning context.
-- `PROJECT_CONTEXT.md` for longitudinal project decisions, current status, and next steps.
+- `PROJECT_CONTEXT.md` for current status, next steps, standing decisions, and recent updates.
+- `docs/history/` for the archived chronological project log, verbatim and append-only.
 - `docs/architecture/` for simulator and platform design.
 - `docs/rules/` for encoded rule assumptions and expansion scope.
 - `docs/events/` for simulation telemetry contracts.
@@ -286,7 +287,21 @@ Update this file when:
 - Core tech stack changes.
 - Rule/expansion scope changes.
 - Coding standards change.
+- Documentation structure or routing changes.
 - AI behaviour preferences change.
 - A repeated correction from Alex should become a standing instruction.
 
-Do not let this file become bloated. If something is project history rather than standing instruction, put it in `PROJECT_CONTEXT.md`.
+Do not let this file become bloated. Project history rather than standing
+instruction goes in `PROJECT_CONTEXT.md`.
+
+`PROJECT_CONTEXT.md` is bounded too. When its chronological log outgrows the
+standing brief — past about **1,000 lines** — move updates older than the most
+recent ten **verbatim and unedited** into `docs/history/project_log_<year>.md`
+with `scripts/archive_project_log.py`, which leaves a dated index behind and
+refuses to finish unless every original line is still present. Route by content
+type as you go: arm results to `docs/experiments/results_ledger.md`, decisions to
+`docs/decisions/`, findings to `docs/experiments/strategy_findings.md`, and
+standing method rules into the brief itself rather than leaving them buried in a
+dated update. **New updates always go to `PROJECT_CONTEXT.md`;** `docs/history/`
+is append-only and never rewritten. `tests/test_doc_structure.py` enforces the
+threshold so this does not depend on anyone remembering it.

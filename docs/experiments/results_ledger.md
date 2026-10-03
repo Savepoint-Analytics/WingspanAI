@@ -287,6 +287,23 @@ than against the rest of the roster. Stated that way it is worth acting on;
 stated as "budget v2 lost 4.2 to bonus_card_focus at p=0.03" it was one of
 about five cells that chance alone would have produced.
 
+## Standing rules for registering and reading an arm
+
+Four rules, each earned by a specific failure. They were scattered across dated
+updates and individual study docs; this is the one place to read them, with
+pointers to the evidence.
+
+| Rule | Earned by |
+|---|---|
+| **1. A registration must state the detection limit its sample will have, and the band must be wider than that limit.** If it cannot be, do not launch -- decide on cost, mechanism or theory and say so. | Three arms in 2026-09 registered bands their samples could not resolve. Per-game score SD is 9-11 at 2p, so an 80-game paired arm resolves about ±3 points and nothing finer; ±1 needs ~860 games. See *Two registrations in a row asked questions their arms could not answer*. |
+| **2. Verify a dry run's game count against the registered n before launching**, not just that it wrote its scripts. | The `reroll_penalty` arm registered 160 games over 20 decks and delivered 80 over 10, because `launch_arm.py --seeds` is ignored for 2p roster arms. The realized limit then sat *above* the registered adopt threshold. See `reroll_penalty_arm.md`. |
+| **3. A re-read of existing data never changes a verdict. It can only nominate a question for a fresh pre-registered arm.** Where an arm is too expensive, the row keeps its original verdict and the re-read is recorded as a caveat, not a correction. | Both rows the 2026-09-25 audit reopened were tested and both reverted. See *Both of the audit's promotions failed their pre-registered arms*. |
+| **4. A per-decision effect is not an estimate of a whole-game effect.** Use per-decision measurement to *find* candidates; always budget the arm on whole-game variance. | Near-tie counterfactuals measured +2.40 a decision for declining a birdfeeder reroll (29 decisions, p=0.0005). The arm testing it returned −0.39, with a CI excluding the +1.44 that effect predicted — because a switch that captures the per-decision gain also changes unrelated decisions. See `near_tie_counterfactuals.md` and `reroll_penalty_arm.md`. |
+
+Rules 1 and 2 are about **power**, 3 and 4 about **what a measurement licenses**.
+The common failure behind all four is treating a number as more transferable than
+its design allows.
+
 ## Reading a row fairly
 
 Two conditions, both learned the hard way. **Pair by seed** (2026-09-01,
