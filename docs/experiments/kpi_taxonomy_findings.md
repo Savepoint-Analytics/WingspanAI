@@ -239,6 +239,56 @@ fall. Against `bonus_card_focus`'s 0.597 fulfilment and 6.0 bonus points — the
 highest of any agent — for 14 fewer points overall, that is the whole
 engine-vs-objective tradeoff in two rows.
 
+### Head-to-head, all 23,346 player-games (re-run 2026-10-05)
+
+> Restored 2026-10-05. This section was written on 2026-09-27 and silently
+> deleted on 2026-09-28 by an index-based splice that replaced everything
+> between two headings, including the section that sat between them. Found
+> because the case study cited `+32.2` and a source check could not find it
+> anywhere. Regenerated from the database, so the numbers are current rather
+> than recovered.
+
+Mean score margin and **outscored rate** (share of shared games where the agent
+scored strictly more than that opponent — not the game win rate, and ties count
+for neither side). Population statistics over whatever lineups were run, **not**
+a balanced tournament.
+
+| | vs `greedy` | vs `net_value` | vs `bonus_focus` | vs `engine_builder` |
+|---|---|---|---|---|
+| `potential_points` | **+32.2** (0.91) | +17.6 (0.82) | +15.0 (0.80) | +17.0 (0.86) |
+| `engine_builder` | +22.5 (0.80) | +6.6 (0.69) | +1.1 (0.52) | — |
+| `bonus_card_focus` | +10.4 (0.76) | +5.2 (0.63) | — | −1.1 (0.47) |
+| `net_value_response` | +9.5 (0.68) | — | −5.2 (0.37) | −6.6 (0.29) |
+| `greedy_immediate` | — | −9.5 (0.31) | −10.4 (0.23) | −22.5 (0.19) |
+
+Champion cell sizes: 1,418 player-games against engine builder and greedy,
+1,174 against bonus-card focus, 1,878 against net value.
+
+**The ordering is strict and transitive**: `potential_points` >
+`engine_builder` > `bonus_card_focus` > `net_value_response` >
+`greedy_immediate`, with no intransitive triple in any of the ten pairs. There
+is no rock-paper-scissors among these policies — no archetype beats a stronger
+one by exploiting it.
+
+Two readings worth keeping:
+
+- **The champion's edge is roughly constant against everything** (+15.0 to
+  +17.6 against the three mid agents), not opponent-specific. That is the same
+  story the opponent-model arms tell from the other direction: play quality is
+  nearly separable from who you are facing.
+- **`engine_builder` vs `bonus_card_focus` is the one near-tie** (+1.1,
+  outscored rate 0.52 over 390 player-games). It is the only pair in the matrix
+  where the archetypes are genuinely close, and the only one where a
+  seed-paired arm might find an interaction worth having.
+
+Self-play cells read margin 0.0 at an outscored rate of 0.485–0.493 rather than
+exactly 0.5 purely because ties are excluded from the numerator: the same-agent
+tie rate is 2.87%, so a symmetric cell should sit at (1 − 0.0287)/2 = **0.486**,
+which is what they do. Nothing about seat advantage is visible here — a
+self-play cell aggregates both seats and is symmetric by construction, so the
+established 2p first-player advantage of about +6 cancels out. Read seat effects
+from `mirror_seat_effect.py`, not from this table.
+
 ## What to instrument, in order
 
 1. **A per-turn food snapshot.** One field closes the entire food-economy

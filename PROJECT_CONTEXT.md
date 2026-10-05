@@ -809,3 +809,62 @@ remedy in the message, rather than being vacuously true.
 
 Also merged the duplicate top task — it appeared **three times** — and recorded a
 pre-existing flaky test (see *Known flaky test*).
+
+## Update: 2026-10-05 - Case study refreshed, and a silently deleted section recovered
+
+`case_study.md` was a 200-line draft from 2026-09-18, structurally complete but
+missing the last fortnight. Refreshed to 2026-10-05. Two structural defects
+fixed alongside the staleness: the self-play section sat **after** Limitations,
+and Limitations still claimed "no self-play" while that section reported it.
+
+What the refresh adds, all of it already settled:
+
+- **Section 2 is now the strongest in the document.** "The opponent barely
+  matters at two players" becomes "four kinds of privileged information are each
+  worth nothing" — deck order (−2.4, actively harmful), the feeder roll, feeder
+  odds (null ×3), and perfect opponent type (+0.00 at 3p). The reading: at
+  strong play Wingspan is very nearly a solitaire optimisation problem, with
+  interaction running through the shared board rather than anyone's plan.
+- **The strict transitive dominance ordering** — the direct answer to "is one
+  heuristic dominant", previously absent.
+- **The near-tie programme** as a third instance of "observed value is not
+  causal value", and the sharpest one: a per-decision effect is not a whole-game
+  effect.
+- **Section 5**: the evaluator is right where it says it is indifferent
+  (+0.062, CI inside the registered band, a third of near-ties exactly zero).
+- **Peer-versus-roster margins** (12.4 vs 24.8; 30.3% vs 13.8% inside five
+  points), which reframes roster win rates as a poor measure of skill.
+- **The method section goes from three rules to four**, adding the powered-band
+  rule and the re-read rule.
+- **A new section on the data-integrity failure**, written as a credibility
+  asset rather than a blemish: what the `game_id` collision did, that it
+  flattered the thing being built (95% at 88.3 against the true 73% at 75.6),
+  and the two things that caught it — cross-checking against an instrument with
+  a different data path, and keeping the durable log separate from the queryable
+  one. It also records that the disagreement was visible in September and was
+  not acted on.
+- **Limitations** now carry the placement-model dispute (+1.12 paired vs +7.64
+  from the guardrail, unresolved and not averaged), the fragility of the +1.12
+  confirmation, and the 10-deck sampling of several 2p arms.
+
+### A section had been silently deleted, and the case study found it
+
+Verifying every figure in the refresh against the source docs — 42 of them —
+turned up two that traced nowhere: the head-to-head matrix's `+32.2` and
+`+17.6`. The cause: the head-to-head section was written into
+`kpi_taxonomy_findings.md` on 2026-09-27 and **deleted on 2026-09-28** by a
+scripted edit that replaced everything between two headings, including the
+section that happened to sit between them. Nobody noticed for a week.
+
+Restored, regenerated from the database so the numbers are current rather than
+recovered, with a note on the deletion. This is the **second** time an
+index-based splice has destroyed content this month (the first was the archive
+tool's `write_text`, caught before it ran twice), so
+`tests/test_doc_structure.py` now asserts that the expected sections of the KPI
+doc, the ledger and the case study are present. Cheap, and it makes the next
+such deletion loud.
+
+The lesson worth keeping: **the provenance rule the case study states about
+itself is what caught this.** "Nothing here is a claim the ledger does not
+carry" is only useful if it is actually checked, and checking it found a
+week-old data loss that no test, read or review had surfaced.

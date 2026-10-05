@@ -107,3 +107,50 @@ class ArchiveIntegrityTests(TestCase):
     def test_history_files_say_they_are_verbatim(self) -> None:
         for path in (ROOT / "docs/history").glob("project_log_*.md"):
             self.assertIn("verbatim", path.read_text()[:600], f"{path.name} lacks the notice")
+
+
+class SectionSurvivalTests(TestCase):
+    """Sections that an index-based splice has already deleted once.
+
+    Twice now a scripted edit that replaced everything between two headings
+    also removed the section sitting between them: the KPI doc's head-to-head
+    matrix on 2026-09-28, found only on 2026-10-05 when the case study cited a
+    figure no source could account for. These assertions are cheap and make the
+    next such deletion loud.
+    """
+
+    EXPECTED = {
+        "docs/experiments/kpi_taxonomy_findings.md": (
+            "### Score composition",
+            "### By agent",
+            "### Bonus-card fulfilment by card",
+            "### Fulfilment by agent",
+            "### Head-to-head",
+            "## What to instrument, in order",
+        ),
+        "docs/experiments/results_ledger.md": (
+            "## Standing rules for registering and reading an arm",
+            "## Reading a row fairly",
+            "## How to add a row",
+        ),
+        "docs/experiments/case_study.md": (
+            "## What was built",
+            "## What we found",
+            "## The method, which is the transferable part",
+            "## The data-integrity failure, and why it is in the write-up",
+            "## Limitations",
+            "## What is next",
+        ),
+    }
+
+    def test_expected_sections_are_present(self) -> None:
+        for relative, headings in self.EXPECTED.items():
+            text = (ROOT / relative).read_text()
+            for heading in headings:
+                self.assertIn(heading, text, f"{relative} lost {heading!r}")
+
+    def test_the_case_study_states_its_own_provenance_rule(self) -> None:
+        """Its figures are only trustworthy if it says where they come from."""
+
+        text = (ROOT / "docs/experiments/case_study.md").read_text()
+        self.assertIn("nothing here is a claim the ledger does not carry", text)
