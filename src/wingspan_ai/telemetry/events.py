@@ -22,6 +22,7 @@ class EventName(StrEnum):
     ACTION_SELECTED = "action_selected"
     ACTION_RESOLVED = "action_resolved"
     ROUND_GOAL_SCORED = "round_goal_scored"
+    ROUND_SCORE_SNAPSHOT = "round_score_snapshot"
     BIRD_SCORECARD = "bird_scorecard"
     GAME_ENDED = "game_ended"
     AGENT_DECISION_SUMMARY = "agent_decision_summary"

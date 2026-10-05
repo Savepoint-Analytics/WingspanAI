@@ -36,6 +36,7 @@ ANALYSIS_EVENT_NAMES = (
     "round_started",
     "action_resolved",
     "round_goal_scored",
+    "round_score_snapshot",
     "bird_scorecard",
     "game_ended",
 )

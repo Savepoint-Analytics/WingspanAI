@@ -243,6 +243,7 @@ def run_single_game(
             # round's goal is recorded too (the game-over branch of
             # ``_advance_turn`` never reaches a new round number).
             _emit_round_goal_scored(sink, action_state, state, resolved_run_id, previous_round)
+            _emit_round_score_snapshot(sink, state, resolved_run_id, previous_round)
         if round_ended and not state.round_state.game_over:
             _emit_round_started(sink, state, resolved_run_id)
             current_round = state.round_state.round_number
@@ -491,6 +492,76 @@ def _emit_round_goal_scored(
             nobody_qualified=top == 0,
         )
     )
+
+
+def _emit_round_score_snapshot(
+    sink: InMemoryEventSink,
+    state: GameState,
+    simulation_run_id: str,
+    round_number: int,
+) -> None:
+    """One row per player per round boundary: score so far and engine state.
+
+    The score taxonomy has asked for "cumulative score by round" and
+    "per-round delta" since 2026-05 and could not answer either: only the final
+    score was ever emitted, so `kpi_taxonomy_findings.md` carries both as
+    unsupported. Differencing consecutive snapshots gives both for free.
+
+    It is also the one blocker for any model of score *trajectory* -- a Markov
+    chain over rounds cannot be fit without round states
+    (`docs/agents/gaussian_markov_value_agent.md`). The fields are therefore
+    chosen to be a usable state vector, not just a score: counts that drive
+    future scoring (birds, capacity, food, hand) alongside the six score
+    categories, all read directly off the state so this costs nothing.
+
+    ``round_number`` is the round that just ended. Emitted after that round's
+    goal is scored, so ``round_goal_points`` here includes it.
+    """
+
+    for player in state.players:
+        breakdown = score_player(state, player.player_id)
+        slots = [slot for slots in player.habitats.values() for slot in slots]
+        sink.emit(
+            SimulationEvent(
+                event_name=EventName.ROUND_SCORE_SNAPSHOT,
+                simulation_run_id=simulation_run_id,
+                game_id=state.game_id,
+                ruleset_id=state.ruleset.ruleset_id,
+                player_id=player.player_id,
+                agent_id=player.agent_id,
+                round_number=round_number,
+                random_seed=state.random_seed,
+                global_turn_number=state.round_state.global_turn_number,
+                payload={
+                    "round_ended": round_number,
+                    "total_score": breakdown.total,
+                    "bird_points": breakdown.bird_points,
+                    "bonus_points": breakdown.bonus_points,
+                    "round_goal_points": breakdown.round_goal_points,
+                    "egg_points": breakdown.egg_points,
+                    "cached_food_points": breakdown.cached_food_points,
+                    "tucked_card_points": breakdown.tucked_card_points,
+                    # Engine state: what the next round has to work with.
+                    "birds_in_play": len(slots),
+                    "birds_by_habitat": {
+                        habitat.value: len(player.habitats[habitat]) for habitat in Habitat
+                    },
+                    "eggs_on_board": sum(slot.eggs for slot in slots),
+                    "egg_capacity_left": player.available_egg_capacity,
+                    "cached_food_on_board": sum(slot.cached_food for slot in slots),
+                    "tucked_cards_on_board": sum(slot.tucked_cards for slot in slots),
+                    "food_tokens_held": sum(player.food_tokens.values()),
+                    "food_by_type": {
+                        food.value: count
+                        for food, count in player.food_tokens.items()
+                        if count
+                    },
+                    "hand_size": len(player.hand),
+                    "bonus_cards_held": len(player.bonus_cards),
+                    "action_cubes_available": player.action_cubes_available,
+                },
+            )
+        )
 
 
 def _emit_round_started(sink: InMemoryEventSink, state: GameState, simulation_run_id: str) -> None:

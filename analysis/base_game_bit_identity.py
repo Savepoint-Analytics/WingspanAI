@@ -8,6 +8,20 @@ exactly the archived games. Runs seeds ``--seeds`` (default 1) of the
 sequence and final scores against every archived batch holding that seed.
 
     python analysis/base_game_bit_identity.py --seeds 1
+
+**Read a DIFFERENT result carefully.** The archive it compares against
+(``rr_belief_opp``, 2026-09-16) predates several *intentional* changes to the
+agent's adopted defaults -- the placement round-goal model became the default on
+2026-09-22, for one -- so any game whose decisions that switch touched now
+reports DIFFERENT and should. On 2026-10-04 seed 1 was identical and seed 2 was
+not, for exactly this reason, which cost half an hour of chasing a
+non-regression.
+
+So this answers "did the *rules* change" only for games the adopted switches do
+not touch. To test whether a specific change is decision-neutral, compare action
+sequences with and without that change in one process rather than against the
+archive. The round-score snapshot emitter was cleared that way: identical
+``action_label`` hashes on three seeds with the emitter monkeypatched out.
 """
 
 from __future__ import annotations

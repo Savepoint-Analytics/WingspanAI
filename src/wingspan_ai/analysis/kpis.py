@@ -533,10 +533,11 @@ def comparative_kpis(score_rows: Iterable[Mapping[str, Any]]) -> dict[str, list[
 TAXONOMY_COVERAGE: tuple[tuple[str, frozenset[str], str, str], ...] = (
     (
         "core_scoring",
-        frozenset({"game_ended"}),
-        "partial",
+        frozenset({"game_ended", "round_score_snapshot"}),
+        "supported",
         "Final score and its six categories are in game_scores. Cumulative score by round and "
-        "per-round delta need a score snapshot at each round end, which is not emitted.",
+        "per-round delta come from round_score_snapshot, emitted at each round boundary from "
+        "2026-10-04; games archived before that date have the final score only.",
     ),
     (
         "end_of_round_goals",
