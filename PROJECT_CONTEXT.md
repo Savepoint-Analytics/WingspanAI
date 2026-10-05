@@ -259,7 +259,6 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 | Priority | Task | Success criteria |
 |---|---|---|
 | 1 | **Ten human games** (Alex) with `flows/human_vs_agent.py` (built 2026-09-20), seat-swapped; then H1–H3. Now the main falsification risk to the headline finding: "nearly solitaire" has only ever been tested against robots that do not block or contest a telegraphed bonus card. The first-player advantage (+6.2 in self-play) is the first thing to read there. | Ten games archived and replay-valid; belief log loss on the human scored against every roster kind (`fit_response_model.py` on `artifacts/human`); H2 disagreement list through the viewer. |
-| 2 | Fix `test_depth_is_bought_before_samples`, flaky at ~1 in 6 (pre-existing; see *Known flaky test*). Remove the wall-clock calibration -- inject a clock or assert the ladder's decision sequence. | The test passes 20 consecutive runs under load; no assertion derives from a measured elapsed time. |
 | 2 | Expansion phase 1 — European (`expansion_configuration.md` §European): action-cubes-per-row state, ~10 unclassified templates, teal handlers with rulebook refs, 7 bonus + 10 goal handlers, audit, 25-game smoke, `rr_european_base` baseline arm. | Gates 1–9 pass for `core_european_v1`; `base_game_bit_identity.py` still identical. |
 | 2 | Strong-play descriptive pass on the 330 mirror games (round-goal contention, engine timing, the champion's belief-posterior row for the oracle table). | `strategy_findings.md` §4 gains the goal-contention and timing rows; `oracle_type_posteriors.json` gains a `potential_points` row. |
 | 2 | **Test whether the guardrail's `round_goal_model` +7.64 is deck selection.** It disagrees seven-fold with two paired arms (+1.12, +0.41). The held-out set is a deterministic function of (field, seed, lineup, position), so it is a *fixed* subset of decks -- computable without running anything. Compare the held-out decks' goal composition to the rest. | Either the held-out decks are unusual for goal scoring, which explains the gap and closes it, or they are not, and the size of the placement effect becomes an open question worth an arm. |
@@ -268,24 +267,6 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 | 3 | Keep model on the 322 measured bonus-card deals, held out on the engine-builder deals. | Beats `expected_points` 61% pick rate on held-out deals (free on archived games). |
 | 3 | `docs/architecture/reusable_board_game_ai_template.md`. | Lists every interface a second game must implement and every module that needs no change. |
 | 4 | European expansion as the first content pack + rules module (`docs/rules/expansion_configuration.md` first). | Loader, handlers and scoring behind `ruleset` config; base-game batches bit-identical with the pack off. |
-
-## Known flaky test
-
-`tests/test_decision_budget.py::test_depth_is_bought_before_samples` fails
-roughly **1 in 6 runs**, and more often under load. It is timing-calibrated: it
-measures one probe decision's elapsed time, sets the budget to 0.65x that, then
-asserts the ladder kept depth 2 and used fewer than 2 samples. Any variation in
-machine load between the two runs moves that ratio across the assertion boundary.
-
-Measured 2026-10-02 to rule out a regression: current HEAD fails 1 of 6, the
-commit before the `reroll_penalty` switch fails **2 of 6**. So the flakiness is
-pre-existing and was not introduced by that change.
-
-This is a real defect, not an infrastructure excuse -- a suite with a 17% flaky
-test teaches people to re-run rather than read failures. The fix is to remove the
-dependence on wall-clock calibration: inject a fake clock, or assert on the
-ladder's decision sequence rather than on counts derived from a measured budget.
-Tracked in the task table.
 
 ## Open questions
 

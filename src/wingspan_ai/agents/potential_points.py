@@ -24,7 +24,7 @@ Power timing valuation plan:
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
 from math import ceil
 from time import perf_counter
@@ -434,6 +434,11 @@ class PotentialPointsAgent(SetupPolicyMixin):
     search_denial_weight: float = DEFAULT_SEARCH_DENIAL_WEIGHT
     #: See ``DEFAULT_REROLL_PENALTY``.
     reroll_penalty: float = DEFAULT_REROLL_PENALTY
+    #: Time source for the anytime ladder, injectable so the budget is
+    #: testable without wall-clock calibration. Measuring one decision to
+    #: set the budget for the next made the ladder test fail about 1 in 6
+    #: under load, because the two runs met different contention.
+    clock: Callable[[], float] = perf_counter
     #: ``"heuristic"`` or ``"placement"``; see ``ROUND_GOAL_MODELS``.
     round_goal_model: str = DEFAULT_ROUND_GOAL_MODEL
     #: Engine-potential term; see ``DEFAULT_MECHANIC_SYNERGY``.
@@ -601,7 +606,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
         samples first, lost 2.0 points at 5 s.
         """
 
-        started = perf_counter()
+        started = self.clock()
         deadline = started + self.max_decision_time_ms / 1000.0
         player_id = state.active_player.player_id
         full_depth = self._search_depth_for(state, player_id)
@@ -645,10 +650,10 @@ class PotentialPointsAgent(SetupPolicyMixin):
                 # First deepening: a ply multiplies cost by about the branching,
                 # bounded by the root's own candidate count on small roots.
                 predicted = previous * min(len(legal_actions), _BUDGET_DEFAULT_LEVEL_RATIO)
-            if predicted > deadline - perf_counter():
+            if predicted > deadline - self.clock():
                 cut_short = True
                 break
-            level_started = perf_counter()
+            level_started = self.clock()
             with profiling.node("budget_level", aggregate=False, search_depth=depth) as node:
                 scores = self._score_actions(
                     samples[0], legal_actions, depth=depth, deadline=deadline
@@ -657,7 +662,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
             if scores is None:
                 cut_short, abandoned = True, abandoned + 1
                 break
-            level_seconds[depth] = perf_counter() - level_started
+            level_seconds[depth] = self.clock() - level_started
             first_sample, reached_depth = scores, depth
             best, used_depth, used_samples = scores, depth, 1
 
@@ -668,7 +673,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
                 "budget_samples", aggregate=False, search_depth=reached_depth
             ) as node:
                 for sample in samples[1:]:
-                    if level_seconds[reached_depth] > deadline - perf_counter():
+                    if level_seconds[reached_depth] > deadline - self.clock():
                         cut_short = True
                         break
                     scores = self._score_actions(
@@ -684,7 +689,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
         self.last_budget_report = {
             "ladder": "v2",
             "budget_ms": self.max_decision_time_ms,
-            "elapsed_ms": round((perf_counter() - started) * 1000.0, 1),
+            "elapsed_ms": round((self.clock() - started) * 1000.0, 1),
             "full_depth": full_depth,
             "depth_used": used_depth,
             "samples_used": used_samples,
@@ -741,7 +746,7 @@ class PotentialPointsAgent(SetupPolicyMixin):
         if depth > 0:
             scores = []
             for index, action in enumerate(legal_actions):
-                if deadline is not None and perf_counter() > deadline:
+                if deadline is not None and self.clock() > deadline:
                     return None
                 with profiling.node("search_root_action", search_depth=depth):
                     value = adjust[index] + _search_action_value(
