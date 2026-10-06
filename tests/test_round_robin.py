@@ -293,7 +293,7 @@ class GuardrailedRosterTests(TestCase):
             "guardrailed:potential_points", seat="p1", setup_policy_kind="strategic"
         )
 
-        self.assertEqual(guarded.base_agent.setup_policy.policy_id, "potential_points_setup_v2")
+        self.assertEqual(guarded.base_agent.setup_policy.policy_id, "potential_points_setup_v4")
 
     def test_guardrailed_cell_labels_are_path_safe(self) -> None:
         """The `guardrailed:` colon is not a legal path segment character."""

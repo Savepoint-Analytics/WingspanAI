@@ -127,6 +127,33 @@ target `AGENTS.md` names.
   win rate and mean margin. Not a strength claim at n=10 (detection limit
   ~±8 points); the number the case study will be asked for first.
 
+### The configuration the ten games face (added 2026-10-06)
+
+This was implicit and is now named, because it changed on the eve of the study.
+
+- **Opener: `potential_points_setup_v4`** (the joint opener, adopted
+  2026-10-06). The previous opener chose the bonus card against the dealt five
+  rather than the kept set, which meant the agent could not coordinate birds,
+  bonus and goals the way a human does. Adopted on mechanism, not on an arm:
+  the population effect is ~0.2 points and confirming it would need ~21,600
+  games (`joint_opener.md`). Named here so a reader knows the ten games were
+  **not** played against the opener every archived agent game used.
+- **Search: the production configuration** — beam pre-ranking plus the v2
+  anytime ladder at a 5 s cap, so the agent answers in about a second a turn.
+  Do not pass `--unbudgeted`; mixing configurations across the ten games would
+  make them unpoolable.
+- **Seats: five games in seat 1, five in seat 2.** The first-player advantage
+  is +6.2 points, comparable to the whole effect being measured, so an
+  unbalanced split would swamp it.
+- **Ten distinct seeds, not five played twice.** Pairing by seed is right for
+  an agent arm and **invalid for a human**: replaying a deck leaks the tray,
+  the goals and the opposing hand. The cost is losing the pairing; the
+  alternative is an invalid study.
+- **Standing holdouts stay on.** The human games carry the same 5% controls as
+  every other game, including the new `setup_policy` holdout that keeps the
+  previous opener — so a handful of the ten may face `..._v2`. Record which,
+  and read H3 on the holdout-free subset as well as the whole ten.
+
 Ten games at ~30 minutes each is a weekend. More than ten is not worth
 scheduling until H2 has produced its first arm.
 

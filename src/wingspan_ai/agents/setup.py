@@ -86,8 +86,48 @@ class SetupPolicyMixin:
 #: default moved to ``"expected_points"`` on 2026-09-16 (Alex's call) after
 #: it scored +0.85 (p=0.011) and 61% vs 52% over 322 measured deals; see
 #: ``docs/experiments/bonus_card_selection_study_plan.md``.
-BONUS_SCORING_KINDS = ("tag_overlap", "expected_points")
-DEFAULT_BONUS_SCORING = "expected_points"
+#: ``"joint"`` is ``"expected_points"`` plus two fixes found 2026-10-06 while
+#: checking whether the agent can coordinate its setup the way a human can.
+#: Measured over 240 openings, the old opener's sequencing cost nothing (joint
+#: enumeration was never strictly better, 0/240) and reading all four goals
+#: moved one hand in 240. The real defect was which scorer saw which cards:
+#: ``expected_bonus_points`` -- which prices every card from its parsed rule
+#: and printed prevalence -- chose the bonus against the **dealt five**,
+#: including birds about to be discarded, while the joint tradeoff inside the
+#: keep loop was priced by ``_bonus_alignment_score``, a hand-written if-chain
+#: covering about a dozen named cards and returning 0 for the rest. So the
+#: good scorer saw the wrong card set and the crude one made the decision,
+#: which is why the two bonus cards tied at the optimum in 37% of hands.
+#: ``"joint"`` enumerates (bonus x keep set) together and prices the bonus
+#: inside the loop with ``expected_bonus_points`` against the **kept** cards.
+BONUS_SCORING_KINDS = ("tag_overlap", "expected_points", "joint")
+#: Adopted 2026-10-06 **on mechanism, not on a significance test**, which the
+#: standing registration rule allows when no affordable sample can resolve the
+#: band. The old default pointed ``expected_bonus_points`` -- the scorer that
+#: prices every card from its parsed rule and prevalence -- at the *dealt five*
+#: including birds about to be discarded, while the joint tradeoff inside the
+#: keep loop was priced by ``_bonus_alignment_score``, an if-chain covering a
+#: dozen named cards and returning 0 for the rest. The good scorer saw the
+#: wrong card set and the crude one made the decision, which is why both bonus
+#: cards tied at the optimum in 37% of 240 openings.
+#:
+#: ``"joint"`` enumerates (bonus x keep set) together and prices the bonus
+#: inside the loop with ``expected_bonus_points``, dropping the crude alignment
+#: term so it is not counted twice at two different qualities.
+#:
+#: **Measured, the kept-set half of that is nearly inert**, and the first
+#: version of this comment overstated it: the opener keeps all five birds in
+#: 570 of 600 openings, so the kept set *is* the dealt hand, and subset pricing
+#: changes the figure in 0.3% of openings. What actually drives the 9.6% of
+#: hands whose opening changes is the in-loop pricing -- 36 of 41 bonus-card
+#: changes happen at keep==5. The bonus is now chosen by the whole opening
+#: score *including* its expected points, rather than by its expected points
+#: alone followed by a crude alignment tie-break.
+#:
+#: That the opener keeps five birds and no starting food in 95% of hands is a
+#: separate and probably larger problem; forcing three was measured at -1.9.
+#: See ``docs/experiments/joint_opener.md``.
+DEFAULT_BONUS_SCORING = "joint"
 
 #: How the potential-points opener values the dealt birds.
 #: ``"heuristic"`` is the hand-written ``_potential_card_score`` plus the
@@ -125,12 +165,20 @@ DEFAULT_SETUP_GOAL_HORIZON = "first"
 #: Per-round discount for the later goals, and the round's own placement
 #: scale relative to round 1's (5/4, 6/4, 7/4) — the product is the weight.
 GOAL_HORIZON_DISCOUNT = 0.55
+#: How heavily the ``"joint"`` opener weights a bonus card's expected points
+#: against the rest of the keep score. 1.0 means "one expected bonus point is
+#: worth one point of opening score", which is the honest default: both sides
+#: are already denominated in final-score points. A registered parameter, not
+#: a measurement.
+JOINT_BONUS_WEIGHT = 1.0
 
 _SETUP_POLICY_IDS = {
     ("tag_overlap", "heuristic"): "potential_points_setup_v1",
     ("expected_points", "heuristic"): "potential_points_setup_v2",
     ("expected_points", "measured"): "potential_points_setup_v3",
     ("tag_overlap", "measured"): "potential_points_setup_v3_tag",
+    ("joint", "heuristic"): "potential_points_setup_v4",
+    ("joint", "measured"): "potential_points_setup_v4_measured",
 }
 #: Appended to the policy id when the opener reads all four goals, so a
 #: manifest and a holdout can name the variant.
@@ -231,6 +279,24 @@ class PotentialPointsSetupPolicy:
                     food_value=self.opening_food_value,
                     unaffordable_discount=self.unaffordable_discount,
                 ) + _round_goal_setup_score(cards, setup_context, self.goal_horizon)
+        elif self.bonus_scoring == "joint":
+
+            def selection_scorer(cards, food, bonus_card, setup_context):
+                # The bonus is priced here, against the cards actually kept,
+                # and the crude alignment term is dropped so it is not counted
+                # twice at two different qualities.
+                return (
+                    _selection_score(
+                        cards,
+                        food,
+                        bonus_card,
+                        setup_context,
+                        card_scorer=_potential_card_score,
+                        goal_horizon=self.goal_horizon,
+                        bonus_alignment_weight=0.0,
+                    )
+                    + expected_bonus_points(bonus_card, list(cards)) * JOINT_BONUS_WEIGHT
+                )
         else:
 
             def selection_scorer(cards, food, bonus_card, setup_context):
@@ -249,10 +315,11 @@ class PotentialPointsSetupPolicy:
             selection_scorer=selection_scorer,
             bonus_scorer=(
                 expected_bonus_points
-                if self.bonus_scoring == "expected_points"
+                if self.bonus_scoring in ("expected_points", "joint")
                 else _potential_bonus_score
             ),
             target_keep_count=self.target_keep_count,
+            joint_bonus=self.bonus_scoring == "joint",
         )
 
 
@@ -363,6 +430,7 @@ def _best_selection(
     card_scorer=None,
     selection_scorer=None,
     target_keep_count: int | None = None,
+    joint_bonus: bool = False,
 ) -> InitialSelection:
     if selection_scorer is None:
         if card_scorer is None:
@@ -372,29 +440,42 @@ def _best_selection(
             return _selection_score(cards, food, bonus_card, setup_context, card_scorer=card_scorer)
 
     setup_context = context or InitialSelectionContext()
-    with profiling.node("bonus_card_choice", candidate_count=len(player.bonus_cards)):
-        bonus_card = max(
-            player.bonus_cards,
-            key=lambda bonus: (bonus_scorer(bonus, player.hand), bonus.name),
-        )
-    best_score: float | None = None
+    if joint_bonus:
+        bonus_candidates = list(player.bonus_cards)
+    else:
+        with profiling.node("bonus_card_choice", candidate_count=len(player.bonus_cards)):
+            bonus_candidates = [
+                max(
+                    player.bonus_cards,
+                    key=lambda bonus: (bonus_scorer(bonus, player.hand), bonus.name),
+                )
+            ]
+    best_key: tuple[float, float, str] | None = None
     best_cards: tuple[BirdCard, ...] = ()
     best_food: tuple[FoodType, ...] = ()
+    best_bonus = bonus_candidates[0]
 
-    for cards in _opening_card_subsets(player.hand, target_keep_count=target_keep_count):
-        food_count = BIRD_FOOD_SELECTION_TOTAL - len(cards)
-        with profiling.node("opening_subset_score"):
-            food = _best_starting_food(cards, food_count)
-            score = selection_scorer(cards, food, bonus_card, setup_context)
-        if best_score is None or score > best_score:
-            best_score = score
-            best_cards = cards
-            best_food = food
+    for bonus_card in bonus_candidates:
+        for cards in _opening_card_subsets(player.hand, target_keep_count=target_keep_count):
+            food_count = BIRD_FOOD_SELECTION_TOTAL - len(cards)
+            with profiling.node("opening_subset_score"):
+                food = _best_starting_food(cards, food_count)
+                score = selection_scorer(cards, food, bonus_card, setup_context)
+            # Ties are the common case -- the two bonus cards scored equally at
+            # the optimum in 37% of 240 openings -- so the richer bonus scorer
+            # breaks them rather than iteration order, which would otherwise
+            # make joint enumeration arbitrarily worse than choosing first.
+            key = (score, bonus_scorer(bonus_card, list(cards)), bonus_card.name)
+            if best_key is None or key > best_key:
+                best_key = key
+                best_cards = cards
+                best_food = food
+                best_bonus = bonus_card
 
     return InitialSelection(
         player_id=player.player_id,
         kept_bird_names=[card.common_name for card in best_cards],
-        kept_bonus_card_names=[bonus_card.name],
+        kept_bonus_card_names=[best_bonus.name],
         starting_food=list(best_food),
     )
 
@@ -420,13 +501,14 @@ def _selection_score(
     *,
     card_scorer,
     goal_horizon: str = DEFAULT_SETUP_GOAL_HORIZON,
+    bonus_alignment_weight: float = 1.8,
 ) -> float:
     selected = tuple(cards)
     score = sum(card_scorer(card, selected, bonus_card, context) for card in cards)
     score += _food_alignment_score(cards, food) * 1.7
     score += _habitat_balance_score(cards)
     score += _opening_playability_score(cards, food) * 2.5
-    score += _bonus_alignment_score(bonus_card, cards) * 1.8
+    score += _bonus_alignment_score(bonus_card, cards) * bonus_alignment_weight
     score += _round_goal_setup_score(cards, context, goal_horizon)
     score -= max(len(cards) - 3, 0) * 0.45
     score -= max(2 - len(cards), 0) * 0.35

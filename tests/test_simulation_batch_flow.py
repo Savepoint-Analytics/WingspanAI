@@ -143,7 +143,7 @@ class SimulationBatchFlowTests(TestCase):
                         {"field": "search_child_expansion", "value": "copy", "share": 0.05},
                         {
                             "field": "setup_policy",
-                            "value": "potential_points_setup_v3_keep3",
+                            "value": "potential_points_setup_v2",
                             "share": 0.05,
                         },
                         {"field": "search_prerank", "value": "beam_leaf", "share": 0.05},

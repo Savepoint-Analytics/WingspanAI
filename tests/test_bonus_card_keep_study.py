@@ -183,7 +183,7 @@ class ExpectedBonusPointsTests(TestCase):
         historic = PotentialPointsSetupPolicy(bonus_scoring="tag_overlap")
         expected = PotentialPointsSetupPolicy(bonus_scoring="expected_points")
         self.assertEqual(expected.policy_id, "potential_points_setup_v2")
-        self.assertEqual(PotentialPointsSetupPolicy().policy_id, "potential_points_setup_v2")
+        self.assertEqual(PotentialPointsSetupPolicy().policy_id, "potential_points_setup_v4")
         self.assertEqual(
             PotentialPointsSetupPolicy(bonus_scoring="tag_overlap").policy_id,
             "potential_points_setup_v1",
@@ -224,7 +224,7 @@ class SetupPolicyOverrideTests(TestCase):
             setup_policy_kind="control",
             setup_policy_overrides=overrides,
         )
-        self.assertEqual(study.setup_policy.policy_id, "potential_points_setup_v2")
+        self.assertEqual(study.setup_policy.policy_id, "potential_points_setup_v4")
         self.assertEqual(opponent.setup_policy.policy_id, "default_setup_v1")
         with self.assertRaises(ValueError):
             _make_agent(
@@ -258,7 +258,7 @@ class SetupPolicyOverrideTests(TestCase):
             self.assertEqual(
                 game["setup_policy_ids"],
                 {
-                    "potential_points_p1": "potential_points_setup_v2",
+                    "potential_points_p1": "potential_points_setup_v4",
                     "greedy_immediate_p2": "default_setup_v1",
                 },
             )

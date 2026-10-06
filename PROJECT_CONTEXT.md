@@ -868,3 +868,72 @@ The lesson worth keeping: **the provenance rule the case study states about
 itself is what caught this.** "Nothing here is a claim the ledger does not
 carry" is only useful if it is actually checked, and checking it found a
 week-old data loss that no test, read or review had surfaced.
+
+## Update: 2026-10-06 - The joint opener, adopted on mechanism before the human games
+
+Alex, preparing the ten human games, observed that a human picks birds, bonus
+card and food **in tandem** with all four goals face up, and asked whether the
+agent could do the same. It could not: it chose the bonus card **first**, scored
+against all five dealt birds including the ones it was about to discard, and
+`goal_horizon` defaulted to `"first"`.
+
+**Three of my own claims died in measurement**, which is most of the value here:
+
+| claim | measured |
+|---|---|
+| the sequencing costs points | **false** — joint enumeration is never strictly better, 0/240; the 37% that differ are **ties** |
+| reading all four goals matters | **barely** — changes 1 hand in 240 |
+| the fix works by pricing the bonus against the *kept* cards | **mostly false** — the opener keeps all five birds in 570/600 openings, so subset pricing bites in 0.3% |
+
+The 37% tie rate was the clue. `expected_bonus_points` — which prices every card
+from its parsed rule and prevalence — was used only for the initial pick, while
+the in-loop tradeoff was priced by a hand-written if-chain covering a dozen named
+cards and **returning 0 for the rest**. The good scorer saw the wrong card set
+and the crude one made the decision.
+
+**Adopted `potential_points_setup_v4`**: enumerate (bonus × keep set × food)
+together, price the bonus in-loop with `expected_bonus_points`, drop the crude
+term so it is not double-counted, and break the frequent ties with the richer
+scorer so joint enumeration cannot be arbitrarily *worse*. Changes the opening in
+**9.6%** of hands. The driver is the in-loop pricing: 36 of 41 bonus changes
+happen at keep==5, where kept and dealt are the same cards.
+
+### No arm, and that is rule 1 working for the first time in advance
+
+| to measure | games needed |
+|---|---:|
+| the population effect (~0.2 points) | **21,609** |
+| the conditional effect on the 9.6% that change | 972 (~2.7 h), limit 2.08 — which multiplies back to 0.20 |
+
+Rule 1 says: if no affordable sample clears the band, decide on mechanism and say
+so. **This is the first time the rule stopped an arm before the compute was
+spent** rather than after the fact. Adopted on three grounds: it strictly
+dominates under its own scorer by construction; the defect is a plain error, not
+a weight judgement; and it gives the agent the coordination the human study needs
+for fairness — where ~0.2 points is itself the answer to the fairness objection.
+It is **not** a claim the agent is stronger.
+
+Holdout: `setup_policy` now keeps `..._v2`, replacing the control on `..._v3_keep3`
+(two holdouts cannot share a field; that question is closed and its control had
+accrued 19 games against a 7.5-point limit over six roots).
+
+### The bigger thing this turned up
+
+**The opener keeps all five birds, and so zero starting food, in 95% of hands.**
+That is poor play by convention, and forcing three was measured at −1.9 — so
+neither extreme is right and the trade between a kept bird and a kept food token
+is not understood. Larger than anything in this change and never studied
+directly. Registered as the follow-up.
+
+### Study registration tightened
+
+`self_play_opponent_plan.md` now names the configuration the ten games face —
+opener, search config, 5/5 seat split, **ten distinct seeds rather than five
+played twice** (pairing is right for an agent arm and invalid for a human, who
+would have seen the deck), and that standing holdouts stay on so H3 is read on
+the holdout-free subset too. This was implicit and changed on the eve of the
+study, which is exactly when it needed writing down.
+
+One process note: the first version of this change shipped with a **vacuous
+test** — it asserted subset pricing differed from dealt-hand pricing, which never
+happens at keep==5. Its vacuity guard is what caught the overstated mechanism.

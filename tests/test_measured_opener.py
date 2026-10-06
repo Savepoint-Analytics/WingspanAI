@@ -19,9 +19,18 @@ from wingspan_ai.rules.base_game import setup_base_game
 
 class PolicyIdTests(TestCase):
     def test_measured_mode_gets_the_v3_id_with_its_keep_count(self) -> None:
+        # v3 is (expected_points, measured). The bonus scorer is named because
+        # the default moved to "joint" on 2026-10-06, which pairs with measured
+        # bird scoring as v4_measured.
+        self.assertEqual(
+            PotentialPointsSetupPolicy(
+                bonus_scoring="expected_points", bird_scoring="measured"
+            ).policy_id,
+            "potential_points_setup_v3",
+        )
         self.assertEqual(
             PotentialPointsSetupPolicy(bird_scoring="measured").policy_id,
-            "potential_points_setup_v3",
+            "potential_points_setup_v4_measured",
         )
         policy = potential_points_setup_policy("potential_points_setup_v3_keep3")
         self.assertEqual(policy.policy_id, "potential_points_setup_v3_keep3")
@@ -31,7 +40,7 @@ class PolicyIdTests(TestCase):
             "potential_points_setup_v2",
         )
         # Existing ids are unchanged.
-        self.assertEqual(PotentialPointsSetupPolicy().policy_id, "potential_points_setup_v2")
+        self.assertEqual(PotentialPointsSetupPolicy().policy_id, "potential_points_setup_v4")
         self.assertTrue(is_potential_points_setup_policy_id("potential_points_setup_v3_keep3"))
         self.assertFalse(is_potential_points_setup_policy_id("control"))
         with self.assertRaises(ValueError):

@@ -100,7 +100,7 @@ class SetupPolicyTests(TestCase):
         p2_setup = next(event for event in setup_events if event.player_id == "player_2")
 
         self.assertEqual(p2_setup.payload["selection_source"], "agent")
-        self.assertEqual(p2_setup.payload["setup_policy_id"], "potential_points_setup_v2")
+        self.assertEqual(p2_setup.payload["setup_policy_id"], "potential_points_setup_v4")
 
 
 def _player_with_opening_hand() -> PlayerState:

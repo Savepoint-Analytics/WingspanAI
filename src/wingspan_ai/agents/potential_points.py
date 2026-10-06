@@ -263,8 +263,12 @@ SETUP_POLICY_HOLDOUT_FIELD = "setup_policy"
 DEFAULT_HOLDOUTS: tuple[Holdout, ...] = (
     Holdout("mechanic_synergy", True),  # the dropped full synergy term
     Holdout("search_child_expansion", "copy"),  # correctness canary for the fast path
-    # The measured opener, −1.9 n.s. vs the plain opener on 2026-09-18.
-    Holdout(SETUP_POLICY_HOLDOUT_FIELD, "potential_points_setup_v3_keep3"),
+    # The pre-2026-10-06 opener, which chose the bonus card against the dealt
+    # five rather than the kept set. This replaces the control on the measured
+    # opener (``..._v3_keep3``, −1.9 n.s. on 2026-09-18): two holdouts cannot
+    # share a field, that question is closed, and its control had accrued only
+    # 19 games against a 7.5-point detection limit over six roots -- unreadable.
+    Holdout(SETUP_POLICY_HOLDOUT_FIELD, "potential_points_setup_v2"),
     # Beam pre-ranking, −0.7 n.s. for −58% latency on 2026-09-18; not the
     # unbudgeted default, the budgeted production candidate.
     Holdout("search_prerank", "beam_leaf"),
