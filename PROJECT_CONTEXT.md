@@ -103,7 +103,7 @@ Root: `README.md`, `AGENTS.md`, `CLAUDE.md`, `COMPANY_CONTEXT.md`,
 - `docs/`: architecture, rules, events, agents (model cards), experiments
   (plans, results, `results_ledger.md`, `standing_holdouts.md`), decisions
   (ADRs). Index: `docs/README.md`.
-- `tests/`: 410 tests; `test_default_workbook_path_points_to_raw_data`
+- `tests/`: 410 tests (527 passed, 2 skipped on 2026-10-05 at `275f6bf`, per the website-ai claims audit); `test_default_workbook_path_points_to_raw_data`
   fails only when `.envrc` sets `WINGSPAN_CARD_WORKBOOK`.
 - `artifacts/`: every arm's manifests, events and outcomes, by root
   (`rr_belief_opp` is the current baseline for the default agent).
