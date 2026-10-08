@@ -4,6 +4,13 @@ Status: audited 2026-10-08. A guardrail exists and works for round goals. **It
 does not cover the two egg-dependent bonus cards, its docstring claims it does,
 and it misses wild-nest birds whose eggs the goal scoring counts.**
 
+Part of a three-document family on decisions the rules layer makes for the
+player: `hidden_power_choices.md` on power handlers, this one on which egg is
+spent, `card_discard_fidelity.md` on which card is discarded. The card
+guardrail considers bonus-card fit and the egg one does not; the egg guardrail
+considers round goals and the card one does not. **Neither learned from the
+other**, which is the most useful thing the three audits together say.
+
 ## Where eggs get spent
 
 Eggs are a currency in three places: playing a bird into slot 2–3 (1 egg) or

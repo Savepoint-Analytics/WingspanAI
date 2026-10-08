@@ -4,6 +4,10 @@ Status: audited 2026-10-08. **16 handlers, 112 of the 180 base-game birds with
 powers (62%).** Nothing here is a bug report against the power registry — see
 *What "complete coverage" does and does not mean* below.
 
+Part of a three-document family on decisions the rules layer makes for the
+player: this one on power handlers, `egg_spending_fidelity.md` on which egg is
+spent, `card_discard_fidelity.md` on which card is discarded.
+
 ## The question that started it
 
 Alex, on the eight cards that read *"If this bird is to the right of all other

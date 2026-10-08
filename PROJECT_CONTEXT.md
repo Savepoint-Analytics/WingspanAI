@@ -258,6 +258,8 @@ study body (`docs/experiments/case_study.md`). Current tasks, in order
 
 | Priority | Task | Success criteria |
 |---|---|---|
+| 2 | **Offer the card discard as a choice** (`card_discard_fidelity.md` gap 1). `_legal_gain_food_actions` bakes one pre-chosen card into every spend-a-card variant: measured, 7 actions offering 1 discard option from a 3-card hand. Enumerate one variant per card instead. | The agent can weigh giving up one card against another; action count rises (7 → 21 in the measured case) so it needs the production beam pre-ranking; replay validation and the bit-identity guard updated. |
+| 2 | **Give `bonus_fit` and the egg protection a count-based branch** (card gap 2 + egg defect 1, same fix shape, cheaper together). Four bonus cards have zero tagged birds because their condition is a board property: `Visionary Leader` (every card in hand scores), `Ecologist`, `Oologist`, `Breeding Manager`. | Holding `Visionary Leader` changes the discard choice; holding `Breeding Manager` stops the 4-egg bird being raided. |
 | 2 | **Fix the wild-nest egg protection** (`egg_spending_fidelity.md` defect 2). The goal *scoring* treats a wild nest as any nest type; the *protection* does a bare string match, so `"[wild]" in "[egg] in [ground]"` is False. 17 of 180 birds, 8 nest-type egg goals. Two lines, behind `VALUE_RESOURCE_SPENDING`. | Wild-nest birds rank as protected when the active goal counts their eggs; the 2026-09-04 ablation design re-run as the check. |
 | 2 | **Pass bonus cards into the egg protection** (defect 1). Its docstring already claims it does; its signature cannot. `Oologist` needs a bird at exactly 1 egg protected, `Breeding Manager` one at exactly 4 — both threshold conditions, so protection should ask "does spending cross a threshold", not add a flat +2. | Demonstrated cases reverse: [4,2] eggs with Breeding Manager held no longer spends from the 4-egg bird. |
 | 3 | **Lift `move_bird_habitat`'s destination into the legal-action space** (`hidden_power_choices.md`). 8 cards, 51.6% end buried, 99% record zero power yield so the evaluator prices them at nothing. The only hidden choice whose heuristic looks actively wrong rather than merely unoptimised. | The destination is a search decision; replay validation and the bit-identity guard both updated for the wider action space. |
@@ -763,3 +765,71 @@ Three tasks added. The case for fixing 1 and 2 is **correctness** — the code
 does not do what its own docstring says, and two parts of one layer disagree
 about wild nests — rather than measured points; the September ablation suggests
 expecting small.
+
+## Update: 2026-10-08 (later) - Card-discard audit completes the fidelity family
+
+`docs/rules/card_discard_fidelity.md`. Third of three on decisions the rules
+layer makes for the player, and the comparison between them is the most useful
+result:
+
+**The card guardrail considers bonus-card fit. The egg guardrail considers round
+goals. Neither considers what the other does.** They were written against
+different threats, months apart, and neither learned from the other.
+
+`discard_priority` ranks a card on what it can still do for the player —
+`(bonus_fit, has_room, affordable, victory_points, -food_cost)` — after a real
+bug: the previous rule was printed points alone and "would discard a cheap bird
+that completes a held bonus card in order to keep an unaffordable high-point
+bird that will never be played."
+
+### Gap 1, the one that matters: the agent chooses *whether*, never *which*
+
+`_legal_gain_food_actions` calls the chooser **while building the action list**
+and bakes the result into every variant. Measured, seed 11, three-card hand, one
+forest bird:
+
+- **7 spend-a-card actions offered**
+- **1 distinct discard option** (`Cedar Waxwing`), on all seven
+
+Seven food combinations, one card. The search can weigh which *food* to take
+against giving up a card, and cannot weigh giving up one card against another.
+This is the hidden-choice pattern appearing in the **action space** rather than
+inside a power handler, which makes it the most consequential of the three.
+
+### Gap 2: `bonus_fit` is blind to the four count-based bonus cards
+
+It matches a held card's name against a bird's `bonus_card_tags`, so it only
+sees conditions that are properties of a *bird*. **Four of 26 bonus cards have
+zero tagged birds** because their condition is a property of the *board*:
+`Visionary Leader` (cards in hand), `Ecologist` (habitat shape), `Oologist`,
+`Breeding Manager`.
+
+`Visionary Leader` is the severe one: it scores **every** card in hand, and
+`bonus_fit` is 0 for all of them. Demonstrated — the discard is identical
+holding `Cartographer`, `Historian` or `Visionary Leader`. The term that exists
+to protect bonus cards is identically useless on the one card where every
+discard is a direct loss. For the other 22 it works; `Historian` alone has 20
+tagged birds.
+
+### Gap 3, and a correction to the obvious framing
+
+`discard_priority(card, player, state=None)` accepts a state, every caller
+passes one, and **the body never uses it**. The tempting write-up is "symmetric
+to the egg gap" — it is not, and I checked before claiming it. **None of the 16
+base-game round goals involves cards or tucked cards**; they are birds in
+habitats, eggs, or total birds. There is nothing card-shaped to protect.
+
+What it does cost is narrower: four goals count birds in a named habitat or in
+total, so when the goal is `[bird] in [forest]` discarding your only affordable
+forest bird is worse than discarding a wetland bird, and the proxies
+(`has_room`, `affordable`) cannot tell. Also recorded: one call site omits
+`state` where four pass it — harmless while unused, a trap the moment it is not.
+
+Not gaps, worth recording: **tucking is not losing** (a tucked card is 1 VP, so
+`tuck_card` converts a card into a point), the tuple ordering is sensible, and
+the agent can decline the action entirely — which makes the pre-chosen card more
+load-bearing rather than less.
+
+Two tasks added, and gap 2 is deliberately merged with the egg audit's defect 1:
+both are "the protection cannot see board-condition bonus cards", so one fix
+serves both and doing them separately costs twice.
