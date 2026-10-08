@@ -2,6 +2,14 @@
 
 Status: complete base-game coverage, 2026-08-31
 
+> **Coverage is not fidelity.** Every base-game power does something and
+> nothing silently no-ops, which is what this registry asserts. It says
+> nothing about whether the *player chooses*: in 16 handlers covering
+> **112 of the 180 powered birds**, a decision the rules give the player is
+> resolved by a fixed rule inside the transition function. See
+> `hidden_power_choices.md`, and `egg_spending_fidelity.md` for the same
+> issue in egg payments.
+
 ## Purpose
 
 Bird powers should never silently disappear from experiments. Each executable or planned handler needs traceable metadata connecting card text, rulebook sources, implementation modules, tests, and current fidelity.

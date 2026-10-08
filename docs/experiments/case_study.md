@@ -27,6 +27,11 @@ score built from six categories.
 - A **rule-faithful, deterministic simulator** for the base game: every
   base-game bird power handled, replay validated by state hashes, bit-for-bit
   reproducible across processes from a single seed (ADRs 0003, 0004).
+  "Handled" means every power resolves and none silently no-ops. It does **not**
+  mean the agent chooses how: in 16 handlers covering 112 of the 180 powered
+  birds, a decision the rules give the player is made by a fixed rule in the
+  transition function, outside the search and outside anything an arm can
+  measure (`docs/rules/hidden_power_choices.md`).
   **10,956 archived games**, every one replayable.
 - **Telemetry** that makes a game inspectable: every decision records the
   candidate actions, the choice, the agent's own ranked valuation of up to

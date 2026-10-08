@@ -3428,3 +3428,256 @@ Also added `analysis/kpi_report.py`, a reproducible entry point for the pass.
 The original existed only as a notebook, which is exactly why it could not be
 re-run or diffed when the archive changed underneath it — the same lesson as the
 registrations: if a result cannot be re-run on demand, it will silently go stale.
+
+## Update: 2026-09-28 - the event log is loaded; the archive is now fully queryable
+
+`scripts/load_events_from_object_storage.py` (new) streams each archived
+`events.jsonl`, keeps the eight families the view layer and KPI functions read,
+and bulk-loads them with `COPY` through an unlogged staging table merged on
+`event_id` — so the load is idempotent and additive. `executemany` over this
+volume was not viable; `COPY` is the difference between minutes and hours.
+
+**10,934 objects, 723,168 rows read, 440,437 newly inserted, zero failures.**
+
+| | before | after |
+|---|---:|---:|
+| games carrying events | 4,491 | **10,936 of 10,956** |
+| `potential_points_p1` coverage | 10.7% | **99.6%** |
+| `engine_builder_p1` | 93.1% | 100% |
+| `greedy_immediate_p2` | 99.9% | 100% |
+| every other seat | **0%** | **99.1-100%** |
+
+The remaining limit is real but narrow: `round_goal_scored` has 3,208 rows
+because the event dates from 2026-09-22, so per-round goal *placement* covers
+recent games only. Goal totals come from `game_scores` and are complete.
+
+### What the load immediately bought
+
+**Breeding Manager is now a finding, not a hypothesis.** It was flagged from 25
+games as "worth a proper paired study rather than a claim". On **391 games** it
+is still last of 26 bonus cards, matching 0.68 birds a game against the best
+card's 3.79 (fulfilment 0.082 vs 0.577). The old numbers were *harsher* than the
+truth (0.031 → 0.082) because they came from weaker agents' decks, but the
+ranking held. The real spread across cards is 7-fold, not the tenfold the small
+sample suggested.
+
+**The archetypes behave as advertised** — a behavioural check that was
+impossible before:
+
+| agent | birds played | matching the kept bonus card | fulfilment |
+|---|---:|---:|---:|
+| `bonus_card_focus` | 7.02 | 4.13 | **0.597** |
+| `potential_points` | 7.71 | 3.49 | 0.442 |
+| `engine_builder` | 8.36 | 2.83 | 0.334 |
+| `greedy_immediate` | 3.93 | 1.29 | 0.310 |
+
+`bonus_card_focus` steers plays toward its card at nearly twice greedy's rate
+while playing fewer birds than `engine_builder`. And the champion sits
+mid-table at 0.442: it is **not** chasing its bonus card, it scores 5.4 bonus
+points by playing well and taking the points where they fall. Against
+`bonus_card_focus`'s 0.597 fulfilment and highest-of-any-agent 6.0 bonus points
+for 14 fewer points overall, that is the engine-vs-objective tradeoff in two
+rows.
+
+### A suspicion I raised and then disproved
+
+Reading the card table I saw `Anatomist [swift_start_asia]` being dealt and kept
+512 times in base-game games and started writing it up as a rule-fidelity bug.
+It is not one. `docs/rules/bonus_card_composition.md` settled this on
+2026-09-16: the workbook's `Set` column reads `core, asia` because the Asia
+swift-start pack **reprints** a core card, and the suffix is a naming artifact.
+The core pool is exactly 26 cards, the right count, and the loader correctly
+excludes `Forest Ranger [swift_start_asia]` (set `asia` only) and the five
+automa cards. Recorded here so the question is not raised a third time.
+
+### Counterfactual replay: feasible, and mostly already built
+
+Asked whether archived games can be rewound to a decision point and replayed
+down the other branch. Yes — `analysis/play_counterfactuals.py` already does it
+for `play_bird` decisions, and three things make it general: the replay is exact
+(ADR 0003 put only `random_seed` in the RNG), the **full** legal-action set is
+logged at every decision, and the reconstruction under that script yields every
+resolved action, not just plays.
+
+Two things worth recording from that conversation:
+
+1. **There is no "perfect" counterfactual.** Once play diverges, the outcome
+   depends on the continuation policy for both seats, the deck order, and the
+   opponents' hidden cards. The continuation policy *defines* what the number
+   means; the existing script is explicit that its values are "what this play
+   was worth to a competent but non-searching continuation", and
+   `--continuation-samples K` averages over resampled worlds so the answer does
+   not hinge on one shuffle.
+2. **The near-tie design is the valuable part, and it is available
+   retroactively.** Restricting to decisions where the agent's own evaluation
+   had two options within ~0.2 points gives thousands of naturally occurring
+   randomised trials, because noise decided which won. The log records the
+   winning option's score but not the runner-up's — however, since the state
+   rebuild is exact and the evaluator deterministic, every candidate's value can
+   be **re-derived** on all 10,956 archived games without new instrumentation.
+
+Why this matters more than another arm: an 80-game arm resolves about ±3 points,
+which is why three recent registrations were unanswerable. Decision-level
+pairing gives thousands of paired observations with deck and opponent luck
+differenced out, putting ±0.5 effects in reach. The honest limit is selection on
+the state distribution — the decisions available are the ones this agent reached
+via its own earlier choices, so the value learned is conditional on that agent's
+trajectory. Near-tie filtering reduces but does not remove it.
+
+## Update: 2026-09-29 - near-tie counterfactuals confirm indifference; tie-break tuning closed
+
+First collection read against the registration written before it
+(`docs/experiments/near_tie_counterfactuals.md`). **2,045 near-tie decisions
+across 90 games** from the placement-default roots.
+
+**The registration was answerable as committed** — delivered n=2,045 against a
+1,400 floor and SD=4.88 against a 5.5 ceiling. This is the first arm in four
+where the power claim held, which is the 2026-09-25 rule working. One honest
+caveat: the realized detection limit is 0.302 rather than the predicted 0.25
+(SD came in at 4.88, not the assumed 4.0), which is a hair outside the band's
+0.3 half-width, so the verdict rests on the confidence interval rather than on
+the limit.
+
+**Result: +0.062, p=0.565, 95% CI [−0.149, +0.273]** — the whole interval inside
+the registered −0.3 to +0.3 band. That is the strong form: a positive finding of
+indifference, not a failure to reject. Where the champion says two options are
+within a hair, it is right, and its tie-breaking carries no recoverable signal.
+**33.6% of near-ties end in exactly zero realized difference** — genuinely inert,
+not merely close.
+
+**No per-pair finding.** Sixteen cells reached n≥20, not the ~10 anticipated, so
+the true Bonferroni threshold is 0.0031 rather than the registered 0.005;
+nothing clears either. Two nominations recorded as nominations: `play_bird`
+chosen over `draw_cards` at −1.51 (p=0.024, n=63 — mechanistically plausible
+over-eagerness to play birds, and at the edge of what a 63-decision cell could
+ever detect) and `gain_food` vs `gain_food` at +0.43 (p=0.051, n=393).
+
+**What this buys: a line of work closed cheaply.** There is no free ≥0.3 points
+in evaluator tie-breaking, so tuning it is not productive. Negative results that
+close directions are the point of this instrument.
+
+### Margins against a peer are half what they are against the roster
+
+Measured while answering a design question, and it reframes several things:
+
+| regime | mean winning margin | games within 5 points |
+|---|---:|---:|
+| vs the weak roster (2p) | 24.8 | 13.8% |
+| **champion vs champion (2p)** | **12.4** | **30.3%** |
+
+Outcome noise from an identical state is SD 4.88. So against a peer the noise is
+the same order as the deciding margin in about a third of games, while against
+the roster most games are blowouts. Any risk-aware or distributional idea is
+capped by that ~30%, and is worth nothing at all in roster games — which is also
+a caution about reading roster win rates as skill measurements.
+
+### Gaussian-Markov agent: assessed, not built
+
+Asked what a Gaussian Markov chain agent would look like. Three readings, two
+dead on this project's own evidence:
+
+- **Kalman-filtering opponents' hidden state** — dead. Perfect opponent-type
+  knowledge measures +0.00, and a filter cannot beat the oracle it approximates.
+- **A GMRF over bird/board synergies** — the nearest prior attempt, the
+  engine-potential mechanic-pair term, measured −4.51 (p=0.001).
+- **A round-indexed linear-Gaussian forecast of final score used as a
+  distributional leaf evaluator** — the live one.
+
+The argument for the third is the score/win disconnect already in the ledger:
+the oracle gained +0.00 score but +0.011 win; the 3p greedy opponent model gained
++1.89 score and *lost* 0.011 win. The evaluator returns a scalar, so the agent
+cannot express "when ahead take the low-variance line, when behind gamble".
+P(win) = Φ((μ_me − μ_opp)/√(σ²_me + σ²_opp − 2cov)) can, and the shared
+tray/feeder/goals make that covariance term mandatory rather than optional.
+
+Design constraints worth keeping: `A_r` must be round-indexed (four rounds of
+8/7/6/5 turns is non-stationary by construction); round goals are rank
+statistics and should stay with the existing Poisson placement model rather than
+be forced into a Gaussian; scoring is end-loaded so the chain should model engine
+state with a separate terminal emission; and the model must never select actions,
+only evaluate leaves, because hard constraints like food costs are inexpressible
+in linear dynamics.
+
+**The blocker is one cheap emitter:** per-round score snapshots are not emitted
+(already flagged in the KPI coverage table), and a Markov chain over rounds
+cannot be fit without round states. Adding it makes future games yield ~4
+transitions each.
+
+**Sequencing advice given:** pre-test the premise on the near-tie rows, which
+already measure outcome variance from identical states, before building
+anything. And if it is built, **register the win-rate band, not the score band** —
+the mechanism is converting score into wins, so a score registration would
+declare it null by construction, and win rates need far more games for the same
+power.
+
+## Update: 2026-09-30 - the reroll_penalty arm lands in the middle zone, and I registered a design the launcher cannot build
+
+### Result
+
+`reroll_penalty=2.0` vs a fresh default baseline, both sides at the same commit.
+
+| read | n | Δ | p | SD | limit | 95% CI |
+|---|---:|---:|---:|---:|---:|---|
+| primary, all games | 80 | **−0.388** | 0.553 | 5.81 | 1.82 | [−1.66, +0.89] |
+| by deck | 10 | −0.388 | 0.501 | — | — | — |
+| differing games only | 41 | −0.756 | 0.556 | 8.15 | 3.56 | [−3.25, +1.74] |
+
+**Middle zone by the registered rule: not adopted, not refuted.** The point
+estimate is mildly negative — the opposite sign to the nomination.
+
+**What it does settle:** the CI's upper bound of +0.89 excludes both the +1.5
+adopt threshold and the +1.44 the nomination predicted, so **the near-tie +2.40
+a decision does not transfer to whole-game score.** The strong form is dead.
+What remains unresolved is anything inside ±0.9.
+
+**The power model held**, which is worth noting after three arms where it did
+not: predicted 47% bit-identical games against 49% delivered, predicted SD 6.5
+against 5.81.
+
+### My error, and the rule it earns
+
+I registered **160 games over 20 decks**. The arm delivered **80 over 10**,
+because `analysis/launch_arm.py --seeds` is ignored for 2p roster arms — its own
+help text says "2p roster arms always use seeds 1-10". I dry-ran the launcher but
+only checked that it wrote its scripts, not that it would produce the registered
+number of games.
+
+That matters rather than being cosmetic: the realized detection limit is **1.82**,
+*above* the registered +1.5 adopt threshold, so the delivered arm could not
+reliably detect its own adoption criterion. Fourth registration this month to
+outrun its sample, and the first where the cause was a tooling assumption rather
+than an optimistic variance estimate.
+
+**Added to the standing registration rule (2026-09-25): verify a dry run's game
+count against the registered n before launching, not just that it wrote its
+scripts.**
+
+### Closed on cost grounds
+
+Resolving ±0.7 at the realized SD needs **540 games**; a 2p roster arm caps at
+80, so it would need mirror mode. Not worth it: the prior was 29 post-hoc
+decisions, the mechanism I proposed was falsified before launch (rerolls resolve
+deterministically, so the search already sees the roll), feeder-odds valuation is
+already null three times over, the point estimate is negative, and the strong
+form is excluded. Recorded as closed with the nomination noted as *untested below
+±0.9* rather than refuted.
+
+If ever reopened, the better intervention is pricing the post-reroll feeder state
+for the player's own later turns — the horizon mechanism — rather than a flat
+penalty, which probing showed is blunt: 2 of 4 flipped decisions demoted
+food-gaining below an unrelated action type instead of just declining the reroll.
+
+### Net position on the near-tie programme
+
+Two registered reads, both honest nulls, both cheap, and both closing a
+direction:
+
+1. Evaluator tie-breaking carries no recoverable signal (+0.062, CI inside the
+   ±0.3 band). Tie-break tuning is not productive.
+2. The one nomination worth testing did not transfer to whole-game score.
+
+That is the instrument working as designed. The lesson to carry into any future
+use: a per-decision effect measured at near-ties is **not** an estimate of a
+whole-game effect, because a switch that captures it also changes unrelated
+decisions. Measure the per-decision effect to *find* candidates, then always
+budget the arm on whole-game variance.
