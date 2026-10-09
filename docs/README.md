@@ -42,6 +42,7 @@ Analysis layer:
 Key rules docs:
 
 - `architecture/simulator_architecture.md`: base simulator and rules-engine design.
+- `architecture/power_decision_methods.md`: draft plan for moving the choices inside bird powers out of the rules layer: decision kinds, heuristic/greedy/search-Bayes resolver tiers, and a plan for every power handler.
 - `architecture/decision_profiling.md`: the decision-tree profiler, the latency/value-per-ms report, the ledger of every arm's points-per-second, and where a default decision's time goes.
 - `agents/archetype_policy_fix.md`: why the archetype bots were indistinguishable and how they were fixed.
 - `agents/baseline_agents.md`: random, greedy, archetype, and Monte Carlo baseline definitions.
