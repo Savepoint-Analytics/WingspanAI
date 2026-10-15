@@ -33,6 +33,10 @@ class InitialSelectionContext:
     round_goal_names: tuple[str, ...] = ()
     round_state: RoundState | None = None
     player_count: int = 1
+    #: Birdfeeder faces as rolled at setup (``BirdfeederFace`` values).
+    birdfeeder_faces: tuple[str, ...] = ()
+    #: Agent id per seat, in seat order, so a seat can see who it is playing.
+    seat_agent_ids: tuple[str, ...] = ()
 
 
 class InitialSetupPolicy(Protocol):

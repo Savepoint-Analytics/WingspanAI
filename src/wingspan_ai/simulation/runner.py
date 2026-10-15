@@ -108,8 +108,11 @@ def run_single_game(
     bird_discards = []
     bonus_discards = []
     setup_selection_events: list[dict] = []
+    # Every seat's agent id is set before anyone chooses, so the setup
+    # context can name each opponent (public: you know who you sit with).
     for player, agent in zip(state.players, agents, strict=True):
         player.agent_id = agent.agent_id
+    for player, agent in zip(state.players, agents, strict=True):
         with profiling.activate("choose_initial_selection") as setup_profiler:
             selection, selection_source, setup_policy_id = _choose_agent_initial_selection(
                 agent,
@@ -143,6 +146,13 @@ def run_single_game(
     # across a design's arms, so it cancels in contrasts.
     for player_id, count in (opening_food_bonus or {}).items():
         grant_opening_food(state, player_id, count)
+    # Setup choices are simultaneous; once all are applied, each seat may see
+    # the public result (cards kept as a count, starting food). Observation
+    # only: the hook must not touch state, so replay is unaffected.
+    for agent in agents:
+        observer = getattr(agent, "observe_setup_complete", None)
+        if callable(observer):
+            observer(state)
 
     sink = InMemoryEventSink()
     public_state_snapshots: dict[str, dict] = {}
@@ -268,6 +278,8 @@ def _initial_selection_context(state: GameState) -> InitialSelectionContext:
         round_goal_names=tuple(goal.name for goal in state.round_goals),
         round_state=state.round_state,
         player_count=len(state.players),
+        birdfeeder_faces=tuple(face.value for face in state.birdfeeder.dice),
+        seat_agent_ids=tuple(player.agent_id or "" for player in state.players),
     )
 
 
