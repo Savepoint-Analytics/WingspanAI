@@ -834,6 +834,27 @@ Two tasks added, and gap 2 is deliberately merged with the egg audit's defect 1:
 both are "the protection cannot see board-condition bonus cards", so one fix
 serves both and doing them separately costs twice.
 
+
+## Update: 2026-10-14 - Prepare Trello consumer in dry-run mode
+
+### What changed
+Added a pinned caller for oz-tmg/trello-hub. SPWF_CONFIG holds board configuration
+in Actions variables; credentials are named Actions secrets. SPWF_LIVE is false.
+No existing CI workflow was present, so CI-failure forwarding is not enabled.
+
+### Why it matters
+GitHub events can be previewed without executing consumer branch code or changing
+Trello. Live validation uses a dedicated integration test card and is separate
+from ordinary research activity; no simulator or research-policy code changed.
+
+### Decision
+Use the same reviewed full SHA for the workflow and runner. Enable live mode
+only after the dry-run is verified and this PR passes the required review.
+
+### Follow-up tasks
+- [ ] Approve and merge the caller through the protected-branch review process.
+- [ ] Validate a dedicated card live, including replay and Experiment guards.
+- [ ] Start the two-week ordinary-use record after successful activation.
 ## Update: 2026-10-09 - Human play shows the table at setup
 
 ### What changed
