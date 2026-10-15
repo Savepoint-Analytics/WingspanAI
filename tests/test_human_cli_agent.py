@@ -48,3 +48,59 @@ class HumanCliAgentTests(TestCase):
             "Gain seed and fish if rolled, after rerolling the birdfeeder "
             "by discarding a card (Canada Goose)",
         )
+
+
+class HumanCliSetupVisibilityTests(TestCase):
+    """The setup screen shows the public table; the post-setup summary stays public."""
+
+    def _game(self):
+        from wingspan_ai.agents import GreedyBaselineAgent
+        from wingspan_ai.simulation.runner import _initial_selection_context
+
+        catalog = make_sample_catalog()
+        state = setup_base_game(
+            catalog,
+            player_ids=["player_1", "player_2"],
+            random_seed=21,
+            apply_initial_selection=False,
+        )
+        state.players[0].agent_id = "human_cli_p1"
+        state.players[1].agent_id = GreedyBaselineAgent().agent_id
+        return state, _initial_selection_context(state)
+
+    def test_setup_table_shows_goals_feeder_tray_and_seats(self) -> None:
+        from wingspan_ai.agents.human_cli import setup_table_lines
+
+        state, context = self._game()
+        text = "\n".join(setup_table_lines(state.players[0], context))
+
+        for goal in state.round_goals:
+            self.assertIn(goal.name, text)
+        for face in state.birdfeeder.dice:
+            self.assertIn(face.value, text)
+        for card in state.bird_tray:
+            self.assertIn(card.common_name, text)
+        self.assertIn(state.players[1].agent_id, text)
+        self.assertEqual(len(context.birdfeeder_faces), len(state.birdfeeder.dice))
+
+    def test_setup_summary_hides_opponent_card_names(self) -> None:
+        import io
+        from contextlib import redirect_stdout
+
+        from wingspan_ai.rules.base_game import (
+            apply_initial_selection_choice,
+            choose_default_initial_selection,
+        )
+
+        state, _context = self._game()
+        opponent_hand = [card.common_name for card in state.players[1].hand]
+        for player in state.players:
+            apply_initial_selection_choice(player, choose_default_initial_selection(player))
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            HumanCliAgent(use_default_setup=False).observe_setup_complete(state)
+        text = buffer.getvalue()
+
+        self.assertIn(f"kept {len(state.players[1].hand)} bird", text)
+        for name in opponent_hand:
+            self.assertNotIn(name, text)

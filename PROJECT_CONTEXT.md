@@ -833,3 +833,43 @@ load-bearing rather than less.
 Two tasks added, and gap 2 is deliberately merged with the egg audit's defect 1:
 both are "the protection cannot see board-condition bonus cards", so one fix
 serves both and doing them separately costs twice.
+
+## Update: 2026-10-09 - Human play shows the table at setup
+
+### What changed
+
+Alex, playing `flows/human_vs_agent.py --seed 101 --seat 1`, could not see the
+round goals, birdfeeder or tray before choosing an opening, nor which agent he
+was playing, nor what the opponent kept. Fixed on branch `human-play-fixes`:
+
+- `InitialSelectionContext` carries `birdfeeder_faces` and `seat_agent_ids`;
+  the runner sets every seat's agent id before any seat chooses.
+- `HumanCliAgent` prints a setup screen (seats, R1–R4 goals with green-side
+  points, feeder dice, full tray cards) before the keep prompt, and accepts `0`
+  to keep no birds.
+- New runner hook `observe_setup_complete(state)`, called once after all
+  openings are applied: the human sees each seat's birds-kept count and starting
+  food. Opponent card names stay hidden. Observation only, so replay is
+  unchanged.
+- `human_vs_agent.py` prints the opponent and its search budget at start; its
+  `--help` lists every opponent with a description and explains what is shown.
+- `scripts/inspect_setup.py` reproduces every seat's dealt and kept opening for
+  a seed without playing (the method used to answer what p2 kept).
+
+### Why it matters
+
+The human-trace study compares human and agent openings. A human choosing
+without the goals and feeder in view would make an uninformed choice, not a human one.
+
+### Decision
+
+Seed 101 is spent for the study: its opponent hand has been inspected. In that
+seed `potential_points_p2` (`potential_points_setup_v4`) kept all five birds and
+no food. That is the registered keep-five follow-up from 2026-10-06, reproduced
+here (286/300 openings keep five at seeds 1–300), not a new defect.
+
+### Follow-up tasks
+
+- Show the opponent's last action at the start of the human's turn (seat 2 sees
+  the board after the agent has moved, but not what it did).
+

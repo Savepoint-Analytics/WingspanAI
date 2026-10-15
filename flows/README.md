@@ -11,6 +11,14 @@ Current flows:
   as a crossed factor. Supports 2-5 players. Writes `round_robin_summary.json` plus a
   markdown report with standings, per-seat win rates, seat-effect magnitude, a `seat_robust`
   flag per matchup, and a setup-policy effect table.
+- `human_vs_agent.py`: plays one archived, replay-validated game as a human against an AI agent
+  (default: the production `potential_points` agent, 5 s cap). Run with `--help` for the opponent
+  list. Before you choose an opening it prints the seats, the four round goals with their
+  points, the birdfeeder dice and the three tray birds; once every seat has chosen it prints
+  each seat's public setup result (birds kept, starting food). Review afterwards with
+  `analysis/game_viewer.py`. `scripts/inspect_setup.py --seed N --seat S` shows every seat's
+  dealt and kept opening for the same seed without playing (private information; a seed you
+  inspect is no longer a clean seed for the human-trace study).
 - `human_vs_greedy.py`: runs an interactive terminal game with `HumanCliAgent` against the greedy baseline. It uses the same legal action generation as automated agents, so human play is feasible without a separate UI.
 
 
