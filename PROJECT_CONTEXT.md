@@ -894,3 +894,20 @@ here (286/300 openings keep five at seeds 1–300), not a new defect.
 - Show the opponent's last action at the start of the human's turn (seat 2 sees
   the board after the agent has moved, but not what it did).
 
+
+
+## Update: 2026-10-15 - Validate the live Trello consumer
+### What changed
+Enabled the existing pinned caller for dedicated-card integration validation and
+added docs/trello-operations.md with operation and replay checks. Credentials and
+board configuration remain outside source. No simulator behavior changed.
+### Why it matters
+The dry-run consumer is installed on main. Hosted live validation must establish
+move/comment behavior, replay safety, and the Experiment completion guard before
+ordinary-use evidence is counted.
+### Decision
+Use a dedicated test card; exclude validation pushes from the ten-push usage
+milestone. Detailed activation evidence remains in the private trello-hub context.
+### Follow-up tasks
+- [ ] Verify hosted live results and start the fourteen-day ordinary-use ledger.
+- [ ] Investigate incorrect or missed moves before extending integration scope.
