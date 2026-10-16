@@ -92,6 +92,8 @@ Key rules docs:
 - `decisions/0003-random-seed-is-the-sole-reproducibility-key.md`: RNG namespace ADR.
 - `decisions/0004-cross-process-determinism-and-canonical-set-ordering.md`: cross-process determinism ADR.
 - `decisions/0005-artifact-storage-is-object-storage.md`: artifacts are durable in MinIO; local `artifacts/` is a prunable cache.
+- `decisions/0006_game_identity_is_the_run_id.md`: the run id, not the game id, is a game's identity in the database.
+- `decisions/0007-power-decisions-resolve-through-a-per-player-seam.md`: (proposed) choices inside bird powers resolve through a per-player `DecisionResolver` seam with today's rules frozen as the bit-identical default; only bit-identical seam work lands before the human games.
 - `rules/expansion_configuration.md`: packs + rules modules, ruleset ids, the engine's module gate, per-expansion rule deltas with rulebook pages (European, Oceania, Asia), the nine gates before a ruleset's first ledger row, and the phase order.
 - `rules/birdfeeder_dice.md`: the six-face die, reroll/refill rules, and derived probabilities.
 - `rules/bonus_card_composition.md`: the 26 core bonus cards are the base-game deck; Bird Bander and Diet Specialist are European.

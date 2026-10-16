@@ -1,7 +1,7 @@
 # Power decision methods: who chooses inside a bird power, and how
 
 Status: **draft plan for Alex's review, 2026-10-08. Nothing here is adopted or
-built.** Answers the gap named at the top of `docs/rules/power_handler_registry.md`
+built.** Decision record: `docs/decisions/0007-power-decisions-resolve-through-a-per-player-seam.md` (proposed 2026-10-15). Answers the gap named at the top of `docs/rules/power_handler_registry.md`
 and audited in `docs/rules/hidden_power_choices.md`: in 16 handlers covering 112 of
 180 powered birds, a choice the rules give the player is made by a fixed rule
 inside the transition function. Companion audits: `egg_spending_fidelity.md`,
