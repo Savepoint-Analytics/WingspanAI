@@ -835,26 +835,6 @@ both are "the protection cannot see board-condition bonus cards", so one fix
 serves both and doing them separately costs twice.
 
 
-## Update: 2026-10-14 - Prepare Trello consumer in dry-run mode
-
-### What changed
-Added a pinned caller for oz-tmg/trello-hub. SPWF_CONFIG holds board configuration
-in Actions variables; credentials are named Actions secrets. SPWF_LIVE is false.
-No existing CI workflow was present, so CI-failure forwarding is not enabled.
-
-### Why it matters
-GitHub events can be previewed without executing consumer branch code or changing
-Trello. Live validation uses a dedicated integration test card and is separate
-from ordinary research activity; no simulator or research-policy code changed.
-
-### Decision
-Use the same reviewed full SHA for the workflow and runner. Enable live mode
-only after the dry-run is verified and this PR passes the required review.
-
-### Follow-up tasks
-- [ ] Approve and merge the caller through the protected-branch review process.
-- [ ] Validate a dedicated card live, including replay and Experiment guards.
-- [ ] Start the two-week ordinary-use record after successful activation.
 ## Update: 2026-10-09 - Human play shows the table at setup
 
 ### What changed
@@ -895,6 +875,26 @@ here (286/300 openings keep five at seeds 1–300), not a new defect.
   the board after the agent has moved, but not what it did).
 
 
+## Update: 2026-10-14 - Prepare Trello consumer in dry-run mode
+
+### What changed
+Added a pinned caller for oz-tmg/trello-hub. SPWF_CONFIG holds board configuration
+in Actions variables; credentials are named Actions secrets. SPWF_LIVE is false.
+No existing CI workflow was present, so CI-failure forwarding is not enabled.
+
+### Why it matters
+GitHub events can be previewed without executing consumer branch code or changing
+Trello. Live validation uses a dedicated integration test card and is separate
+from ordinary research activity; no simulator or research-policy code changed.
+
+### Decision
+Use the same reviewed full SHA for the workflow and runner. Enable live mode
+only after the dry-run is verified and this PR passes the required review.
+
+### Follow-up tasks
+- [ ] Approve and merge the caller through the protected-branch review process.
+- [ ] Validate a dedicated card live, including replay and Experiment guards.
+- [ ] Start the two-week ordinary-use record after successful activation.
 
 ## Update: 2026-10-15 - Validate the live Trello consumer
 ### What changed
@@ -911,3 +911,31 @@ milestone. Detailed activation evidence remains in the private trello-hub contex
 ### Follow-up tasks
 - [ ] Verify hosted live results and start the fourteen-day ordinary-use ledger.
 - [ ] Investigate incorrect or missed moves before extending integration scope.
+
+## Update: 2026-10-15 (later) - Branches merged; resolver-seam ADR proposed
+
+### What changed
+PRs #1–#4 are merged and `main` is unblocked (the branch-protection rule now
+requires a PR but zero approvals, since Alex is the only reviewer). The five
+fully merged remote branches are to be deleted. The 2026-10-09 and 2026-10-14
+updates above were swapped back into date order after PR #2's conflict
+resolution. `docs/decisions/0007-power-decisions-resolve-through-a-per-player-seam.md`
+turns the draft plan in `power_decision_methods.md` into a **proposed** ADR;
+nothing is accepted or built.
+
+### Why it matters
+The ten human games are priority 1 and their registration names the agent
+configuration the human faces. The ADR writes down the sequencing that
+follows: plan tasks 1–3 (seam, frozen legacy resolver, telemetry, registry
+fields) are gated on `base_game_bit_identity.py` and may land during the study;
+tasks 4–9 change the champion's choices and wait until game ten is archived.
+
+### Decision
+None yet. Open for Alex: accept or amend ADR 0007, and check findings A
+(every brown power optional) and B (`pink_reaction` makes three hidden choices)
+against the rulebook, since both widen the decision-kind inventory.
+
+### Follow-up tasks
+- [ ] Alex: rulebook check of findings A and B; accept/amend ADR 0007.
+- [ ] If accepted: plan task 1 (seam + `LegacyHeuristicResolver`), bit-identity guard identical, full suite green.
+- [ ] Reconcile the 174 vs 180 powered-card count between `power_handler_registry.md` and `hidden_power_choices.md`.
